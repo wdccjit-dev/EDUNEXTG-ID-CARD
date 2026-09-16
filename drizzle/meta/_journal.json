@@ -1,0 +1,48 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1789471729003,
+      "tag": "0000_ordinary_runaways",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1789533532067,
+      "tag": "0001_tense_diamondback",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1789533983382,
+      "tag": "0002_normalize_school_id_cards",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1789534497522,
+      "tag": "0003_school_template_locking",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1789535418469,
+      "tag": "0004_application_auth_passwords",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1789538676302,
+      "tag": "0005_foamy_thunderbird",
+      "breakpoints": true
+    }
+  ]
+}
