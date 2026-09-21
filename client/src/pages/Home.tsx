@@ -249,6 +249,7 @@ export default function Home({
           "Overview",
           "ID card templates",
           "ID card requests",
+          "Approved cards",
           "Notifications",
         ].includes(label),
       );
@@ -2896,42 +2897,46 @@ function ModuleView({
               />
             </div>
 
-            {/* Bulk Actions Toolbar */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-[#84918e] mr-2">
-                {selectedApprovedCardIds.length} of {approvedCards.length} selected
-              </span>
-              <Button
-                variant="outline"
-                onClick={onBulkPrint}
-                disabled={selectedApprovedCardIds.length === 0}
-                className="h-10 rounded-xl text-xs font-bold border-[#e2e8e3]"
-              >
-                <Printer className="w-4 h-4 mr-1.5 text-[#0f7f79]" /> Bulk Print
-              </Button>
-              <Button
-                onClick={onBulkPdf}
-                disabled={selectedApprovedCardIds.length === 0}
-                className="h-10 rounded-xl bg-[#0f7f79] hover:bg-[#096c67] text-xs font-bold text-white"
-              >
-                <Download className="w-4 h-4 mr-1.5" /> Download PDF
-              </Button>
-            </div>
+            {/* Bulk Actions Toolbar (Admin only) */}
+            {authenticatedUser.role === "SUPER_ADMIN" && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-[#84918e] mr-2">
+                  {selectedApprovedCardIds.length} of {approvedCards.length} selected
+                </span>
+                <Button
+                  variant="outline"
+                  onClick={onBulkPrint}
+                  disabled={selectedApprovedCardIds.length === 0}
+                  className="h-10 rounded-xl text-xs font-bold border-[#e2e8e3]"
+                >
+                  <Printer className="w-4 h-4 mr-1.5 text-[#0f7f79]" /> Bulk Print
+                </Button>
+                <Button
+                  onClick={onBulkPdf}
+                  disabled={selectedApprovedCardIds.length === 0}
+                  className="h-10 rounded-xl bg-[#0f7f79] hover:bg-[#096c67] text-xs font-bold text-white"
+                >
+                  <Download className="w-4 h-4 mr-1.5" /> Download PDF
+                </Button>
+              </div>
+            )}
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-[#f8faf8] border-b border-[#edf0ed] text-[#84918e] uppercase tracking-wider font-semibold">
                 <tr>
-                  <th className="px-5 py-3.5 w-12 text-center">
-                    <Checkbox
-                      checked={
-                        allApprovedCardIds.length > 0 &&
-                        selectedApprovedCardIds.length === allApprovedCardIds.length
-                      }
-                      onCheckedChange={() => onSelectAllApproved(allApprovedCardIds)}
-                    />
-                  </th>
+                  {authenticatedUser.role === "SUPER_ADMIN" && (
+                    <th className="px-5 py-3.5 w-12 text-center">
+                      <Checkbox
+                        checked={
+                          allApprovedCardIds.length > 0 &&
+                          selectedApprovedCardIds.length === allApprovedCardIds.length
+                        }
+                        onCheckedChange={() => onSelectAllApproved(allApprovedCardIds)}
+                      />
+                    </th>
+                  )}
                   <th className="px-5 py-3.5">Card Number</th>
                   <th className="px-5 py-3.5">School</th>
                   <th className="px-5 py-3.5">Template</th>
@@ -2942,19 +2947,21 @@ function ModuleView({
               <tbody className="divide-y divide-[#edf0ed]">
                 {approvedCards.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-5 py-10 text-center text-[#98a4a1]">
-                      No approved cards found. Submit cards and approve them to print here.
+                    <td colSpan={authenticatedUser.role === "SUPER_ADMIN" ? 6 : 5} className="px-5 py-10 text-center text-[#98a4a1]">
+                      No approved cards found. Submit cards and approve them to view here.
                     </td>
                   </tr>
                 ) : (
                   approvedCards.map((card) => (
                     <tr key={card.id} className="hover:bg-[#fbfdfb] transition-colors">
-                      <td className="px-5 py-4 text-center">
-                        <Checkbox
-                          checked={selectedApprovedCardIds.includes(card.id)}
-                          onCheckedChange={() => onToggleSelectApproved(card.id)}
-                        />
-                      </td>
+                      {authenticatedUser.role === "SUPER_ADMIN" && (
+                        <td className="px-5 py-4 text-center">
+                          <Checkbox
+                            checked={selectedApprovedCardIds.includes(card.id)}
+                            onCheckedChange={() => onToggleSelectApproved(card.id)}
+                          />
+                        </td>
+                      )}
                       <td className="px-5 py-4 font-mono font-bold text-[#203734]">
                         {card.cardNumber}
                       </td>
@@ -2971,12 +2978,14 @@ function ModuleView({
                       </td>
                       <td className="px-5 py-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            onClick={() => onPrintCard(card.id)}
-                            className="rounded-lg bg-[#e1f3ed] px-2.5 py-1.5 text-[11px] font-bold text-[#0a716b] hover:bg-[#cbf0e4]"
-                          >
-                            <Printer className="inline w-3 h-3 mr-1" /> Print / PDF
-                          </button>
+                          {authenticatedUser.role === "SUPER_ADMIN" && (
+                            <button
+                              onClick={() => onPrintCard(card.id)}
+                              className="rounded-lg bg-[#e1f3ed] px-2.5 py-1.5 text-[11px] font-bold text-[#0a716b] hover:bg-[#cbf0e4]"
+                            >
+                              <Printer className="inline w-3 h-3 mr-1" /> Print / PDF
+                            </button>
+                          )}
                           <button
                             onClick={() => onOpenReview(card.id)}
                             className="rounded-lg bg-[#f0efec] px-2.5 py-1.5 text-[11px] font-bold text-[#55605d] hover:bg-[#e4e2de]"

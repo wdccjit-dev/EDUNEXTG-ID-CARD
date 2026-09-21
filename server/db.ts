@@ -97,27 +97,33 @@ export async function getUserByOpenId(openId: string) {
 
 // --- Schools ---------------------------------------------------------------
 
-export async function listSchools() {
+export async function listSchools(schoolId?: number) {
   const db = await getDb();
   if (!db) return [];
+  if (schoolId) {
+    return db.select().from(schools).where(eq(schools.id, schoolId));
+  }
   return db.select().from(schools).orderBy(desc(schools.createdAt));
 }
 
 // --- ID card templates -------------------------------------------------------
 
-export async function listIdCardTemplates() {
+export async function listIdCardTemplates(onlyActive = false) {
   const db = await getDb();
   if (!db) return [];
+  if (onlyActive) {
+    return db.select().from(idCardTemplates).where(eq(idCardTemplates.status, "ACTIVE")).orderBy(desc(idCardTemplates.createdAt));
+  }
   return db.select().from(idCardTemplates).orderBy(desc(idCardTemplates.createdAt));
 }
 
 // --- ID card requests --------------------------------------------------------
 
-export async function listIdCardRequests() {
+export async function listIdCardRequests(schoolId?: number) {
   const db = await getDb();
   if (!db) return [];
 
-  return db
+  const query = db
     .select({
       id: idCardRequests.id,
       studentName: idCardRequests.studentName,
@@ -130,8 +136,13 @@ export async function listIdCardRequests() {
       schoolName: schools.name,
     })
     .from(idCardRequests)
-    .innerJoin(schools, eq(idCardRequests.schoolId, schools.id))
-    .orderBy(desc(idCardRequests.submittedAt));
+    .innerJoin(schools, eq(idCardRequests.schoolId, schools.id));
+
+  if (schoolId) {
+    return query.where(eq(idCardRequests.schoolId, schoolId)).orderBy(desc(idCardRequests.submittedAt));
+  }
+
+  return query.orderBy(desc(idCardRequests.submittedAt));
 }
 
 export async function approveIdCardRequest(id: number) {

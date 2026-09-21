@@ -19,17 +19,31 @@ export interface CardPdfData {
   cardData: Record<string, string>;
 }
 
-/** Helper to extract image buffer from data URL or remote/local url */
+import fs from "fs";
+
+/** Helper to extract image buffer from data URL, raw base64, or local file */
 function bufferFromDataUrl(dataUrl: string): Buffer | null {
   try {
-    if (dataUrl.startsWith("data:")) {
-      const match = dataUrl.match(/^data:[^;]+;base64,(.+)$/);
-      if (match && match[1]) {
-        return Buffer.from(match[1], "base64");
+    const trimmed = dataUrl.trim();
+    if (trimmed.startsWith("data:")) {
+      const commaIdx = trimmed.indexOf(",");
+      if (commaIdx !== -1) {
+        const base64Str = trimmed.slice(commaIdx + 1).replace(/[\r\n\s]/g, "");
+        return Buffer.from(base64Str, "base64");
       }
     }
+    // Check if raw base64 string
+    const cleanRaw = trimmed.replace(/[\r\n\s]/g, "");
+    if (/^[A-Za-z0-9+/=]{50,}$/.test(cleanRaw)) {
+      return Buffer.from(cleanRaw, "base64");
+    }
+    // Check if local file path
+    if (fs.existsSync(trimmed)) {
+      return fs.readFileSync(trimmed);
+    }
     return null;
-  } catch {
+  } catch (err) {
+    console.warn("[PDF] Failed to parse image buffer:", err);
     return null;
   }
 }
@@ -169,20 +183,14 @@ async function renderCardSide(
               align: "center",
               valign: "center",
             });
-          } catch {
-            doc.rect(x, y, w, h).fill("#e0e0e0");
-            doc.fillColor("#666666").fontSize(8).text(el.label || el.elementType, x, y + h / 2 - 4, {
-              width: w,
-              align: "center",
-            });
+          } catch (imgErr) {
+            console.warn(`[PDF] Error rendering image for element '${el.elementKey}' (${el.elementType}):`, imgErr);
+            // Visual placeholder without any text (never print the word "IMAGE" or element labels)
+            doc.rect(x, y, w, h).fill("#f3f4f6");
           }
         } else {
-          // Placeholder box
-          doc.rect(x, y, w, h).fill("#f3f4f6");
-          doc.fillColor("#999999").fontSize(7).text(el.label || el.elementType, x, y + h / 2 - 4, {
-            width: w,
-            align: "center",
-          });
+          // Placeholder box without any text printed into the PDF
+          doc.rect(x, y, w, h).fill("#f9fafb");
         }
         break;
       }
