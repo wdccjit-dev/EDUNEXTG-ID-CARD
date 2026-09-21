@@ -50,6 +50,13 @@
       "when": 1789540000000,
       "tag": "0006_longtext_id_card_data_files",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1789993883114,
+      "tag": "0007_vengeful_red_ghost",
+      "breakpoints": true
     }
   ]
 }

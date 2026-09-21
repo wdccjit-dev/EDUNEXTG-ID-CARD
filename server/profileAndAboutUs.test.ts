@@ -5,7 +5,7 @@ import { apiRouter } from "./api";
 import { getDb } from "./db";
 import { schools, users, type User } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
-import { hashPassword, loginUser, verifyPassword } from "./appAuth";
+import { authenticateApplicationRequest, hashPassword, loginUser, verifyPassword } from "./appAuth";
 
 describe("Super Admin Profile, About Us, and Test Account Isolation", () => {
   let db: Awaited<ReturnType<typeof getDb>>;
@@ -54,6 +54,9 @@ describe("Super Admin Profile, About Us, and Test Account Isolation", () => {
           return this;
         },
         setHeader() {
+          return this;
+        },
+        cookie() {
           return this;
         },
         clearCookie() {
@@ -300,13 +303,15 @@ describe("Super Admin Profile, About Us, and Test Account Isolation", () => {
     });
 
     it("successfully changes password with valid credentials and persists hashed password", async () => {
-      const res = await makeRequest("POST", "/api/profile/password", adminToken, {
+      const oldToken = adminToken;
+      const res = await makeRequest("POST", "/api/profile/password", oldToken, {
         currentPassword: originalAdminPassword,
         newPassword: newAdminPassword,
         confirmNewPassword: newAdminPassword,
       });
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
+      expect(res.body.token).toBeDefined();
 
       // Verify that the new password works for login
       const newLogin = await loginUser(testAdminUser.email!, newAdminPassword);
@@ -316,6 +321,26 @@ describe("Super Admin Profile, About Us, and Test Account Isolation", () => {
       // Verify that old password no longer works
       const oldLogin = await loginUser(testAdminUser.email!, originalAdminPassword);
       expect(oldLogin).toBeNull();
+
+      // Verify that old session token is invalidated
+      const oldAuth = await authenticateApplicationRequest({
+        headers: { authorization: `Bearer ${oldToken}` },
+      } as any);
+      expect(oldAuth).toBeNull();
+
+      // Verify that new session token is valid
+      const newAuth = await authenticateApplicationRequest({
+        headers: { authorization: `Bearer ${res.body.token}` },
+      } as any);
+      expect(newAuth).not.toBeNull();
+      expect(newAuth?.id).toBe(testAdminUser.id);
+
+      // Verify only 1 record exists in users (no duplicate created)
+      const userRecords = await db!.select().from(users).where(eq(users.id, testAdminUser.id));
+      expect(userRecords).toHaveLength(1);
+
+      // Update adminToken for downstream tests in this suite
+      adminToken = res.body.token;
     });
   });
 

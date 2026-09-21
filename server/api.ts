@@ -1,5 +1,5 @@
 import { Router, type NextFunction, type Request, type Response } from "express";
-import { and, desc, eq, inArray, ne } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, ne } from "drizzle-orm";
 import {
   approvalHistory,
   auditLogs,
@@ -9,6 +9,7 @@ import {
   idCardTemplates,
   idCards,
   notifications,
+  passwordResets,
   schoolTemplates,
   templateElements,
   schools,
@@ -17,7 +18,7 @@ import {
 } from "../drizzle/schema";
 import { getDb } from "./db";
 import { ENV } from "./_core/env";
-import { authenticateApplicationRequest, clearApplicationSession, createPasswordReset, hashPassword, loginUser, resetPassword, setApplicationSession, verifyPassword } from "./appAuth";
+import { authenticateApplicationRequest, clearApplicationSession, createPasswordReset, hashPassword, loginUser, resetPassword, setApplicationSession, signApplicationSession, verifyPassword } from "./appAuth";
 import { generateSingleCardPdf, generateBulkCardPdf, type CardPdfData } from "./pdf";
 
 const router = Router();
@@ -277,11 +278,19 @@ router.post("/profile/password", requireRole(adminRoles), async (req, res) => {
 
     const newHash = await hashPassword(newPassword);
     await db.update(users).set({ passwordHash: newHash, updatedAt: new Date() }).where(eq(users.id, user.id));
+    // Invalidate any unexpired password reset tokens for this user
+    await db.update(passwordResets).set({ usedAt: new Date() }).where(and(eq(passwordResets.userId, user.id), isNull(passwordResets.usedAt)));
     await audit(user, "CHANGE_PASSWORD", "user", user.id, null, null);
+
+    // Fetch the updated user and sign a fresh session token
+    const refreshedUser = (await db.select().from(users).where(eq(users.id, user.id)))[0];
+    const newToken = await signApplicationSession(refreshedUser ?? { ...user, passwordHash: newHash });
+    await setApplicationSession(res, newToken);
 
     res.json({
       success: true,
       message: "Password changed successfully.",
+      token: newToken,
     });
   } catch (e) {
     console.error("[Profile Password Error]", e);
