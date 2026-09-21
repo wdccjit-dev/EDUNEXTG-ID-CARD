@@ -335,14 +335,15 @@ describe("Complete 16-Step End-to-End Real Workflow QA", () => {
   });
 
   // 7. Create ID card
-  it("Step 7: School creates ID card draft with auto-generated card number", async () => {
+  it("Step 7: Admin creates ID card draft for school with auto-generated card number", async () => {
     const res = await fetch(`${baseUrl}/api/id-cards`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${schoolToken}`,
+        Authorization: `Bearer ${adminToken}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
+        schoolId,
         templateId,
         data: {
           student_name: "Benjamin Vance",
@@ -362,14 +363,14 @@ describe("Complete 16-Step End-to-End Real Workflow QA", () => {
   });
 
   // 8. Upload photo/signature
-  it("Step 8: Upload photo via /api/upload and attach to ID card files", async () => {
+  it("Step 8: Admin uploads photo via /api/upload and attaches to ID card files", async () => {
     // 1x1 transparent PNG sample base64
     const samplePhotoBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
 
     const uploadRes = await fetch(`${baseUrl}/api/upload`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${schoolToken}`,
+        Authorization: `Bearer ${adminToken}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -387,7 +388,7 @@ describe("Complete 16-Step End-to-End Real Workflow QA", () => {
     const fileRes = await fetch(`${baseUrl}/api/id-cards/${cardId}/files`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${schoolToken}`,
+        Authorization: `Bearer ${adminToken}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -403,11 +404,11 @@ describe("Complete 16-Step End-to-End Real Workflow QA", () => {
   });
 
   // 9. Save draft
-  it("Step 9: Save draft updates fields and persists to database", async () => {
+  it("Step 9: Admin saves draft, updates fields, and School can view card details", async () => {
     const res = await fetch(`${baseUrl}/api/id-cards/${cardId}`, {
       method: "PUT",
       headers: {
-        Authorization: `Bearer ${schoolToken}`,
+        Authorization: `Bearer ${adminToken}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -420,7 +421,7 @@ describe("Complete 16-Step End-to-End Real Workflow QA", () => {
 
     expect(res.status).toBe(200);
 
-    // Verify persistence after simulated refresh
+    // Verify persistence after simulated refresh by school
     const getRes = await fetch(`${baseUrl}/api/id-cards/${cardId}`, {
       headers: { Authorization: `Bearer ${schoolToken}` },
     });
@@ -434,11 +435,11 @@ describe("Complete 16-Step End-to-End Real Workflow QA", () => {
   });
 
   // 10. Submit for approval
-  it("Step 10: Submit card for approval transitions status from DRAFT to SUBMITTED", async () => {
+  it("Step 10: Admin submits card for school approval, status transitions to SUBMITTED", async () => {
     const res = await fetch(`${baseUrl}/api/id-cards/${cardId}/submit`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${schoolToken}`,
+        Authorization: `Bearer ${adminToken}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -450,7 +451,7 @@ describe("Complete 16-Step End-to-End Real Workflow QA", () => {
     const body = await res.json();
     expect(body.status).toBe("SUBMITTED");
 
-    // Verify card status in DB
+    // Verify card status in DB via school view
     const cardRes = await fetch(`${baseUrl}/api/id-cards/${cardId}`, {
       headers: { Authorization: `Bearer ${schoolToken}` },
     });
@@ -458,33 +459,24 @@ describe("Complete 16-Step End-to-End Real Workflow QA", () => {
     expect(card.status).toBe("SUBMITTED");
   });
 
-  // 11. Admin review
-  it("Step 11: Admin inspects card and starts review (UNDER_REVIEW)", async () => {
-    // Admin reads card details
+  // 11. School inspects card
+  it("Step 11: School inspects submitted card in their queue", async () => {
+    // School reads card details
     const getRes = await fetch(`${baseUrl}/api/id-cards/${cardId}`, {
-      headers: { Authorization: `Bearer ${adminToken}` },
+      headers: { Authorization: `Bearer ${schoolToken}` },
     });
     expect(getRes.status).toBe(200);
     const card = await getRes.json();
     expect(card.status).toBe("SUBMITTED");
     expect(card.schoolId).toBe(schoolId);
-
-    // Admin starts review
-    const reviewRes = await fetch(`${baseUrl}/api/id-cards/${cardId}/review`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${adminToken}` },
-    });
-    expect(reviewRes.status).toBe(200);
-    const reviewBody = await reviewRes.json();
-    expect(reviewBody.status).toBe("UNDER_REVIEW");
   });
 
   // 12. Request changes
-  it("Step 12: Admin requests changes with mandatory comment, status becomes CHANGES_REQUIRED", async () => {
+  it("Step 12: School requests changes with mandatory comment, status becomes CHANGES_REQUIRED", async () => {
     const res = await fetch(`${baseUrl}/api/id-cards/${cardId}/request-changes`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${adminToken}`,
+        Authorization: `Bearer ${schoolToken}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -497,22 +489,22 @@ describe("Complete 16-Step End-to-End Real Workflow QA", () => {
     expect(body.status).toBe("CHANGES_REQUIRED");
   });
 
-  // 13. School edit and resubmit
-  it("Step 13: School updates corrected student name and resubmits (RESUBMITTED)", async () => {
-    // Verify school sees the change request comment
+  // 13. Admin edit and resubmit
+  it("Step 13: Admin updates corrected student name and resubmits (RESUBMITTED)", async () => {
+    // Verify admin sees the change request comment
     const getRes = await fetch(`${baseUrl}/api/id-cards/${cardId}`, {
-      headers: { Authorization: `Bearer ${schoolToken}` },
+      headers: { Authorization: `Bearer ${adminToken}` },
     });
     const detail = await getRes.json();
     expect(detail.status).toBe("CHANGES_REQUIRED");
     const lastHistory = detail.approvalHistory[detail.approvalHistory.length - 1];
     expect(lastHistory.comments).toContain("middle initial");
 
-    // School edits card
+    // Admin edits card
     const editRes = await fetch(`${baseUrl}/api/id-cards/${cardId}`, {
       method: "PUT",
       headers: {
-        Authorization: `Bearer ${schoolToken}`,
+        Authorization: `Bearer ${adminToken}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -523,11 +515,11 @@ describe("Complete 16-Step End-to-End Real Workflow QA", () => {
     });
     expect(editRes.status).toBe(200);
 
-    // School resubmits
+    // Admin resubmits
     const submitRes = await fetch(`${baseUrl}/api/id-cards/${cardId}/submit`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${schoolToken}`,
+        Authorization: `Bearer ${adminToken}`,
         "Content-Type": "application/json",
       },
     });
@@ -536,17 +528,17 @@ describe("Complete 16-Step End-to-End Real Workflow QA", () => {
     expect(submitBody.status).toBe("RESUBMITTED");
   });
 
-  // 14. Admin approve
-  it("Step 14: Admin approves the card (APPROVED), card becomes read-only and immutable", async () => {
+  // 14. School approve
+  it("Step 14: School approves the card (APPROVED); School attempts to edit or delete return 403 Forbidden", async () => {
     const approveRes = await fetch(`${baseUrl}/api/id-cards/${cardId}/approve`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${adminToken}` },
+      headers: { Authorization: `Bearer ${schoolToken}` },
     });
     expect(approveRes.status).toBe(200);
     const body = await approveRes.json();
     expect(body.status).toBe("APPROVED");
 
-    // Verify card cannot be edited once approved
+    // Verify card cannot be edited by School
     const editRes = await fetch(`${baseUrl}/api/id-cards/${cardId}`, {
       method: "PUT",
       headers: {
@@ -555,20 +547,27 @@ describe("Complete 16-Step End-to-End Real Workflow QA", () => {
       },
       body: JSON.stringify({ data: { student_name: "Sneaky Update" } }),
     });
-    expect(editRes.status).toBe(400);
+    expect(editRes.status).toBe(403);
 
-    // Verify card cannot be deleted once approved
+    // Verify card cannot be deleted by School
     const delRes = await fetch(`${baseUrl}/api/id-cards/${cardId}`, {
       method: "DELETE",
       headers: { Authorization: `Bearer ${schoolToken}` },
     });
-    expect(delRes.status).toBe(400);
+    expect(delRes.status).toBe(403);
   });
 
   // 15. Generate PDF
-  it("Step 15: Generate PDF endpoint outputs valid vector PDF stream matching card", async () => {
-    const res = await fetch(`${baseUrl}/api/id-cards/${cardId}/pdf`, {
+  it("Step 15: Admin generates PDF endpoint matching card; School download attempt returns 403", async () => {
+    // School attempt returns 403
+    const schoolPdfRes = await fetch(`${baseUrl}/api/id-cards/${cardId}/pdf`, {
       headers: { Authorization: `Bearer ${schoolToken}` },
+    });
+    expect(schoolPdfRes.status).toBe(403);
+
+    // Admin attempt returns 200
+    const res = await fetch(`${baseUrl}/api/id-cards/${cardId}/pdf`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
     });
 
     expect(res.status).toBe(200);
@@ -583,10 +582,18 @@ describe("Complete 16-Step End-to-End Real Workflow QA", () => {
   });
 
   // 16. Print card
-  it("Step 16: Print card endpoint transitions status from APPROVED to PRINTED and records timestamp", async () => {
-    const printRes = await fetch(`${baseUrl}/api/id-cards/${cardId}/print`, {
+  it("Step 16: Admin prints card (transitions to PRINTED); School print attempt returns 403", async () => {
+    // School print returns 403
+    const schoolPrintRes = await fetch(`${baseUrl}/api/id-cards/${cardId}/print`, {
       method: "POST",
       headers: { Authorization: `Bearer ${schoolToken}` },
+    });
+    expect(schoolPrintRes.status).toBe(403);
+
+    // Admin print succeeds
+    const printRes = await fetch(`${baseUrl}/api/id-cards/${cardId}/print`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${adminToken}` },
     });
 
     expect(printRes.status).toBe(200);

@@ -110,35 +110,199 @@ router.post("/auth/reset-password", async (req, res) => { try { const token = St
 
 router.use(auth);
 
+async function attachSchoolTemplateMeta(db: any, schoolList: any[]) {
+  if (!schoolList.length) return [];
+  const defaultTemplates = await db
+    .select({
+      schoolId: schoolTemplates.schoolId,
+      templateId: schoolTemplates.templateId,
+      isDefault: schoolTemplates.isDefault,
+      templateName: idCardTemplates.name,
+      accent: idCardTemplates.accent,
+      orientation: idCardTemplates.orientation,
+      status: idCardTemplates.status,
+    })
+    .from(schoolTemplates)
+    .innerJoin(idCardTemplates, eq(schoolTemplates.templateId, idCardTemplates.id))
+    .where(eq(schoolTemplates.isDefault, true));
+
+  const templateMap = new Map<number, (typeof defaultTemplates)[0]>();
+  for (const dt of defaultTemplates) {
+    templateMap.set(dt.schoolId, dt);
+  }
+
+  return schoolList.map((s) => {
+    const tmpl = templateMap.get(s.id);
+    return {
+      ...s,
+      selectedTemplateId: tmpl?.templateId ?? null,
+      selectedTemplateName: tmpl?.templateName ?? null,
+      templateSelectionStatus: tmpl ? ("Selected" as const) : ("Not Selected" as const),
+      selectedTemplate: tmpl
+        ? {
+            id: tmpl.templateId,
+            name: tmpl.templateName,
+            accent: tmpl.accent,
+            orientation: tmpl.orientation,
+            status: tmpl.status,
+          }
+        : null,
+    };
+  });
+}
+
 router.get("/schools", async (_req, res) => {
   try {
     const db = await getDb();
     if (!db) return res.status(503).json({ error: "Database not available" });
     const user = currentUser(res);
-    const rows = adminRoles.has(user.role) ? await db.select().from(schools).orderBy(desc(schools.createdAt)) : user.schoolId ? await db.select().from(schools).where(eq(schools.id, user.schoolId)) : [];
-    res.json(rows);
-  } catch (e) { fail(res, e); }
+    const rows = adminRoles.has(user.role)
+      ? await db.select().from(schools).orderBy(desc(schools.createdAt))
+      : user.schoolId
+      ? await db.select().from(schools).where(eq(schools.id, user.schoolId))
+      : [];
+    const enriched = await attachSchoolTemplateMeta(db, rows);
+    res.json(enriched);
+  } catch (e) {
+    fail(res, e);
+  }
 });
 
 router.post("/schools", requireRole(adminRoles), async (req, res) => {
   try {
     const db = await getDb();
     if (!db) return res.status(503).json({ error: "Database not available" });
-    const result = await db.insert(schools).values({ name: String(req.body.name), shortCode: String(req.body.shortCode), email: req.body.email ?? null, phone: req.body.phone ?? null, address: req.body.address ?? null });
+    const shortCode = String(req.body.shortCode).trim();
+    const result = await db.insert(schools).values({
+      name: String(req.body.name).trim(),
+      shortCode,
+      email: req.body.email ?? null,
+      phone: req.body.phone ?? null,
+      address: req.body.address ?? null,
+    });
     const id = Number(result[0].insertId);
     await audit(currentUser(res), "CREATE_SCHOOL", "school", id, id, req.body);
-    res.status(201).json((await db.select().from(schools).where(eq(schools.id, id)))[0]);
-  } catch (e) { fail(res, e); }
+
+    // Auto-generate Login ID and ID Pass / Password for newly created school
+    const cleanCode = shortCode.replace(/[^a-zA-Z0-9]/g, "").toUpperCase() || `SCH${id}`;
+    let loginId = req.body.loginId && String(req.body.loginId).trim()
+      ? String(req.body.loginId).trim()
+      : `SCH_${cleanCode}`;
+
+    // Ensure loginId uniqueness in users.openId
+    const existingOpenId = (await db.select({ id: users.id }).from(users).where(eq(users.openId, loginId)))[0];
+    if (existingOpenId) {
+      loginId = `SCH_${cleanCode}_${id}`;
+    }
+
+    const rawPassword = req.body.password && String(req.body.password).length >= 8
+      ? String(req.body.password)
+      : `Pass@${cleanCode}${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const userEmail = req.body.email && String(req.body.email).trim()
+      ? String(req.body.email).trim()
+      : `${loginId.toLowerCase()}@edunextg.com`;
+
+    const passwordHash = await hashPassword(rawPassword);
+
+    await db.insert(users).values({
+      openId: loginId,
+      name: `${String(req.body.name).trim()} Administrator`,
+      email: userEmail,
+      passwordHash,
+      loginMethod: "local",
+      role: "SCHOOL_ADMIN",
+      schoolId: id,
+      isActive: true,
+    });
+
+    const schoolRow = (await db.select().from(schools).where(eq(schools.id, id)))[0];
+    const withTemplate = (await attachSchoolTemplateMeta(db, [schoolRow]))[0];
+
+    res.status(201).json({
+      ...withTemplate,
+      credentials: {
+        loginId,
+        email: userEmail,
+        password: rawPassword,
+      },
+    });
+  } catch (e) {
+    fail(res, e);
+  }
+});
+
+router.post("/schools/:id/credentials", requireRole(adminRoles), async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const db = await getDb();
+    if (!db) return res.status(503).json({ error: "Database not available" });
+    const school = (await db.select().from(schools).where(eq(schools.id, id)))[0];
+    if (!school) return res.status(404).json({ error: "School not found" });
+
+    const cleanCode = school.shortCode.replace(/[^a-zA-Z0-9]/g, "").toUpperCase() || `SCH${id}`;
+    let loginId = `SCH_${cleanCode}`;
+    const rawPassword = req.body.password && String(req.body.password).length >= 8
+      ? String(req.body.password)
+      : `Pass@${cleanCode}${Math.floor(1000 + Math.random() * 9000)}`;
+    const passwordHash = await hashPassword(rawPassword);
+
+    // Find existing SCHOOL_ADMIN user for this school, or create one
+    const existingUser = (
+      await db
+        .select()
+        .from(users)
+        .where(and(eq(users.schoolId, id), eq(users.role, "SCHOOL_ADMIN")))
+    )[0];
+
+    let userEmail = school.email ? String(school.email).trim() : `${loginId.toLowerCase()}@edunextg.com`;
+
+    if (existingUser) {
+      await db.update(users).set({ passwordHash, updatedAt: new Date() }).where(eq(users.id, existingUser.id));
+      loginId = existingUser.openId;
+      userEmail = existingUser.email || userEmail;
+    } else {
+      const existingWithOpenId = (await db.select({ id: users.id }).from(users).where(eq(users.openId, loginId)))[0];
+      if (existingWithOpenId) loginId = `SCH_${cleanCode}_${id}`;
+      await db.insert(users).values({
+        openId: loginId,
+        name: `${school.name} Administrator`,
+        email: userEmail,
+        passwordHash,
+        loginMethod: "local",
+        role: "SCHOOL_ADMIN",
+        schoolId: id,
+        isActive: true,
+      });
+    }
+
+    await audit(currentUser(res), "GENERATE_SCHOOL_CREDENTIALS", "school", id, id, { loginId });
+    res.json({
+      success: true,
+      credentials: {
+        loginId,
+        email: userEmail,
+        password: rawPassword,
+      },
+    });
+  } catch (e) {
+    fail(res, e);
+  }
 });
 
 router.get("/schools/:id", async (req, res) => {
   try {
     const id = requestedSchoolId(currentUser(res), req.params.id);
     if (!id) return res.status(403).json({ error: "School access denied" });
-    const db = await getDb(); if (!db) return res.status(503).json({ error: "Database not available" });
+    const db = await getDb();
+    if (!db) return res.status(503).json({ error: "Database not available" });
     const row = (await db.select().from(schools).where(eq(schools.id, id)))[0];
-    return row ? res.json(row) : res.status(404).json({ error: "School not found" });
-  } catch (e) { fail(res, e); }
+    if (!row) return res.status(404).json({ error: "School not found" });
+    const enriched = (await attachSchoolTemplateMeta(db, [row]))[0];
+    return res.json(enriched);
+  } catch (e) {
+    fail(res, e);
+  }
 });
 
 router.put("/schools/:id", requireRole(schoolManagerRoles), async (req, res) => {
@@ -412,10 +576,14 @@ router.post("/schools/:schoolId/templates/select", requireRole(schoolManagerRole
         .where(and(eq(schoolTemplates.schoolId, schoolId), eq(schoolTemplates.templateId, templateId)))
     )[0];
     if (existing?.isLocked) return res.status(409).json({ error: "Template selection is locked" });
+
+    // Atomically reset previous default templates for this school
+    await db.update(schoolTemplates).set({ isDefault: false }).where(eq(schoolTemplates.schoolId, schoolId));
+
     if (existing) await db.update(schoolTemplates).set({ isDefault: true, assignedByUserId: user.id }).where(eq(schoolTemplates.id, existing.id));
     else await db.insert(schoolTemplates).values({ schoolId, templateId, isDefault: true, assignedByUserId: user.id });
     await audit(user, "SELECT_TEMPLATE", "school_template", existing?.id ?? null, schoolId, { templateId });
-    res.json({ success: true });
+    res.json({ success: true, selectedTemplateId: templateId, selectedTemplateName: targetTemplate.name });
   } catch (e) {
     fail(res, e);
   }
@@ -553,7 +721,7 @@ router.get("/id-cards", async (req, res) => {
   }
 });
 
-router.post("/id-cards", requireRole(schoolWriteRoles), async (req, res) => {
+router.post("/id-cards", requireRole(adminRoles), async (req, res) => {
   try {
     const user = currentUser(res);
     const db = await getDb();
@@ -663,6 +831,7 @@ router.get("/id-cards/:id", async (req, res) => {
     const db = await getDb();
     if (!db) return res.status(503).json({ error: "Database not available" });
     const id = Number(req.params.id);
+    if (!id || isNaN(id)) return res.status(400).json({ error: "Invalid card ID" });
     const card = (await db.select().from(idCards).where(eq(idCards.id, id)))[0];
     if (!card) return res.status(404).json({ error: "ID card not found" });
     if (!canReadSchool(user, card.schoolId)) return res.status(403).json({ error: "ID card access denied" });
@@ -713,21 +882,15 @@ router.get("/id-cards/:id", async (req, res) => {
   }
 });
 
-router.put("/id-cards/:id", requireRole(schoolWriteRoles), async (req, res) => {
+router.put("/id-cards/:id", requireRole(adminRoles), async (req, res) => {
   try {
     const user = currentUser(res);
     const db = await getDb();
     if (!db) return res.status(503).json({ error: "Database not available" });
     const id = Number(req.params.id);
+    if (!id || isNaN(id)) return res.status(400).json({ error: "Invalid card ID" });
     const card = (await db.select().from(idCards).where(eq(idCards.id, id)))[0];
-    if (!card || !canWriteSchool(user, card.schoolId)) return res.status(403).json({ error: "ID card access denied" });
-
-    // Strict rule: Approved cards are read-only to normal school users
-    if (card.status !== "DRAFT" && card.status !== "CHANGES_REQUIRED" && !adminRoles.has(user.role)) {
-      return res.status(400).json({
-        error: `Cannot edit card in ${card.status} status. Only DRAFT or CHANGES_REQUIRED cards can be edited.`,
-      });
-    }
+    if (!card) return res.status(404).json({ error: "ID card not found" });
 
     // Persist card number — do NOT change on edit
     const updatePayload: Record<string, unknown> = {};
@@ -780,19 +943,15 @@ router.put("/id-cards/:id", requireRole(schoolWriteRoles), async (req, res) => {
   }
 });
 
-router.delete("/id-cards/:id", requireRole(schoolWriteRoles), async (req, res) => {
+router.delete("/id-cards/:id", requireRole(adminRoles), async (req, res) => {
   try {
     const user = currentUser(res);
     const db = await getDb();
     if (!db) return res.status(503).json({ error: "Database not available" });
     const id = Number(req.params.id);
+    if (!id || isNaN(id)) return res.status(400).json({ error: "Invalid card ID" });
     const card = (await db.select().from(idCards).where(eq(idCards.id, id)))[0];
-    if (!card || !canWriteSchool(user, card.schoolId)) return res.status(403).json({ error: "ID card access denied" });
-
-    // Strict rule: Only DRAFT cards can be deleted
-    if (card.status !== "DRAFT" && !adminRoles.has(user.role)) {
-      return res.status(400).json({ error: "Only DRAFT ID cards can be deleted" });
-    }
+    if (!card) return res.status(404).json({ error: "ID card not found" });
 
     await db.delete(idCards).where(eq(idCards.id, id));
     await audit(user, "DELETE_ID_CARD", "id_card", id, card.schoolId);
@@ -803,17 +962,18 @@ router.delete("/id-cards/:id", requireRole(schoolWriteRoles), async (req, res) =
 });
 
 // ─── SUBMISSION & TRANSITIONS ──────────────────────────────────────────────
-router.post("/id-cards/:id/submit", requireRole(schoolWriteRoles), async (req, res) => {
+router.post("/id-cards/:id/submit", requireRole(adminRoles), async (req, res) => {
   try {
     const user = currentUser(res);
     const db = await getDb();
     if (!db) return res.status(503).json({ error: "Database not available" });
     const cardId = Number(req.params.id);
+    if (!cardId || isNaN(cardId)) return res.status(400).json({ error: "Invalid card ID" });
     const card = (await db.select().from(idCards).where(eq(idCards.id, cardId)))[0];
-    if (!card || !canWriteSchool(user, card.schoolId)) return res.status(403).json({ error: "ID card access denied" });
+    if (!card) return res.status(404).json({ error: "ID card not found" });
 
-    // Allowed transition check
-    if (card.status !== "DRAFT" && card.status !== "CHANGES_REQUIRED") {
+    // Allowed transition check (Admin submits or resubmits)
+    if (card.status !== "DRAFT" && card.status !== "CHANGES_REQUIRED" && card.status !== "REJECTED") {
       return res.status(400).json({ error: `Cannot submit card in ${card.status} status. Invalid transition.` });
     }
 
@@ -945,15 +1105,15 @@ router.post("/id-cards/:id/submit", requireRole(schoolWriteRoles), async (req, r
 
     await audit(user, action, "id_card", cardId, card.schoolId, { requestId, status: targetStatus });
 
-    // Notify admins of submission
-    const admins = await db.select({ id: users.id }).from(users).where(eq(users.role, "SUPER_ADMIN"));
-    for (const a of admins) {
+    // Notify school users of submission by Admin
+    const schoolUsers = await db.select({ id: users.id }).from(users).where(eq(users.schoolId, card.schoolId));
+    for (const s of schoolUsers) {
       await notify(
-        a.id,
+        s.id,
         card.schoolId,
         action,
-        `Card ${targetStatus.toLowerCase()}: ${card.cardNumber}`,
-        `${studentName}'s ID card was submitted for approval`,
+        `New ID Card for Approval: ${card.cardNumber}`,
+        `${studentName}'s ID card was submitted by Admin for your review & approval`,
         "id_card",
         cardId,
       );
@@ -965,7 +1125,7 @@ router.post("/id-cards/:id/submit", requireRole(schoolWriteRoles), async (req, r
   }
 });
 
-// ─── ADMIN APPROVAL & REVIEW TRANSITIONS ──────────────────────────────────
+// ─── APPROVAL & REVIEW TRANSITIONS (SCHOOL APPROVES / REJECTS, ADMIN PRINTS) ──
 async function transitionApproval(
   req: Request,
   res: Response,
@@ -977,6 +1137,7 @@ async function transitionApproval(
   const db = await getDb();
   if (!db) return res.status(503).json({ error: "Database not available" });
   const paramId = Number(req.params.id);
+  if (!paramId || isNaN(paramId)) return res.status(400).json({ error: "Invalid ID" });
 
   let request = (await db.select().from(idCardRequests).where(eq(idCardRequests.id, paramId)))[0];
   let card = (await db.select().from(idCards).where(eq(idCards.id, paramId)))[0];
@@ -990,18 +1151,23 @@ async function transitionApproval(
   const schoolId = card?.schoolId ?? request?.schoolId;
   if (!schoolId) return res.status(404).json({ error: "Record not found" });
 
-  if (targetStatus !== "RESUBMITTED" && !adminRoles.has(user.role)) {
-    return res.status(403).json({ error: "Only administrators can review, approve, or reject cards" });
+  const isCardSchool = user.schoolId !== null && user.schoolId === schoolId;
+  const isSuperAdmin = adminRoles.has(user.role);
+
+  // Cross-school data isolation check
+  if (!isSuperAdmin && !isCardSchool) {
+    return res.status(403).json({ error: "Access denied to ID card of another school" });
   }
-  if (targetStatus === "RESUBMITTED" && !canWriteSchool(user, schoolId)) {
-    return res.status(403).json({ error: "School access denied" });
+
+  if (targetStatus === "RESUBMITTED" && !isSuperAdmin) {
+    return res.status(403).json({ error: "Only administrators can resubmit cards" });
   }
 
   if (targetStatus === "CHANGES_REQUIRED" && !comment?.trim()) {
     return res.status(400).json({ error: "A comment is required when requesting changes" });
   }
   if (targetStatus === "REJECTED" && !comment?.trim()) {
-    return res.status(400).json({ error: "A reason is required when rejecting a card" });
+    return res.status(400).json({ error: "A rejection reason is required when rejecting a card" });
   }
 
   const currentStatus = card?.status ?? request?.status ?? "DRAFT";
@@ -1016,8 +1182,8 @@ async function transitionApproval(
       return res.status(400).json({ error: `Invalid transition from ${currentStatus} to ${targetStatus}` });
     }
   } else if (targetStatus === "RESUBMITTED") {
-    if (currentStatus !== "CHANGES_REQUIRED") {
-      return res.status(400).json({ error: `Cannot resubmit card in ${currentStatus} status. Must be CHANGES_REQUIRED.` });
+    if (currentStatus !== "CHANGES_REQUIRED" && currentStatus !== "REJECTED") {
+      return res.status(400).json({ error: `Cannot resubmit card in ${currentStatus} status. Must be CHANGES_REQUIRED or REJECTED.` });
     }
   }
 
@@ -1067,28 +1233,28 @@ async function transitionApproval(
   }
 
   // Send notifications
-  if (targetStatus === "RESUBMITTED") {
+  if (targetStatus === "APPROVED" || targetStatus === "REJECTED") {
     const adminUsers = await db.select({ id: users.id }).from(users).where(eq(users.role, "SUPER_ADMIN"));
     for (const a of adminUsers) {
       await notify(
         a.id,
         schoolId,
         action,
-        `Card Resubmitted: #${card?.cardNumber ?? request?.admissionCode}`,
-        `School resubmitted card for review`,
+        `ID card ${targetStatus === "APPROVED" ? "approved" : "rejected"} by school: #${card?.cardNumber ?? request?.admissionCode}`,
+        comment ?? `School marked ID card #${card?.cardNumber ?? request?.admissionCode} as ${targetStatus}`,
         "id_card",
         card?.id ?? request?.id,
       );
     }
-  } else {
+  } else if (targetStatus === "RESUBMITTED") {
     const schoolUsers = await db.select({ id: users.id }).from(users).where(eq(users.schoolId, schoolId));
     for (const s of schoolUsers) {
       await notify(
         s.id,
         schoolId,
         action,
-        `ID card ${targetStatus.toLowerCase().replaceAll("_", " ")}: #${card?.cardNumber ?? request?.admissionCode}`,
-        comment ?? `ID card status changed to ${targetStatus}`,
+        `ID card resubmitted: #${card?.cardNumber ?? request?.admissionCode}`,
+        `Admin resubmitted card for review`,
         "id_card",
         card?.id ?? request?.id,
       );
@@ -1099,35 +1265,35 @@ async function transitionApproval(
 }
 
 // Approval endpoints (both /api/approvals and /api/id-cards)
-router.post("/approvals/:id/review", requireRole(adminRoles), async (req, res) => {
+router.post("/approvals/:id/review", async (req, res) => {
   try {
     await transitionApproval(req, res, "UNDER_REVIEW", "START_REVIEW");
   } catch (e) {
     fail(res, e);
   }
 });
-router.post("/approvals/:id/request-changes", requireRole(adminRoles), async (req, res) => {
+router.post("/approvals/:id/request-changes", async (req, res) => {
   try {
     await transitionApproval(req, res, "CHANGES_REQUIRED", "REQUEST_CHANGES", req.body.comment || req.body.note);
   } catch (e) {
     fail(res, e);
   }
 });
-router.post("/approvals/:id/resubmit", requireRole(schoolWriteRoles), async (req, res) => {
+router.post("/approvals/:id/resubmit", requireRole(adminRoles), async (req, res) => {
   try {
     await transitionApproval(req, res, "RESUBMITTED", "RESUBMIT_ID_CARD");
   } catch (e) {
     fail(res, e);
   }
 });
-router.post("/approvals/:id/approve", requireRole(adminRoles), async (req, res) => {
+router.post("/approvals/:id/approve", async (req, res) => {
   try {
     await transitionApproval(req, res, "APPROVED", "APPROVE_ID_CARD");
   } catch (e) {
     fail(res, e);
   }
 });
-router.post("/approvals/:id/reject", requireRole(adminRoles), async (req, res) => {
+router.post("/approvals/:id/reject", async (req, res) => {
   try {
     await transitionApproval(req, res, "REJECTED", "REJECT_ID_CARD", req.body.reason || req.body.comment);
   } catch (e) {
@@ -1135,35 +1301,35 @@ router.post("/approvals/:id/reject", requireRole(adminRoles), async (req, res) =
   }
 });
 
-router.post("/id-cards/:id/review", requireRole(adminRoles), async (req, res) => {
+router.post("/id-cards/:id/review", async (req, res) => {
   try {
     await transitionApproval(req, res, "UNDER_REVIEW", "START_REVIEW");
   } catch (e) {
     fail(res, e);
   }
 });
-router.post("/id-cards/:id/request-changes", requireRole(adminRoles), async (req, res) => {
+router.post("/id-cards/:id/request-changes", async (req, res) => {
   try {
     await transitionApproval(req, res, "CHANGES_REQUIRED", "REQUEST_CHANGES", req.body.comment || req.body.note);
   } catch (e) {
     fail(res, e);
   }
 });
-router.post("/id-cards/:id/resubmit", requireRole(schoolWriteRoles), async (req, res) => {
+router.post("/id-cards/:id/resubmit", requireRole(adminRoles), async (req, res) => {
   try {
     await transitionApproval(req, res, "RESUBMITTED", "RESUBMIT_ID_CARD");
   } catch (e) {
     fail(res, e);
   }
 });
-router.post("/id-cards/:id/approve", requireRole(adminRoles), async (req, res) => {
+router.post("/id-cards/:id/approve", async (req, res) => {
   try {
     await transitionApproval(req, res, "APPROVED", "APPROVE_ID_CARD");
   } catch (e) {
     fail(res, e);
   }
 });
-router.post("/id-cards/:id/reject", requireRole(adminRoles), async (req, res) => {
+router.post("/id-cards/:id/reject", async (req, res) => {
   try {
     await transitionApproval(req, res, "REJECTED", "REJECT_ID_CARD", req.body.reason || req.body.comment);
   } catch (e) {
@@ -1172,7 +1338,7 @@ router.post("/id-cards/:id/reject", requireRole(adminRoles), async (req, res) =>
 });
 
 // ─── PRINTING ─────────────────────────────────────────────────────────────
-router.post("/id-cards/:id/print", requireRole(schoolWriteRoles), async (req, res) => {
+router.post("/id-cards/:id/print", requireRole(adminRoles), async (req, res) => {
   try {
     const user = currentUser(res);
     const db = await getDb();
@@ -1206,7 +1372,7 @@ router.post("/id-cards/:id/print", requireRole(schoolWriteRoles), async (req, re
   }
 });
 
-router.post("/id-cards/bulk-print", requireRole(schoolWriteRoles), async (req, res) => {
+router.post("/id-cards/bulk-print", requireRole(adminRoles), async (req, res) => {
   try {
     const user = currentUser(res);
     const db = await getDb();
@@ -1275,7 +1441,7 @@ async function fetchCardPdfData(db: any, cardId: number): Promise<CardPdfData | 
   };
 }
 
-router.get("/id-cards/:id/pdf", async (req, res) => {
+router.get("/id-cards/:id/pdf", requireRole(adminRoles), async (req, res) => {
   try {
     const user = currentUser(res);
     const db = await getDb();
@@ -1299,7 +1465,7 @@ router.get("/id-cards/:id/pdf", async (req, res) => {
   }
 });
 
-router.post("/id-cards/bulk-pdf", async (req, res) => {
+router.post("/id-cards/bulk-pdf", requireRole(adminRoles), async (req, res) => {
   try {
     const user = currentUser(res);
     const db = await getDb();
@@ -1332,7 +1498,7 @@ router.post("/id-cards/bulk-pdf", async (req, res) => {
 });
 
 // ─── FILE METADATA ────────────────────────────────────────────────────────
-router.post("/id-cards/:id/files", requireRole(schoolWriteRoles), async (req, res) => {
+router.post("/id-cards/:id/files", requireRole(adminRoles), async (req, res) => {
   try {
     const user = currentUser(res);
     const db = await getDb();

@@ -6,6 +6,7 @@ import PrintModal from "@/components/PrintModal";
 import ApprovalTimeline from "@/components/ApprovalTimeline";
 import { SAMPLE_CARD_DATA, type DesignerElement } from "@shared/templateDesigner";
 import {
+  AlertCircle,
   AlertTriangle,
   ArrowUpRight,
   Bell,
@@ -15,6 +16,7 @@ import {
   ChevronDown,
   ClipboardCheck,
   Clock3,
+  Copy,
   Download,
   Eye,
   FileCheck2,
@@ -22,6 +24,7 @@ import {
   FilePlus2,
   Filter,
   Grid2X2,
+  KeyRound,
   LayoutDashboard,
   Loader2,
   LogOut,
@@ -134,9 +137,8 @@ function ToneIcon({
   const style = toneStyles[tone];
   return (
     <span
-      className={`inline-flex items-center justify-center rounded-lg ${style.bg} ${style.fg} ${
-        size === "h-4 w-4" ? "h-8 w-8" : "h-10 w-10"
-      }`}
+      className={`inline-flex items-center justify-center rounded-lg ${style.bg} ${style.fg} ${size === "h-4 w-4" ? "h-8 w-8" : "h-10 w-10"
+        }`}
     >
       <Icon className={size} strokeWidth={1.8} />
     </span>
@@ -158,9 +160,8 @@ function CardPreview({
   }[accent];
   return (
     <div
-      className={`relative overflow-hidden rounded-xl border border-white/50 shadow-[0_8px_25px_rgba(22,47,44,0.18)] ${
-        mini ? "h-[94px] w-[150px]" : "h-[164px] w-[244px]"
-      }`}
+      className={`relative overflow-hidden rounded-xl border border-white/50 shadow-[0_8px_25px_rgba(22,47,44,0.18)] ${mini ? "h-[94px] w-[150px]" : "h-[164px] w-[244px]"
+        }`}
       style={{
         background: `linear-gradient(135deg, ${palette} 0%, #154847 66%, #123536 100%)`,
       }}
@@ -187,9 +188,8 @@ function CardPreview({
         <div className="flex items-end justify-between gap-2">
           <div className="flex items-end gap-2">
             <div
-              className={`${
-                mini ? "h-9 w-8" : "h-14 w-12"
-              } rounded-md border border-white/40 bg-white/25`}
+              className={`${mini ? "h-9 w-8" : "h-14 w-12"
+                } rounded-md border border-white/40 bg-white/25`}
             />
             <div>
               <div className="text-[12px] font-extrabold">Student Name</div>
@@ -245,14 +245,13 @@ export default function Home({
     portal === "admin"
       ? navItems
       : navItems.filter(({ label }) =>
-          [
-            "Overview",
-            "ID card templates",
-            "ID card requests",
-            "Approved cards",
-            "Notifications",
-          ].includes(label),
-        );
+        [
+          "Overview",
+          "ID card templates",
+          "ID card requests",
+          "Notifications",
+        ].includes(label),
+      );
   const [query, setQuery] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [filter, setFilter] = useState<"All" | "Pending" | "Changes required">(
@@ -273,6 +272,14 @@ export default function Home({
   const [selectedSchoolId, setSelectedSchoolId] = useState<number | null>(
     authenticatedUser.schoolId,
   );
+
+  // School Credentials Display Modal state
+  const [credentialsModalOpen, setCredentialsModalOpen] = useState(false);
+  const [credentialsData, setCredentialsData] = useState<{
+    schoolName: string;
+    loginId: string;
+    password?: string;
+  } | null>(null);
 
   // Modal dialog states replacing browser prompts
   const [schoolModalOpen, setSchoolModalOpen] = useState(false);
@@ -543,10 +550,38 @@ export default function Home({
         setSelectedSchoolId(created.id);
         setSchoolModalOpen(false);
         toast.success(`School "${created.name}" created successfully`);
+        if (created.credentials) {
+          setCredentialsData({
+            schoolName: created.name,
+            loginId: created.credentials.loginId,
+            password: created.credentials.password,
+          });
+          setCredentialsModalOpen(true);
+        }
       }
     } catch (error) {
       toast.error(editingSchool ? "Could not update school" : "Could not create school", {
         description: error instanceof Error ? error.message : "Request failed",
+      });
+    }
+  };
+
+  const handleGenerateCredentials = async (school: ApiSchool) => {
+    if (authenticatedUser.role !== "SUPER_ADMIN") {
+      return toast.error("Only Super Admins can manage school credentials");
+    }
+    try {
+      const creds = await api.schools.generateCredentials(school.id);
+      setCredentialsData({
+        schoolName: school.name,
+        loginId: creds.credentials.loginId,
+        password: creds.credentials.password,
+      });
+      setCredentialsModalOpen(true);
+      toast.success(`Credentials generated for ${school.name}`);
+    } catch (err) {
+      toast.error("Failed to generate credentials", {
+        description: err instanceof Error ? err.message : "Request failed",
       });
     }
   };
@@ -804,7 +839,7 @@ export default function Home({
       setNotifications((prev) =>
         prev.map((n) => (n.id === notifId ? { ...n, isRead: true } : n)),
       );
-    } catch {}
+    } catch { }
   };
 
   const handleSelectTemplate = async (template: ApiTemplate) => {
@@ -820,7 +855,9 @@ export default function Home({
     }
     try {
       await api.schoolTemplates.select(schoolId, template.id);
-      toast.success(`${template.name} selected for ${currentActiveSchool?.name ?? `School #${schoolId}`}`);
+      toast.success(`${template.name} selected as final template for ${currentActiveSchool?.name ?? `School #${schoolId}`}`);
+      const freshSchools = await api.schools.list();
+      setSchools(freshSchools);
     } catch (error) {
       toast.error("Could not select template", {
         description: error instanceof Error ? error.message : "Request failed",
@@ -917,9 +954,8 @@ export default function Home({
   return (
     <div className="min-h-screen app-shell bg-[#f7f6f2] text-[#182326]">
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-[244px] flex-col bg-[#102728] text-[#dfecea] transition-transform duration-200 lg:translate-x-0 overflow-y-auto overflow-x-hidden [scrollbar-width:thin] [scrollbar-color:#294344_transparent] ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className={`fixed inset-y-0 left-0 z-50 flex w-[244px] flex-col bg-[#102728] text-[#dfecea] transition-transform duration-200 lg:translate-x-0 overflow-y-auto overflow-x-hidden [scrollbar-width:thin] [scrollbar-color:#294344_transparent] ${sidebarOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
       >
         <div className="flex h-[76px] shrink-0 items-center justify-between px-6">
           <div className="flex items-center gap-3">
@@ -962,7 +998,7 @@ export default function Home({
                     ? currentActiveSchool.name
                     : "All schools"
                   : authenticatedUser.schoolName ??
-                    `School #${authenticatedUser.schoolId}`}
+                  `School #${authenticatedUser.schoolId}`}
                 <div className="mt-0.5 text-[9px] text-[#6f9892]">
                   {authenticatedUser.role === "VIEWER"
                     ? "Read only"
@@ -984,23 +1020,29 @@ export default function Home({
           <nav className="space-y-1">
             {visibleNavItems.map(({ label, icon: Icon }) => {
               const active = activeNav === label;
+              const displayLabel =
+                authenticatedUser.role !== "SUPER_ADMIN"
+                  ? label === "ID card templates"
+                    ? "Templates"
+                    : label === "ID card requests"
+                      ? "My ID Cards"
+                      : label
+                  : label;
               return (
                 <button
                   key={label}
                   onClick={() => goTo(label as NavLabel)}
-                  className={`group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-[12px] font-semibold transition-colors ${
-                    active
+                  className={`group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-[12px] font-semibold transition-colors ${active
                       ? "bg-[#dff3ee] text-[#123b3b]"
                       : "text-[#99b6b2] hover:bg-[#1b3a3a] hover:text-white"
-                  }`}
+                    }`}
                 >
                   <Icon
-                    className={`h-[17px] w-[17px] ${
-                      active ? "text-[#0f7f79]" : "text-[#779b96]"
-                    }`}
+                    className={`h-[17px] w-[17px] ${active ? "text-[#0f7f79]" : "text-[#779b96]"
+                      }`}
                     strokeWidth={active ? 2.3 : 1.8}
                   />
-                  <span className="flex-1">{label}</span>
+                  <span className="flex-1">{displayLabel}</span>
                 </button>
               );
             })}
@@ -1017,13 +1059,15 @@ export default function Home({
               <Settings2 className="h-[17px] w-[17px] text-[#779b96]" />
               Settings
             </button>
-            <button
-              onClick={() => toast("Audit logs opened")}
-              className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-[12px] font-semibold text-[#99b6b2] hover:bg-[#1b3a3a] hover:text-white"
-            >
-              <BookOpenCheck className="h-[17px] w-[17px] text-[#779b96]" />
-              Audit logs
-            </button>
+            {authenticatedUser.role === "SUPER_ADMIN" && (
+              <button
+                onClick={() => toast("Audit logs opened")}
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-[12px] font-semibold text-[#99b6b2] hover:bg-[#1b3a3a] hover:text-white"
+              >
+                <BookOpenCheck className="h-[17px] w-[17px] text-[#779b96]" />
+                Audit logs
+              </button>
+            )}
             <button
               onClick={() => void logout()}
               className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-[12px] font-semibold text-[#f87171] hover:bg-[#341b1b] hover:text-[#fca5a5]"
@@ -1196,23 +1240,50 @@ export default function Home({
                       <Palette className="mr-2 h-4 w-4" /> New template
                     </Button>
                   )}
-                  {authenticatedUser.role !== "VIEWER" && (
+                  {authenticatedUser.role === "SUPER_ADMIN" ? (
                     <Button
                       onClick={openCreateCard}
                       className="h-10 rounded-xl bg-[#0f7f79] px-4 text-xs font-bold text-white hover:bg-[#096c67]"
                     >
                       <FilePlus2 className="mr-2 h-4 w-4" /> Create card
                     </Button>
+                  ) : (
+                    <>
+                      <Button
+                        onClick={() => goTo("ID card templates")}
+                        variant="outline"
+                        className="h-10 rounded-xl border-[#dce5df] bg-white px-4 text-xs font-bold text-[#38514e] shadow-sm hover:bg-[#edf5f0]"
+                      >
+                        <Palette className="mr-2 h-4 w-4" /> Select Template
+                      </Button>
+                      <Button
+                        onClick={() => goTo("ID card requests")}
+                        className="h-10 rounded-xl bg-[#0f7f79] px-4 text-xs font-bold text-white hover:bg-[#096c67]"
+                      >
+                        <ClipboardCheck className="mr-2 h-4 w-4" /> Review ID Cards
+                      </Button>
+                    </>
                   )}
                 </div>
               </section>
 
               <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <div onClick={() => goTo("Schools")} className="cursor-pointer transition-transform hover:-translate-y-0.5">
+                <div
+                  onClick={() => authenticatedUser.role === "SUPER_ADMIN" && goTo("Schools")}
+                  className={authenticatedUser.role === "SUPER_ADMIN" ? "cursor-pointer transition-transform hover:-translate-y-0.5" : ""}
+                >
                   <MetricCard
-                    label="Active schools"
-                    value={String(schools.filter((school) => school.isActive).length)}
-                    change="Click to manage schools →"
+                    label={authenticatedUser.role === "SUPER_ADMIN" ? "Active schools" : "My School"}
+                    value={
+                      authenticatedUser.role === "SUPER_ADMIN"
+                        ? String(schools.filter((school) => school.isActive).length)
+                        : (currentActiveSchool?.shortCode || "Connected")
+                    }
+                    change={
+                      authenticatedUser.role === "SUPER_ADMIN"
+                        ? "Click to manage schools →"
+                        : (currentActiveSchool?.name || "Active")
+                    }
                     icon={Building2}
                     tone="teal"
                   />
@@ -1262,11 +1333,10 @@ export default function Home({
                             <button
                               key={item}
                               onClick={() => setFilter(item)}
-                              className={`rounded-md px-2.5 py-1.5 text-[10px] font-bold ${
-                                filter === item
+                              className={`rounded-md px-2.5 py-1.5 text-[10px] font-bold ${filter === item
                                   ? "bg-white text-[#0f7f79] shadow-sm"
                                   : "text-[#8a9793]"
-                              }`}
+                                }`}
                             >
                               {item}
                             </button>
@@ -1340,24 +1410,22 @@ export default function Home({
                                     )}
                                   </td>
                                   <td className="px-6 py-4 text-right">
-                                    {authenticatedUser.role === "SUPER_ADMIN" && (
-                                      <button
-                                        disabled={approveLoading}
-                                        onClick={() => approve(item.id, item.studentName)}
-                                        className="rounded-lg bg-[#e1f3ed] px-3 py-2 text-[10px] font-extrabold text-[#0a716b] transition-colors hover:bg-[#c7ebe1] disabled:opacity-50"
-                                      >
-                                        Approve
-                                      </button>
-                                    )}
+                                    {(authenticatedUser.role === "SUPER_ADMIN" ||
+                                      authenticatedUser.schoolId === item.schoolId) && (
+                                        <button
+                                          disabled={approveLoading}
+                                          onClick={() => approve(item.id, item.studentName)}
+                                          className="rounded-lg bg-[#e1f3ed] px-3 py-2 text-[10px] font-extrabold text-[#0a716b] transition-colors hover:bg-[#c7ebe1] disabled:opacity-50"
+                                        >
+                                          Approve
+                                        </button>
+                                      )}
                                     <button
-                                      onClick={() =>
-                                        toast("Review panel opened", {
-                                          description: `Reviewing ${item.studentName}'s submitted card.`,
-                                        })
-                                      }
+                                      onClick={() => handleOpenReview(item.cardId || item.id)}
                                       className="ml-1 rounded-lg p-2 text-[#a3adaa] hover:bg-[#eef5f1] hover:text-[#50706b]"
+                                      title="View card details"
                                     >
-                                      <MoreHorizontal className="h-4 w-4" />
+                                      <Eye className="h-4 w-4" />
                                     </button>
                                   </td>
                                 </tr>
@@ -1618,6 +1686,10 @@ export default function Home({
               onEditSchool={handleEditSchool}
               onDeleteSchool={handleDeleteSchool}
               onDeleteTemplate={handleDeleteTemplate}
+              activeSchool={currentActiveSchool}
+              onGenerateCredentials={handleGenerateCredentials}
+              onApproveCardDirect={(id: number, num: string) => approve(id, num)}
+              onRejectCardDirect={(id: number) => handleOpenReview(id)}
             />
           )}
         </div>
@@ -1919,11 +1991,10 @@ export default function Home({
                       <button
                         key={side}
                         onClick={() => setReviewSide(side)}
-                        className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
-                          reviewSide === side
+                        className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${reviewSide === side
                             ? "bg-[#0f7f79] text-white shadow-sm"
                             : "text-[#55605d] hover:text-[#203734]"
-                        }`}
+                          }`}
                       >
                         {side}
                       </button>
@@ -2015,17 +2086,20 @@ export default function Home({
               {/* Action buttons */}
               <DialogFooter className="mt-4 flex flex-wrap gap-2 sm:justify-between">
                 <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => handlePrintCard(reviewingCard.id)}
-                    className="text-xs"
-                  >
-                    <Printer className="w-3.5 h-3.5 mr-1" /> Print / PDF
-                  </Button>
+                  {authenticatedUser.role === "SUPER_ADMIN" && (
+                    <Button
+                      variant="outline"
+                      onClick={() => handlePrintCard(reviewingCard.id)}
+                      className="text-xs"
+                    >
+                      <Printer className="w-3.5 h-3.5 mr-1" /> Print / PDF
+                    </Button>
+                  )}
                 </div>
 
                 <div className="flex gap-2">
-                  {authenticatedUser.role === "SUPER_ADMIN" &&
+                  {(authenticatedUser.role === "SUPER_ADMIN" ||
+                    authenticatedUser.schoolId === reviewingCard.schoolId) &&
                     (reviewingCard.status === "SUBMITTED" ||
                       reviewingCard.status === "UNDER_REVIEW" ||
                       reviewingCard.status === "RESUBMITTED") && (
@@ -2161,11 +2235,10 @@ export default function Home({
                   <button
                     key={side}
                     onClick={() => setPreviewModalSide(side)}
-                    className={`rounded-lg px-4 py-1.5 text-xs font-bold transition-all ${
-                      previewModalSide === side
+                    className={`rounded-lg px-4 py-1.5 text-xs font-bold transition-all ${previewModalSide === side
                         ? "bg-[#0f7f79] text-white"
                         : "bg-[#f0efec] text-[#778381] hover:bg-[#e5e4e0]"
-                    }`}
+                      }`}
                   >
                     {side}
                   </button>
@@ -2273,6 +2346,10 @@ function ModuleView({
   onEditSchool,
   onDeleteSchool,
   onDeleteTemplate,
+  activeSchool,
+  onGenerateCredentials,
+  onApproveCardDirect,
+  onRejectCardDirect,
 }: {
   label: NavLabel;
   onBack: () => void;
@@ -2303,6 +2380,10 @@ function ModuleView({
   onEditSchool?: (school: ApiSchool) => void;
   onDeleteSchool?: (schoolId: number, schoolName: string) => void;
   onDeleteTemplate?: (templateId: number, templateName: string) => void;
+  activeSchool?: ApiSchool;
+  onGenerateCredentials?: (school: ApiSchool) => void;
+  onApproveCardDirect?: (cardId: number, num: string) => void;
+  onRejectCardDirect?: (cardId: number) => void;
 }) {
   const [, navigate] = useLocation();
   const [cardStatusFilter, setCardStatusFilter] = useState<string>("All");
@@ -2373,21 +2454,35 @@ function ModuleView({
           <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[#82908e]">
             Workspace module
           </div>
-          <h2 className="text-2xl font-extrabold tracking-[-0.05em] sm:text-3xl">{label}</h2>
+          <h2 className="text-2xl font-extrabold tracking-[-0.05em] sm:text-3xl">
+            {authenticatedUser.role !== "SUPER_ADMIN"
+              ? label === "ID card templates"
+                ? "Templates"
+                : label === "ID card requests"
+                  ? "My ID Cards"
+                  : label
+              : label}
+          </h2>
           <p className="mt-2 text-sm text-[#778381]">
             {isRequests
-              ? "Create, submit, review and track school student ID cards."
+              ? authenticatedUser.role === "SUPER_ADMIN"
+                ? "Create, edit, submit, and manage student ID cards for all schools."
+                : "View and approve or reject student ID cards created for your school."
               : isApproved
                 ? "Print and export batch production-ready verified ID cards."
                 : isTemplates
-                  ? "Manage customizable front and back ID card templates."
+                  ? authenticatedUser.role === "SUPER_ADMIN"
+                    ? "Manage customizable front and back ID card templates."
+                    : "Browse available templates and select your school's final preferred template."
                   : "A focused workspace for managing your school identity operations."}
           </p>
         </div>
-        {(isRequests || isSchools || isTemplates || isUsers) && (
+        {((isRequests && authenticatedUser.role === "SUPER_ADMIN") ||
+          (isSchools && authenticatedUser.role === "SUPER_ADMIN") ||
+          (isTemplates && authenticatedUser.role === "SUPER_ADMIN") ||
+          (isUsers && authenticatedUser.role === "SUPER_ADMIN")) && (
           <Button
             onClick={onCreate}
-            disabled={authenticatedUser.role === "VIEWER"}
             className="h-10 rounded-xl bg-[#0f7f79] text-xs font-bold text-white hover:bg-[#096c67]"
           >
             <FilePlus2 className="mr-2 h-4 w-4" />{" "}
@@ -2449,33 +2544,43 @@ function ModuleView({
                       {authenticatedUser.role === "SUPER_ADMIN" && (
                         <button
                           onClick={() => onToggleTemplateStatus(template)}
-                          className={`rounded-lg px-2.5 py-1.5 text-[10px] font-extrabold ${
-                            template.status === "ACTIVE"
+                          className={`rounded-lg px-2.5 py-1.5 text-[10px] font-extrabold ${template.status === "ACTIVE"
                               ? "bg-[#fff0e8] text-[#c65c3d] hover:bg-[#fde2d6]"
                               : "bg-[#e1f3ed] text-[#0a716b] hover:bg-[#cbf0e4]"
-                          }`}
+                            }`}
                         >
                           {template.status === "ACTIVE" ? "Deactivate" : "Activate"}
                         </button>
                       )}
 
-                      {/* Select button only for School users */}
-                      {authenticatedUser.role !== "SUPER_ADMIN" && template.status === "ACTIVE" && (
-                        <button
-                          onClick={() => onSelectTemplate(template)}
-                          className="rounded-lg bg-[#e1f3ed] px-2.5 py-1.5 text-[10px] font-extrabold text-[#0a716b] hover:bg-[#cbf0e4]"
-                        >
-                          Select
-                        </button>
+                      {/* Final template badge if this is school's selected template */}
+                      {activeSchool?.selectedTemplateId === template.id && (
+                        <span className="inline-flex items-center gap-1 rounded-lg bg-[#0f7f79] px-2.5 py-1.5 text-[10px] font-bold text-white shadow-xs">
+                          <CheckCircle2 className="w-3 h-3" /> Final Selected Template
+                        </span>
                       )}
 
-                      {/* Lock button available */}
-                      <button
-                        onClick={() => onLockTemplate(template)}
-                        className="rounded-lg bg-[#fff0e8] px-2.5 py-1.5 text-[10px] font-extrabold text-[#c65c3d] hover:bg-[#fde2d6]"
-                      >
-                        Lock
-                      </button>
+                      {/* Select as Final Template button for School users when not currently selected */}
+                      {authenticatedUser.role !== "SUPER_ADMIN" &&
+                        template.status === "ACTIVE" &&
+                        activeSchool?.selectedTemplateId !== template.id && (
+                          <button
+                            onClick={() => onSelectTemplate(template)}
+                            className="rounded-lg bg-[#e1f3ed] px-2.5 py-1.5 text-[10px] font-extrabold text-[#0a716b] hover:bg-[#cbf0e4]"
+                          >
+                            Select as Final Template
+                          </button>
+                        )}
+
+                      {/* Lock button only for Super Admin */}
+                      {authenticatedUser.role === "SUPER_ADMIN" && (
+                        <button
+                          onClick={() => onLockTemplate(template)}
+                          className="rounded-lg bg-[#fff0e8] px-2.5 py-1.5 text-[10px] font-extrabold text-[#c65c3d] hover:bg-[#fde2d6]"
+                        >
+                          Lock
+                        </button>
+                      )}
 
                       {/* Delete button for Super Admin */}
                       {authenticatedUser.role === "SUPER_ADMIN" && (
@@ -2513,11 +2618,10 @@ function ModuleView({
                 <button
                   key={status}
                   onClick={() => setCardStatusFilter(status)}
-                  className={`rounded-lg px-2.5 py-1.5 text-[11px] font-bold transition-all ${
-                    cardStatusFilter === status
+                  className={`rounded-lg px-2.5 py-1.5 text-[11px] font-bold transition-all ${cardStatusFilter === status
                       ? "bg-[#0f7f79] text-white shadow-sm"
                       : "bg-[#f0efec] text-[#55605d] hover:bg-[#e4e2de]"
-                  }`}
+                    }`}
                 >
                   {status.replace(/_/g, " ")}
                 </button>
@@ -2577,9 +2681,9 @@ function ModuleView({
                             {authenticatedUser.role === "SUPER_ADMIN" ? "Review" : "View"}
                           </button>
 
-                          {/* Editable when Draft or Changes Required */}
+                          {/* Admin actions: Edit, Submit, Delete draft */}
                           {(card.status === "DRAFT" || card.status === "CHANGES_REQUIRED") &&
-                            authenticatedUser.role !== "VIEWER" && (
+                            authenticatedUser.role === "SUPER_ADMIN" && (
                               <>
                                 <button
                                   onClick={() => onEditCard(card.id)}
@@ -2604,6 +2708,24 @@ function ModuleView({
                                 )}
                               </>
                             )}
+
+                          {/* Approval actions: When card is SUBMITTED, UNDER_REVIEW, or RESUBMITTED, School user can Approve or Reject */}
+                          {(card.status === "SUBMITTED" || card.status === "UNDER_REVIEW" || card.status === "RESUBMITTED") && (
+                            <>
+                              <button
+                                onClick={() => onApproveCardDirect?.(card.id, card.cardNumber)}
+                                className="rounded-lg bg-[#dff3ee] border border-[#a2d8ce] px-2.5 py-1.5 text-[11px] font-bold text-[#0a716b] hover:bg-[#caebe3]"
+                              >
+                                <CheckCircle2 className="inline w-3 h-3 mr-1" /> Approve
+                              </button>
+                              <button
+                                onClick={() => onRejectCardDirect?.(card.id)}
+                                className="rounded-lg bg-[#fef2f2] border border-[#fecaca] px-2.5 py-1.5 text-[11px] font-bold text-[#dc2626] hover:bg-[#fee2e2]"
+                              >
+                                <XCircle className="inline w-3 h-3 mr-1" /> Reject
+                              </button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -2742,15 +2864,13 @@ function ModuleView({
               notifications.map((n) => (
                 <div
                   key={n.id}
-                  className={`flex items-start justify-between gap-4 p-5 transition-colors ${
-                    !n.isRead ? "bg-[#f4faf7]" : "hover:bg-[#fbfdfb]"
-                  }`}
+                  className={`flex items-start justify-between gap-4 p-5 transition-colors ${!n.isRead ? "bg-[#f4faf7]" : "hover:bg-[#fbfdfb]"
+                    }`}
                 >
                   <div className="flex items-start gap-3">
                     <div
-                      className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-xs font-bold ${
-                        !n.isRead ? "bg-[#dff3ee] text-[#0b716b]" : "bg-[#f0efec] text-[#84918e]"
-                      }`}
+                      className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-xs font-bold ${!n.isRead ? "bg-[#dff3ee] text-[#0b716b]" : "bg-[#f0efec] text-[#84918e]"
+                        }`}
                     >
                       <Bell className="h-4 w-4" />
                     </div>
@@ -2849,47 +2969,66 @@ function ModuleView({
                     (s.email?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false),
                 )
                 .map((school) => (
-                <div key={school.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 gap-3 hover:bg-[#fbfdfb] transition-colors">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#dff3ee] text-[#0b716b] shrink-0">
-                      <Building2 className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <div className="text-sm font-extrabold text-[#304541] flex items-center gap-2">
-                        {school.name}
-                        <StatusPill tone="teal">Active</StatusPill>
+                  <div key={school.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 gap-3 hover:bg-[#fbfdfb] transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#dff3ee] text-[#0b716b] shrink-0">
+                        <Building2 className="h-5 w-5" />
                       </div>
-                      <div className="text-[11px] text-[#8d9995] flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
-                        <span>Code: <b className="text-[#304541]">{school.shortCode}</b></span>
-                        {school.email && <span>Email: {school.email}</span>}
-                        {school.phone && <span>Phone: {school.phone}</span>}
-                        {school.address && <span>Address: {school.address}</span>}
+                      <div>
+                        <div className="text-sm font-extrabold text-[#304541] flex flex-wrap items-center gap-2">
+                          {school.name}
+                          <StatusPill tone="teal">Active</StatusPill>
+                          {school.templateSelectionStatus === "Selected" ? (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-teal-200 bg-teal-50 px-2.5 py-0.5 text-[10px] font-bold text-teal-800">
+                              <CheckCircle2 className="h-3 w-3 text-teal-600" />
+                              Template: {school.selectedTemplateName || "Selected"}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[10px] font-bold text-amber-800">
+                              <AlertTriangle className="h-3 w-3 text-amber-600" />
+                              Template: Not Selected
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-[#8d9995] flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
+                          <span>Code: <b className="text-[#304541]">{school.shortCode}</b></span>
+                          {school.email && <span>Email: {school.email}</span>}
+                          {school.phone && <span>Phone: {school.phone}</span>}
+                          {school.address && <span>Address: {school.address}</span>}
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
-                    {authenticatedUser.role === "SUPER_ADMIN" && (
-                      <>
-                        <button
-                          onClick={() => onEditSchool?.(school)}
-                          className="flex items-center gap-1 rounded-lg border border-[#d3ded8] bg-white px-2.5 py-1.5 text-xs font-bold text-[#304541] shadow-sm hover:bg-[#f2f7f4] hover:text-[#0f7f79]"
-                        >
-                          <FileEdit className="h-3.5 w-3.5" />
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => onDeleteSchool?.(school.id, school.name)}
-                          className="flex items-center gap-1 rounded-lg border border-[#fecaca] bg-white px-2.5 py-1.5 text-xs font-bold text-[#dc2626] shadow-sm hover:bg-[#fef2f2]"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Delete
-                        </button>
-                      </>
-                    )}
+                    <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                      {authenticatedUser.role === "SUPER_ADMIN" && (
+                        <>
+                          <button
+                            onClick={() => onGenerateCredentials?.(school)}
+                            className="flex items-center gap-1 rounded-lg border border-[#c3dfd9] bg-[#eef7f4] px-2.5 py-1.5 text-xs font-bold text-[#0f7f79] shadow-sm hover:bg-[#dff1ec]"
+                            title="View or regenerate school login credentials and ID pass"
+                          >
+                            <KeyRound className="h-3.5 w-3.5" />
+                            ID Pass
+                          </button>
+                          <button
+                            onClick={() => onEditSchool?.(school)}
+                            className="flex items-center gap-1 rounded-lg border border-[#d3ded8] bg-white px-2.5 py-1.5 text-xs font-bold text-[#304541] shadow-sm hover:bg-[#f2f7f4] hover:text-[#0f7f79]"
+                          >
+                            <FileEdit className="h-3.5 w-3.5" />
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => onDeleteSchool?.(school.id, school.name)}
+                            className="flex items-center gap-1 rounded-lg border border-[#fecaca] bg-white px-2.5 py-1.5 text-xs font-bold text-[#dc2626] shadow-sm hover:bg-[#fef2f2]"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            Delete
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))
+                ))
             ) : isUsers ? (
               users.map((user) => (
                 <div key={user.id} className="flex items-center justify-between p-4 hover:bg-[#fbfdfb]">

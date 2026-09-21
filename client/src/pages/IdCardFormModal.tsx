@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import CardRenderer from "@/components/CardRenderer";
-import type { ApiIdCard, ApiIdCardDetail, ApiTemplate, ApiTemplateElement } from "@/lib/api";
+import type { ApiIdCard, ApiIdCardDetail, ApiSchool, ApiTemplate, ApiTemplateElement } from "@/lib/api";
 import { api } from "@/lib/api";
 import { DYNAMIC_FIELDS, type DesignerElement } from "@shared/templateDesigner";
 import {
@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import {
+  Building2,
   Camera,
   CheckCircle2,
   FileSignature,
@@ -43,6 +44,7 @@ interface IdCardFormModalProps {
   schoolCode?: string;
   initialCard?: ApiIdCardDetail | null;
   availableTemplates: ApiTemplate[];
+  schools?: ApiSchool[];
   onSaved: (card: ApiIdCard, submitted: boolean) => void;
 }
 
@@ -54,8 +56,10 @@ export default function IdCardFormModal({
   schoolCode = "",
   initialCard,
   availableTemplates,
+  schools,
   onSaved,
 }: IdCardFormModalProps) {
+  const [currentSchoolId, setCurrentSchoolId] = useState(schoolId);
   const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
   const [fullTemplate, setFullTemplate] = useState<ApiTemplate | null>(null);
   const [loadingTemplate, setLoadingTemplate] = useState(false);
@@ -73,6 +77,54 @@ export default function IdCardFormModal({
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  // Sync currentSchoolId if schoolId prop changes
+  useEffect(() => {
+    setCurrentSchoolId(schoolId);
+  }, [schoolId]);
+
+  const effectiveSchool = useMemo(() => {
+    return schools?.find((s) => s.id === currentSchoolId);
+  }, [schools, currentSchoolId]);
+
+  const loadTemplatesForSchool = (targetSchoolId: number) => {
+    api.schoolTemplates
+      .list(targetSchoolId)
+      .then((assigned) => {
+        const locked = assigned.find((t) => t.isLocked);
+        if (locked) {
+          setIsLockedTemplate(true);
+          setSelectedTemplateId(locked.templateId);
+          return;
+        }
+        const defaultTmpl = assigned.find((t) => t.isDefault);
+        if (defaultTmpl) {
+          setIsLockedTemplate(false);
+          setSelectedTemplateId(defaultTmpl.templateId);
+          return;
+        }
+        if (availableTemplates.length > 0) {
+          setIsLockedTemplate(false);
+          setSelectedTemplateId(availableTemplates[0].id);
+        }
+      })
+      .catch(() => {
+        if (availableTemplates.length > 0) {
+          setSelectedTemplateId(availableTemplates[0].id);
+        }
+      });
+  };
+
+  const handleSchoolChange = (newSchoolId: number) => {
+    setCurrentSchoolId(newSchoolId);
+    const targetSchool = schools?.find((s) => s.id === newSchoolId);
+    setFormData((prev) => ({
+      ...prev,
+      school_name: targetSchool?.name || "",
+      school_code: targetSchool?.shortCode || "",
+    }));
+    loadTemplatesForSchool(newSchoolId);
+  };
+
   // Initialize or reset form data whenever dialog opens or initialCard changes
   useEffect(() => {
     if (!open) return;
@@ -87,8 +139,8 @@ export default function IdCardFormModal({
     } else {
       setCardNumber("");
       const initial: Record<string, string> = {
-        school_name: schoolName,
-        school_code: schoolCode,
+        school_name: effectiveSchool?.name || schoolName,
+        school_code: effectiveSchool?.shortCode || schoolCode,
         gender: "Male",
         blood_group: "B+",
       };
@@ -97,33 +149,9 @@ export default function IdCardFormModal({
       setSignatureUrl(null);
 
       // Automatically determine school's locked or default template
-      api.schoolTemplates
-        .list(schoolId)
-        .then((assigned) => {
-          const locked = assigned.find((t) => t.isLocked);
-          if (locked) {
-            setIsLockedTemplate(true);
-            setSelectedTemplateId(locked.templateId);
-            return;
-          }
-          const defaultTmpl = assigned.find((t) => t.isDefault);
-          if (defaultTmpl) {
-            setIsLockedTemplate(false);
-            setSelectedTemplateId(defaultTmpl.templateId);
-            return;
-          }
-          if (availableTemplates.length > 0) {
-            setIsLockedTemplate(false);
-            setSelectedTemplateId(availableTemplates[0].id);
-          }
-        })
-        .catch(() => {
-          if (availableTemplates.length > 0) {
-            setSelectedTemplateId(availableTemplates[0].id);
-          }
-        });
+      loadTemplatesForSchool(currentSchoolId);
     }
-  }, [open, initialCard, schoolId, schoolName, schoolCode, availableTemplates]);
+  }, [open, initialCard, currentSchoolId, schoolName, schoolCode, availableTemplates]);
 
   // Load full template details & elements whenever selected template changes
   useEffect(() => {
@@ -241,7 +269,7 @@ export default function IdCardFormModal({
       else setSaving(true);
 
       const payload = {
-        schoolId,
+        schoolId: currentSchoolId,
         templateId: selectedTemplateId,
         cardNumber: cardNumber.trim() || undefined,
         data: {
@@ -326,30 +354,54 @@ export default function IdCardFormModal({
                 )}
               </DialogTitle>
               <div className="text-xs text-gray-500 mt-0.5">
-                School: <strong>{schoolName || `School #${schoolId}`}</strong> · Form is dynamically driven by the selected template.
+                School: <strong>{effectiveSchool?.name || schoolName || `School #${currentSchoolId}`}</strong> · Form is dynamically driven by the selected template.
               </div>
             </div>
 
-            {/* Template selector if not locked */}
-            {!isLockedTemplate && !initialCard && (
-              <div className="w-full sm:w-56">
-                <Select
-                  value={selectedTemplateId ? String(selectedTemplateId) : ""}
-                  onValueChange={(val) => setSelectedTemplateId(Number(val))}
-                >
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue placeholder="Select template" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableTemplates.map((t) => (
-                      <SelectItem key={t.id} value={String(t.id)}>
-                        {t.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+            <div className="flex flex-wrap items-center gap-2">
+              {/* School selector if admin has multiple schools */}
+              {schools && schools.length > 1 && !initialCard && (
+                <div className="w-full sm:w-56">
+                  <Select
+                    value={String(currentSchoolId)}
+                    onValueChange={(val) => handleSchoolChange(Number(val))}
+                  >
+                    <SelectTrigger className="h-8 text-xs font-semibold">
+                      <Building2 className="h-3.5 w-3.5 mr-1 text-[#0f7f79]" />
+                      <SelectValue placeholder="Select target school" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {schools.map((s) => (
+                        <SelectItem key={s.id} value={String(s.id)}>
+                          {s.name} ({s.shortCode})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* Template selector if not locked */}
+              {!isLockedTemplate && !initialCard && (
+                <div className="w-full sm:w-56">
+                  <Select
+                    value={selectedTemplateId ? String(selectedTemplateId) : ""}
+                    onValueChange={(val) => setSelectedTemplateId(Number(val))}
+                  >
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue placeholder="Select template" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableTemplates.map((t) => (
+                        <SelectItem key={t.id} value={String(t.id)}>
+                          {t.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
           </div>
         </DialogHeader>
 

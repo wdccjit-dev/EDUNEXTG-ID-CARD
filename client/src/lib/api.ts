@@ -1,4 +1,21 @@
-export type ApiSchool = { id: number; name: string; shortCode: string; email: string | null; phone: string | null; address: string | null; isActive: boolean };
+export type ApiSchool = {
+  id: number;
+  name: string;
+  shortCode: string;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  isActive: boolean;
+  selectedTemplateId?: number | null;
+  selectedTemplateName?: string | null;
+  templateSelectionStatus?: "Selected" | "Not Selected";
+  selectedTemplate?: ApiTemplate | null;
+  credentials?: {
+    loginId: string;
+    email: string;
+    password: string;
+  };
+};
 export type ApiUser = { id: number; name: string | null; email: string | null; role: string; schoolId: number | null; isActive: boolean };
 export type ApiTemplate = {
   id: number;
@@ -106,6 +123,8 @@ export const api = {
     update: (id: number, body: Partial<ApiSchool>) => request<ApiSchool>(`/api/schools/${id}`, put(body)),
     delete: (id: number) => request<void>(`/api/schools/${id}`, { method: "DELETE" }),
     setStatus: (id: number, isActive: boolean) => request<void>(`/api/schools/${id}/status`, json({ isActive })),
+    generateCredentials: (id: number) =>
+      request<{ success: true; credentials: { loginId: string; email: string; password: string } }>(`/api/schools/${id}/credentials`, json({})),
   },
   users: {
     list: () => request<ApiUser[]>("/api/users"),
@@ -123,7 +142,8 @@ export const api = {
   },
   schoolTemplates: {
     list: (schoolId: number) => request<ApiSchoolTemplate[]>(`/api/schools/${schoolId}/templates`),
-    select: (schoolId: number, templateId: number) => request<void>(`/api/schools/${schoolId}/templates/select`, json({ templateId })),
+    select: (schoolId: number, templateId: number) =>
+      request<{ success: true; selectedTemplateId: number; selectedTemplateName: string }>(`/api/schools/${schoolId}/templates/select`, json({ templateId })),
     lock: (schoolId: number, templateId: number) => request<void>(`/api/schools/${schoolId}/templates/lock`, json({ templateId })),
     unlock: (schoolId: number, templateId: number) => request<void>(`/api/schools/${schoolId}/templates/unlock`, json({ templateId })),
   },
@@ -143,6 +163,8 @@ export const api = {
       request<{ success: true; id: number }>(`/api/id-cards/${id}`, put(body)),
     delete: (id: number) => request<void>(`/api/id-cards/${id}`, { method: "DELETE" }),
     submit: (id: number) => request<{ success: true; requestId?: number; status: string }>(`/api/id-cards/${id}/submit`, json({})),
+    approve: (id: number) => request<{ success: true; status: string }>(`/api/id-cards/${id}/approve`, json({})),
+    reject: (id: number, reason: string) => request<{ success: true; status: string }>(`/api/id-cards/${id}/reject`, json({ reason })),
     print: (id: number) => request<{ success: true; status: string; printedAt: string }>(`/api/id-cards/${id}/print`, json({})),
     bulkPrint: (cardIds: number[]) => request<{ success: true; count: number }>("/api/id-cards/bulk-print", json({ cardIds })),
     pdfUrl: (id: number) => `/api/id-cards/${id}/pdf`,

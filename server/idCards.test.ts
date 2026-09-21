@@ -221,14 +221,15 @@ describe("ID Card Management, Approval Workflow, PDF & Printing — 18 Scenarios
   });
 
   // 1. Create draft
-  it("Scenario 1: Create draft card with generated card number and DRAFT status", async () => {
+  it("Scenario 1: Admin creates draft card for school with generated card number and DRAFT status", async () => {
     const res = await fetch(`${baseUrl}/api/id-cards`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${schoolAToken}`,
+        Authorization: `Bearer ${adminToken}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
+        schoolId: schoolAId,
         templateId,
         data: {
           student_name: "Alice Johnson",
@@ -251,11 +252,11 @@ describe("ID Card Management, Approval Workflow, PDF & Printing — 18 Scenarios
   });
 
   // 2. Edit draft
-  it("Scenario 2: Edit draft card details", async () => {
+  it("Scenario 2: Admin edits draft card details", async () => {
     const res = await fetch(`${baseUrl}/api/id-cards/${cardAId}`, {
       method: "PUT",
       headers: {
-        Authorization: `Bearer ${schoolAToken}`,
+        Authorization: `Bearer ${adminToken}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -288,11 +289,11 @@ describe("ID Card Management, Approval Workflow, PDF & Printing — 18 Scenarios
   });
 
   // 4. Submit card
-  it("Scenario 4: Submit card transitions status from DRAFT to SUBMITTED", async () => {
+  it("Scenario 4: Admin submits card for school approval transitions status to SUBMITTED", async () => {
     const res = await fetch(`${baseUrl}/api/id-cards/${cardAId}/submit`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${schoolAToken}`,
+        Authorization: `Bearer ${adminToken}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -318,10 +319,11 @@ describe("ID Card Management, Approval Workflow, PDF & Printing — 18 Scenarios
     const createRes = await fetch(`${baseUrl}/api/id-cards`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${schoolAToken}`,
+        Authorization: `Bearer ${adminToken}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
+        schoolId: schoolAId,
         templateId,
         data: {
           student_name: "Incomplete Student",
@@ -334,7 +336,7 @@ describe("ID Card Management, Approval Workflow, PDF & Printing — 18 Scenarios
     const submitRes = await fetch(`${baseUrl}/api/id-cards/${incomplete.id}/submit`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${schoolAToken}`,
+        Authorization: `Bearer ${adminToken}`,
         "Content-Type": "application/json",
       },
     });
@@ -344,11 +346,11 @@ describe("ID Card Management, Approval Workflow, PDF & Printing — 18 Scenarios
     expect(err.error).toMatch(/Missing required template field|photo is required/i);
   });
 
-  // 6. Admin sees submitted card
-  it("Scenario 6: Admin sees submitted card in pending approvals queue", async () => {
+  // 6. School sees submitted card
+  it("Scenario 6: School sees submitted card in their queue for review", async () => {
     const res = await fetch(`${baseUrl}/api/id-cards/${cardAId}`, {
       headers: {
-        Authorization: `Bearer ${adminToken}`,
+        Authorization: `Bearer ${schoolAToken}`,
       },
     });
 
@@ -359,12 +361,12 @@ describe("ID Card Management, Approval Workflow, PDF & Printing — 18 Scenarios
   });
 
   // 7. Request changes
-  it("Scenario 7: Admin requests changes with mandatory comment, status becomes CHANGES_REQUIRED", async () => {
+  it("Scenario 7: School requests changes with mandatory comment, status becomes CHANGES_REQUIRED", async () => {
     // Missing comment should fail
     const failRes = await fetch(`${baseUrl}/api/id-cards/${cardAId}/request-changes`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${adminToken}`,
+        Authorization: `Bearer ${schoolAToken}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ comment: "" }),
@@ -375,7 +377,7 @@ describe("ID Card Management, Approval Workflow, PDF & Printing — 18 Scenarios
     const res = await fetch(`${baseUrl}/api/id-cards/${cardAId}/request-changes`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${adminToken}`,
+        Authorization: `Bearer ${schoolAToken}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ comment: "Student name spelling should be verified against birth cert" }),
@@ -386,11 +388,11 @@ describe("ID Card Management, Approval Workflow, PDF & Printing — 18 Scenarios
     expect(body.status).toBe("CHANGES_REQUIRED");
   });
 
-  // 8. School sees change request
-  it("Scenario 8: School sees CHANGES_REQUIRED status and admin comment in audit timeline", async () => {
+  // 8. School & Admin see change request
+  it("Scenario 8: Admin and School see CHANGES_REQUIRED status and comment in audit timeline", async () => {
     const res = await fetch(`${baseUrl}/api/id-cards/${cardAId}`, {
       headers: {
-        Authorization: `Bearer ${schoolAToken}`,
+        Authorization: `Bearer ${adminToken}`,
       },
     });
 
@@ -406,13 +408,13 @@ describe("ID Card Management, Approval Workflow, PDF & Printing — 18 Scenarios
     expect(changeRequestHistory.comments).toContain("birth cert");
   });
 
-  // 9. School resubmits
-  it("Scenario 9: School updates corrections and resubmits, transitioning to RESUBMITTED", async () => {
-    // School edits card
-    await fetch(`${baseUrl}/api/id-cards/${cardAId}`, {
+  // 9. Admin updates and resubmits
+  it("Scenario 9: Admin updates corrections and resubmits, transitioning to RESUBMITTED", async () => {
+    // Admin edits card
+    const editRes = await fetch(`${baseUrl}/api/id-cards/${cardAId}`, {
       method: "PUT",
       headers: {
-        Authorization: `Bearer ${schoolAToken}`,
+        Authorization: `Bearer ${adminToken}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -421,24 +423,10 @@ describe("ID Card Management, Approval Workflow, PDF & Printing — 18 Scenarios
         },
       }),
     });
+    expect(editRes.status).toBe(200);
 
-    // School resubmits
+    // Admin resubmits
     const res = await fetch(`${baseUrl}/api/id-cards/${cardAId}/submit`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${schoolAToken}`,
-        "Content-Type": "application/json",
-      },
-    });
-
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.status).toBe("RESUBMITTED");
-  });
-
-  // 10. Admin approves
-  it("Scenario 10: Admin approves resubmitted card, transitioning status to APPROVED", async () => {
-    const res = await fetch(`${baseUrl}/api/id-cards/${cardAId}/approve`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${adminToken}`,
@@ -448,11 +436,26 @@ describe("ID Card Management, Approval Workflow, PDF & Printing — 18 Scenarios
 
     expect(res.status).toBe(200);
     const body = await res.json();
+    expect(body.status).toBe("RESUBMITTED");
+  });
+
+  // 10. School approves
+  it("Scenario 10: School approves resubmitted card, transitioning status to APPROVED", async () => {
+    const res = await fetch(`${baseUrl}/api/id-cards/${cardAId}/approve`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${schoolAToken}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
     expect(body.status).toBe("APPROVED");
   });
 
-  // 11. Approved card becomes read-only
-  it("Scenario 11: Approved card is read-only; edit and delete attempts are rejected with 400", async () => {
+  // 11. School cannot edit or delete cards
+  it("Scenario 11: School attempts to edit or delete cards are rejected with 403 Forbidden", async () => {
     // Edit attempt
     const editRes = await fetch(`${baseUrl}/api/id-cards/${cardAId}`, {
       method: "PUT",
@@ -464,7 +467,7 @@ describe("ID Card Management, Approval Workflow, PDF & Printing — 18 Scenarios
         data: { student_name: "Hacked Name" },
       }),
     });
-    expect(editRes.status).toBe(400);
+    expect(editRes.status).toBe(403);
 
     // Delete attempt
     const deleteRes = await fetch(`${baseUrl}/api/id-cards/${cardAId}`, {
@@ -473,14 +476,23 @@ describe("ID Card Management, Approval Workflow, PDF & Printing — 18 Scenarios
         Authorization: `Bearer ${schoolAToken}`,
       },
     });
-    expect(deleteRes.status).toBe(400);
+    expect(deleteRes.status).toBe(403);
   });
 
   // 12. PDF generation
-  it("Scenario 12: PDF generation endpoint returns application/pdf byte stream", async () => {
-    const res = await fetch(`${baseUrl}/api/id-cards/${cardAId}/pdf`, {
+  it("Scenario 12: Admin can download PDF while School is rejected with 403 Forbidden", async () => {
+    // School attempt rejected with 403
+    const schoolRes = await fetch(`${baseUrl}/api/id-cards/${cardAId}/pdf`, {
       headers: {
         Authorization: `Bearer ${schoolAToken}`,
+      },
+    });
+    expect(schoolRes.status).toBe(403);
+
+    // Admin attempt succeeds with 200
+    const res = await fetch(`${baseUrl}/api/id-cards/${cardAId}/pdf`, {
+      headers: {
+        Authorization: `Bearer ${adminToken}`,
       },
     });
 
@@ -494,7 +506,7 @@ describe("ID Card Management, Approval Workflow, PDF & Printing — 18 Scenarios
     const bulkRes = await fetch(`${baseUrl}/api/id-cards/bulk-pdf`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${schoolAToken}`,
+        Authorization: `Bearer ${adminToken}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ cardIds: [cardAId] }),
@@ -504,11 +516,22 @@ describe("ID Card Management, Approval Workflow, PDF & Printing — 18 Scenarios
   });
 
   // 13. Printing
-  it("Scenario 13: Printing transitions card status from APPROVED to PRINTED", async () => {
-    const res = await fetch(`${baseUrl}/api/id-cards/${cardAId}/print`, {
+  it("Scenario 13: Admin printing transitions card status from APPROVED to PRINTED; School print is rejected with 403", async () => {
+    // School attempt rejected with 403
+    const schoolPrintRes = await fetch(`${baseUrl}/api/id-cards/${cardAId}/print`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${schoolAToken}`,
+        "Content-Type": "application/json",
+      },
+    });
+    expect(schoolPrintRes.status).toBe(403);
+
+    // Admin attempt succeeds
+    const res = await fetch(`${baseUrl}/api/id-cards/${cardAId}/print`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${adminToken}`,
         "Content-Type": "application/json",
       },
     });
@@ -590,9 +613,8 @@ describe("ID Card Management, Approval Workflow, PDF & Printing — 18 Scenarios
     expect(delRes.status).toBe(403);
   });
 
-  // 17. School user cannot spoof school_id
-  it("Scenario 17: School user cannot spoof school_id (enforced to user's assigned school)", async () => {
-    // School A user attempts to create card with schoolId: schoolBId
+  // 17. School user cannot create ID cards
+  it("Scenario 17: School user cannot create ID cards (rejected with 403 Forbidden)", async () => {
     const res = await fetch(`${baseUrl}/api/id-cards`, {
       method: "POST",
       headers: {
@@ -600,30 +622,28 @@ describe("ID Card Management, Approval Workflow, PDF & Printing — 18 Scenarios
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        schoolId: schoolBId, // attempting to spoof
+        schoolId: schoolAId,
         templateId,
         data: {
-          student_name: "Spoof Attempt",
+          student_name: "School Attempt",
         },
       }),
     });
 
-    expect(res.status).toBe(201);
-    const created = await res.json();
-    // Server must enforce School A
-    expect(created.schoolId).toBe(schoolAId);
+    expect(res.status).toBe(403);
   });
 
   // 18. Invalid status transitions rejected
   it("Scenario 18: Invalid status transitions are rejected with 400", async () => {
-    // Create new draft
+    // Admin creates new draft
     const draftRes = await fetch(`${baseUrl}/api/id-cards`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${schoolAToken}`,
+        Authorization: `Bearer ${adminToken}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
+        schoolId: schoolAId,
         templateId,
         data: { student_name: "Premature Approval" },
       }),
@@ -634,7 +654,7 @@ describe("ID Card Management, Approval Workflow, PDF & Printing — 18 Scenarios
     const badApprove = await fetch(`${baseUrl}/api/id-cards/${draft.id}/approve`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${adminToken}`,
+        Authorization: `Bearer ${schoolAToken}`,
         "Content-Type": "application/json",
       },
     });
@@ -644,7 +664,7 @@ describe("ID Card Management, Approval Workflow, PDF & Printing — 18 Scenarios
     const badPrint = await fetch(`${baseUrl}/api/id-cards/${draft.id}/print`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${schoolAToken}`,
+        Authorization: `Bearer ${adminToken}`,
         "Content-Type": "application/json",
       },
     });
