@@ -8,7 +8,6 @@ import {
   HeartHandshake,
   Layers,
   Lock,
-  Mail,
   Palette,
   Phone,
   Printer,
@@ -198,24 +197,17 @@ export default function AboutUsSection() {
         <div className="flex flex-col justify-between gap-6 sm:flex-row sm:items-center">
           <div className="space-y-1">
             <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#778381]">
-              EduNextG Technologies
+              EduNextG
             </div>
             <h3 className="text-lg font-black text-[#182326]">
               AtlasID Management Suite
             </h3>
             <p className="text-xs text-[#778381]">
-              Version 2.4.0 (Enterprise Build) · Developed by Rishu Rajak.
+              Version 1.1.0 (Internal Build) · Developed by Rishu Rajak.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <a
-              href="mailto:support@edunextg.com"
-              className="inline-flex items-center gap-2 rounded-xl border border-[#dfe7e2] bg-[#f7faf8] px-4 py-2.5 text-xs font-bold text-[#1f3733] hover:bg-[#edf5f0] transition-colors"
-            >
-              <Mail className="h-3.5 w-3.5 text-[#0f7f79]" />
-              support@edunextg.com
-            </a>
             <div className="inline-flex items-center gap-2 rounded-xl border border-[#b7e3d9] bg-[#dff3ee] px-4 py-2.5 text-xs font-extrabold text-[#0b716b]">
               <span className="h-2 w-2 rounded-full bg-[#0b716b] animate-pulse" />
               System Status: Operational

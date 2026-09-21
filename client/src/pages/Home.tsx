@@ -499,11 +499,12 @@ export default function Home({
     if (authenticatedUser.role !== "SUPER_ADMIN") {
       return toast.error("Only Super Admins can delete schools");
     }
-    if (!window.confirm(`Are you sure you want to delete "${schoolName}"? All associated data and templates will be affected.`)) {
+    if (!window.confirm(`Are you sure you want to delete "${schoolName}"? All associated data and user accounts will be deleted.`)) {
       return;
     }
     // 1. Optimistically remove from state immediately
     setSchools((prev) => prev.filter((s) => s.id !== schoolId));
+    setUsers((prev) => prev.filter((u) => u.schoolId !== schoolId));
     if (selectedSchoolId === schoolId) {
       const remaining = schools.filter((s) => s.id !== schoolId);
       setSelectedSchoolId(remaining[0]?.id ?? null);
@@ -511,19 +512,39 @@ export default function Home({
 
     try {
       await api.schools.delete(schoolId);
-      toast.success(`School "${schoolName}" deleted successfully`);
+      toast.success(`School "${schoolName}" and its accounts deleted successfully`);
       // 2. Fetch fresh list from server in background to ensure total sync
-      const freshSchools = await api.schools.list();
+      const [freshSchools, freshUsers] = await Promise.all([
+        api.schools.list().catch(() => []),
+        api.users.list().catch(() => []),
+      ]);
       setSchools(freshSchools);
+      setUsers(freshUsers);
       if (selectedSchoolId === schoolId) {
         setSelectedSchoolId(freshSchools[0]?.id ?? null);
       }
     } catch (error) {
       // Revert if delete failed
-      const freshSchools = await api.schools.list().catch(() => []);
+      const [freshSchools, freshUsers] = await Promise.all([
+        api.schools.list().catch(() => []),
+        api.users.list().catch(() => []),
+      ]);
       if (freshSchools.length > 0) setSchools(freshSchools);
+      if (freshUsers.length > 0) setUsers(freshUsers);
       toast.error("Could not delete school", {
         description: error instanceof Error ? error.message : "Request failed",
+      });
+    }
+  };
+
+  const handleClearActivity = async () => {
+    try {
+      await api.auditLogs.clear();
+      setActivity([]);
+      toast.success("Recent activity cleared");
+    } catch (err) {
+      toast.error("Failed to clear recent activity", {
+        description: err instanceof Error ? err.message : "Request failed",
       });
     }
   };
@@ -558,6 +579,9 @@ export default function Home({
         setSelectedSchoolId(created.id);
         setSchoolModalOpen(false);
         toast.success(`School "${created.name}" created successfully`);
+        // Refresh users list so new school user immediately appears in Users
+        const freshUsers = await api.users.list().catch(() => []);
+        setUsers(freshUsers);
         if (created.credentials) {
           setCredentialsData({
             schoolName: created.name,
@@ -1151,7 +1175,7 @@ export default function Home({
             </button>
             <div>
               <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#82908e]">
-                Tuesday · 15 September 2026
+                {format(new Date(), "EEEE · d MMMM yyyy")}
               </div>
               <h1 className="mt-1 text-[22px] font-extrabold tracking-[-0.05em]">
                 {activeNav === "Overview"
@@ -1538,36 +1562,52 @@ export default function Home({
                         Your team’s latest actions
                       </p>
                     </div>
-                    <button
-                      onClick={() => toast("Audit logs opened")}
-                      className="text-[10px] font-extrabold text-[#0f7f79] hover:underline"
-                    >
-                      View log
-                    </button>
+                    <div className="flex items-center gap-3">
+                      {activity.length > 0 && (
+                        <button
+                          onClick={() => void handleClearActivity()}
+                          className="text-[10px] font-extrabold text-[#dc2626] hover:underline cursor-pointer"
+                        >
+                          Clear
+                        </button>
+                      )}
+                      <button
+                        onClick={() => toast("Audit logs opened")}
+                        className="text-[10px] font-extrabold text-[#0f7f79] hover:underline"
+                      >
+                        View log
+                      </button>
+                    </div>
                   </CardHeader>
                   <CardContent className="px-6 pb-6 pt-4">
-                    <div className="space-y-5">
-                      {activity.map((item) => (
-                        <div key={item.id} className="flex gap-3">
-                          <ToneIcon icon={BookOpenCheck} tone="teal" />
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="text-xs font-extrabold text-[#304541]">
-                                {item.action.replaceAll("_", " ")}
+                    {activity.length === 0 ? (
+                      <div className="py-8 text-center text-xs text-[#8ea49d]">
+                        No recent activity entries.
+                      </div>
+                    ) : (
+                      <div className="space-y-5">
+                        {activity.map((item) => (
+                          <div key={item.id} className="flex gap-3">
+                            <ToneIcon icon={BookOpenCheck} tone="teal" />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="text-xs font-extrabold text-[#304541]">
+                                  {item.action.replaceAll("_", " ")}
+                                </div>
+                                <span className="whitespace-nowrap font-mono text-[9px] text-[#a3adaa]">
+                                  {formatDistanceToNow(new Date(item.createdAt), {
+                                    addSuffix: true,
+                                  })}
+                                </span>
                               </div>
-                              <span className="whitespace-nowrap font-mono text-[9px] text-[#a3adaa]">
-                                {formatDistanceToNow(new Date(item.createdAt), {
-                                  addSuffix: true,
-                                })}
-                              </span>
+                              <p className="mt-1 text-[11px] leading-4 text-[#81908b]">
+                                {item.entityType} #{item.entityId ?? "-"}
+                              </p>
                             </div>
-                            <p className="mt-1 text-[11px] leading-4 text-[#81908b]">
-                              {item.entityType} #{item.entityId ?? "-"}
-                            </p>
                           </div>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    )}
                     <div className="mt-6 rounded-xl border border-dashed border-[#d6e4dc] bg-[#f7fbf8] p-3 text-center">
                       <div className="font-mono text-[9px] uppercase tracking-[0.12em] text-[#8ea49d]">
                         All systems operational
@@ -2646,7 +2686,8 @@ function ModuleView({
         (u) =>
           !searchTerm ||
           (u.name?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
-          (u.email?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false),
+          (u.email?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
+          (u.openId?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false),
       );
   }, [users, userRoleFilter, searchTerm]);
 
@@ -3199,75 +3240,89 @@ function ModuleView({
           </div>
           <div className="divide-y divide-[#edf0ed]">
             {isSchools ? (
-              schools
-                .filter(
-                  (s) =>
-                    !searchTerm ||
-                    s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                    s.shortCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                    (s.email?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false),
-                )
-                .map((school) => (
-                  <div key={school.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 gap-3 hover:bg-[#fbfdfb] transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#dff3ee] text-[#0b716b] shrink-0">
-                        <Building2 className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <div className="text-sm font-extrabold text-[#304541] flex flex-wrap items-center gap-2">
-                          {school.name}
-                          <StatusPill tone="teal">Active</StatusPill>
-                          {school.templateSelectionStatus === "Selected" ? (
-                            <span className="inline-flex items-center gap-1 rounded-full border border-teal-200 bg-teal-50 px-2.5 py-0.5 text-[10px] font-bold text-teal-800">
-                              <CheckCircle2 className="h-3 w-3 text-teal-600" />
-                              Template: {school.selectedTemplateName || "Selected"}
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[10px] font-bold text-amber-800">
-                              <AlertTriangle className="h-3 w-3 text-amber-600" />
-                              Template: Not Selected
-                            </span>
-                          )}
+              schools.filter(
+                (s) =>
+                  !searchTerm ||
+                  s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                  s.shortCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                  (s.email?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false),
+              ).length === 0 ? (
+                <div className="p-12 text-center text-sm text-[#8d9995]">
+                  <Building2 className="mx-auto mb-3 h-8 w-8 text-[#98a4a1]" />
+                  <p className="font-semibold text-[#304541]">No schools registered yet</p>
+                  <p className="mt-1 text-xs text-[#98a4a1]">Click &ldquo;Add school&rdquo; above to add a new school and generate its credentials.</p>
+                </div>
+              ) : (
+                schools
+                  .filter(
+                    (s) =>
+                      !searchTerm ||
+                      s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                      s.shortCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                      (s.email?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false),
+                  )
+                  .map((school) => (
+                    <div key={school.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 gap-3 hover:bg-[#fbfdfb] transition-colors">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#dff3ee] text-[#0b716b] shrink-0">
+                          <Building2 className="h-5 w-5" />
                         </div>
-                        <div className="text-[11px] text-[#8d9995] flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
-                          <span>Code: <b className="text-[#304541]">{school.shortCode}</b></span>
-                          {school.email && <span>Email: {school.email}</span>}
-                          {school.phone && <span>Phone: {school.phone}</span>}
-                          {school.address && <span>Address: {school.address}</span>}
+                        <div>
+                          <div className="text-sm font-extrabold text-[#304541] flex flex-wrap items-center gap-2">
+                            {school.name}
+                            <StatusPill tone="teal">Active</StatusPill>
+                            {school.templateSelectionStatus === "Selected" ? (
+                              <span className="inline-flex items-center gap-1 rounded-full border border-teal-200 bg-teal-50 px-2.5 py-0.5 text-[10px] font-bold text-teal-800">
+                                <CheckCircle2 className="h-3 w-3 text-teal-600" />
+                                Template: {school.selectedTemplateName || "Selected"}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[10px] font-bold text-amber-800">
+                                <AlertTriangle className="h-3 w-3 text-amber-600" />
+                                Template: Not Selected
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-[#8d9995] flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
+                            <span>Code: <b className="text-[#304541]">{school.shortCode}</b></span>
+                            {school.email && <span>Email: {school.email}</span>}
+                            {school.phone && <span>Phone: {school.phone}</span>}
+                            {school.address && <span>Address: {school.address}</span>}
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
-                      {authenticatedUser.role === "SUPER_ADMIN" && (
-                        <>
-                          <button
-                            onClick={() => onGenerateCredentials?.(school)}
-                            className="flex items-center gap-1 rounded-lg border border-[#c3dfd9] bg-[#eef7f4] px-2.5 py-1.5 text-xs font-bold text-[#0f7f79] shadow-sm hover:bg-[#dff1ec]"
-                            title="View or regenerate school login credentials and ID pass"
-                          >
-                            <KeyRound className="h-3.5 w-3.5" />
-                            ID Pass
-                          </button>
-                          <button
-                            onClick={() => onEditSchool?.(school)}
-                            className="flex items-center gap-1 rounded-lg border border-[#d3ded8] bg-white px-2.5 py-1.5 text-xs font-bold text-[#304541] shadow-sm hover:bg-[#f2f7f4] hover:text-[#0f7f79]"
-                          >
-                            <FileEdit className="h-3.5 w-3.5" />
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => onDeleteSchool?.(school.id, school.name)}
-                            className="flex items-center gap-1 rounded-lg border border-[#fecaca] bg-white px-2.5 py-1.5 text-xs font-bold text-[#dc2626] shadow-sm hover:bg-[#fef2f2]"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                            Delete
-                          </button>
-                        </>
-                      )}
+                      <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                        {authenticatedUser.role === "SUPER_ADMIN" && (
+                          <>
+                            <button
+                              onClick={() => onGenerateCredentials?.(school)}
+                              className="flex items-center gap-1 rounded-lg border border-[#c3dfd9] bg-[#eef7f4] px-2.5 py-1.5 text-xs font-bold text-[#0f7f79] shadow-sm hover:bg-[#dff1ec]"
+                              title="View or regenerate school login credentials and ID pass"
+                            >
+                              <KeyRound className="h-3.5 w-3.5" />
+                              ID Pass
+                            </button>
+                            <button
+                              onClick={() => onEditSchool?.(school)}
+                              className="flex items-center gap-1 rounded-lg border border-[#d3ded8] bg-white px-2.5 py-1.5 text-xs font-bold text-[#304541] shadow-sm hover:bg-[#f2f7f4] hover:text-[#0f7f79]"
+                            >
+                              <FileEdit className="h-3.5 w-3.5" />
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => onDeleteSchool?.(school.id, school.name)}
+                              className="flex items-center gap-1 rounded-lg border border-[#fecaca] bg-white px-2.5 py-1.5 text-xs font-bold text-[#dc2626] shadow-sm hover:bg-[#fef2f2]"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              Delete
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))
+                  ))
+              )
             ) : isUsers ? (
               <>
                 <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-[#fbfdfb] border-b border-[#edf0ed]">
@@ -3308,14 +3363,22 @@ function ModuleView({
                         </div>
                         <div>
                           <div className="text-sm font-extrabold text-[#304541] flex items-center gap-2">
-                            {user.name || user.email}
+                            {user.name || user.email || user.openId}
                             {user.schoolId && (
                               <span className="text-[10px] font-semibold text-[#0f7f79] bg-[#eef7f4] px-2 py-0.5 rounded-full">
                                 School #{user.schoolId}
                               </span>
                             )}
                           </div>
-                          <div className="text-[11px] text-[#8d9995]">{user.email}</div>
+                          <div className="text-[11px] text-[#8d9995] flex flex-wrap items-center gap-2">
+                            <span>Login ID: <b className="font-mono text-[#4e5c59]">{user.openId}</b></span>
+                            {user.email ? (
+                              <>
+                                <span>·</span>
+                                <span>{user.email}</span>
+                              </>
+                            ) : null}
+                          </div>
                         </div>
                       </div>
                       <StatusPill tone={user.role === "SUPER_ADMIN" ? "indigo" : "teal"}>

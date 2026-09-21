@@ -3,7 +3,7 @@ import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from "node:cry
 import { parse as parseCookieHeader } from "cookie";
 import { SignJWT, jwtVerify } from "jose";
 import type { Request, Response } from "express";
-import { eq, gt, and, or } from "drizzle-orm";
+import { eq, gt, and, or, sql } from "drizzle-orm";
 import { COOKIE_NAME } from "@shared/const";
 import { passwordResets, users, type User } from "../drizzle/schema";
 import { getDb } from "./db";
@@ -18,60 +18,95 @@ function secretKey() {
   return new TextEncoder().encode(ENV.cookieSecret);
 }
 
-export async function hashPassword(password: string) {
+export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(16).toString("hex");
-  const derived = await scrypt(password, salt, 64) as Buffer;
+  const derived = (await scrypt(password, salt, 64)) as Buffer;
   return `scrypt$${salt}$${derived.toString("hex")}`;
 }
 
-export async function verifyPassword(password: string, stored: string | null) {
-  if (!stored?.startsWith("scrypt$")) return false;
-  const [, salt, expectedHex] = stored.split("$");
-  if (!salt || !expectedHex) return false;
-  const actual = await scrypt(password, salt, 64) as Buffer;
-  const expected = Buffer.from(expectedHex, "hex");
-  return expected.length === actual.length && timingSafeEqual(expected, actual);
+export async function verifyPassword(password: string, stored?: string | null): Promise<boolean> {
+  if (!stored) return false;
+  if (stored.startsWith("scrypt$")) {
+    const parts = stored.split("$");
+    if (parts.length < 3) return false;
+    const [, salt, expectedHex] = parts;
+    if (!salt || !expectedHex) return false;
+    const actual = (await scrypt(password, salt, 64)) as Buffer;
+    const expected = Buffer.from(expectedHex, "hex");
+    return expected.length === actual.length && timingSafeEqual(expected, actual);
+  }
+  if (stored.includes(":")) {
+    const [salt, key] = stored.split(":");
+    if (!salt || !key) return false;
+    const derived = (await scrypt(password, salt, 64)) as Buffer;
+    return timingSafeEqual(Buffer.from(key, "hex"), derived);
+  }
+  return false;
 }
 
-async function signApplicationSession(user: User) {
-  return new SignJWT({ type: "application", userId: user.id, role: user.role, schoolId: user.schoolId })
-    .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+export async function signApplicationSession(user: User): Promise<string> {
+  return new SignJWT({
+    type: "application",
+    openId: user.openId,
+    appRole: user.role,
+    role: user.role,
+    userId: user.id,
+    schoolId: user.schoolId ?? null,
+  })
+    .setProtectedHeader({ alg: "HS256" })
     .setSubject(String(user.id))
     .setIssuedAt()
-    .setExpirationTime(Math.floor((Date.now() + SESSION_TTL_MS) / 1000))
+    .setExpirationTime(`${SESSION_TTL_MS / 1000}s`)
     .sign(secretKey());
 }
 
-export function setApplicationSession(res: Response, token: string) {
-  res.cookie(COOKIE_NAME, token, { httpOnly: true, secure: ENV.isProduction, sameSite: "lax", path: "/", maxAge: SESSION_TTL_MS });
+export async function authenticateApplicationRequest(req: Request): Promise<User | null> {
+  const cookies = parseCookieHeader(req.headers.cookie ?? "");
+  const token = req.headers.authorization?.replace(/^Bearer\s+/i, "") ?? cookies[COOKIE_NAME];
+  if (!token) return null;
+  try {
+    const verified = await jwtVerify(token, secretKey());
+    const payload = verified.payload;
+    const db = await getDb();
+    if (!db) return null;
+    let user: User | undefined;
+    if (typeof payload.userId === "number") {
+      user = (await db.select().from(users).where(eq(users.id, payload.userId)))[0];
+    } else if (payload.openId) {
+      user = (await db.select().from(users).where(eq(users.openId, String(payload.openId))))[0];
+    }
+    if (!user || !user.isActive) return null;
+    return user;
+  } catch {
+    return null;
+  }
+}
+
+export async function setApplicationSession(res: Response, token: string) {
+  res.cookie(COOKIE_NAME, token, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: ENV.isProduction,
+    maxAge: SESSION_TTL_MS,
+    path: "/",
+  });
 }
 
 export function clearApplicationSession(res: Response) {
-  res.clearCookie(COOKIE_NAME, { httpOnly: true, secure: ENV.isProduction, sameSite: "lax", path: "/" });
-}
-
-function readSessionToken(req: Request) {
-  const cookies = parseCookieHeader(req.headers.cookie ?? "");
-  return cookies[COOKIE_NAME] ?? (req.headers.authorization?.startsWith("Bearer ") ? req.headers.authorization.slice(7) : undefined);
-}
-
-export async function authenticateApplicationRequest(req: Request): Promise<User> {
-  const token = readSessionToken(req);
-  if (!token) throw new Error("Authentication required");
-  const { payload } = await jwtVerify(token, secretKey(), { algorithms: ["HS256"] });
-  if (payload.type !== "application" || typeof payload.userId !== "number") throw new Error("Invalid application session");
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  const user = (await db.select().from(users).where(eq(users.id, payload.userId)))[0];
-  if (!user || !user.isActive || !user.passwordHash) throw new Error("Account unavailable");
-  return user;
+  res.clearCookie(COOKIE_NAME, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: ENV.isProduction,
+    path: "/",
+  });
 }
 
 export async function loginUser(identifier: string, password: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const clean = identifier.trim().toLowerCase();
-  // Match either exact email, exact openId, or email before @
+  const rawClean = identifier.trim();
+  const clean = rawClean.toLowerCase();
+  // Match either exact email, exact openId (case-insensitive)
   const user = (
     await db
       .select()
@@ -79,8 +114,9 @@ export async function loginUser(identifier: string, password: string) {
       .where(
         or(
           eq(users.email, clean),
+          eq(users.openId, rawClean),
           eq(users.openId, clean),
-          eq(users.email, `${clean}@edunextg.com`)
+          sql`LOWER(${users.openId}) = ${clean}`
         )
       )
   )[0];

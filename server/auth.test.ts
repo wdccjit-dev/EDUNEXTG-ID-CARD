@@ -29,35 +29,19 @@ describe("Application Authentication & School-Scoped Isolation", () => {
       throw new Error("Database required for auth test suite");
     }
 
-    // Ensure we have two schools for multi-tenant isolation tests
-    const existingSchools = await db.select().from(schools).limit(2);
-    if (existingSchools.length >= 2) {
-      testSchoolAId = existingSchools[0].id;
-      testSchoolBId = existingSchools[1].id;
-    } else if (existingSchools.length === 1) {
-      testSchoolAId = existingSchools[0].id;
-      const otherCode = existingSchools[0].shortCode === "TSB" ? "TSA" : "TSB";
-      const otherName = otherCode === "TSA" ? "Test School A" : "Test School B";
-      const [resB] = await db.insert(schools).values({
-        name: otherName,
-        shortCode: otherCode,
-        isActive: true,
-      });
-      testSchoolBId = Number(resB.insertId);
-    } else {
-      const [resA] = await db.insert(schools).values({
-        name: "Test School A",
-        shortCode: "TSA",
-        isActive: true,
-      });
-      testSchoolAId = Number(resA.insertId);
-      const [resB] = await db.insert(schools).values({
-        name: "Test School B",
-        shortCode: "TSB",
-        isActive: true,
-      });
-      testSchoolBId = Number(resB.insertId);
-    }
+    // Create dedicated test schools for multi-tenant isolation tests
+    const [resA] = await db.insert(schools).values({
+      name: "Auth Test School A",
+      shortCode: `AUTHA_${Date.now().toString().slice(-4)}`,
+      isActive: true,
+    });
+    testSchoolAId = Number(resA.insertId);
+    const [resB] = await db.insert(schools).values({
+      name: "Auth Test School B",
+      shortCode: `AUTHB_${Date.now().toString().slice(-4)}`,
+      isActive: true,
+    });
+    testSchoolBId = Number(resB.insertId);
 
     // Seed or retrieve test users
     const pwdHash = await hashPassword("TestPass123!");
@@ -151,8 +135,9 @@ describe("Application Authentication & School-Scoped Isolation", () => {
       } as unknown as Request;
 
       const authUser = await authenticateApplicationRequest(mockReqCookie);
-      expect(authUser.id).toBe(superAdminUser.id);
-      expect(authUser.role).toBe("SUPER_ADMIN");
+      expect(authUser).not.toBeNull();
+      expect(authUser!.id).toBe(superAdminUser.id);
+      expect(authUser!.role).toBe("SUPER_ADMIN");
 
       // Mock request with Authorization Bearer header
       const mockReqBearer = {
@@ -162,7 +147,8 @@ describe("Application Authentication & School-Scoped Isolation", () => {
       } as unknown as Request;
 
       const authUserBearer = await authenticateApplicationRequest(mockReqBearer);
-      expect(authUserBearer.id).toBe(superAdminUser.id);
+      expect(authUserBearer).not.toBeNull();
+      expect(authUserBearer!.id).toBe(superAdminUser.id);
     });
 
     it("sets and clears HTTP-only session cookie correctly", () => {
@@ -248,17 +234,18 @@ describe("Application Authentication & School-Scoped Isolation", () => {
       const superAdminMe = await authenticateApplicationRequest({
         headers: { authorization: `Bearer ${adminToken}` },
       } as unknown as Request);
-      expect(superAdminMe.role).toBe("SUPER_ADMIN");
+      expect(superAdminMe).not.toBeNull();
+      expect(superAdminMe!.role).toBe("SUPER_ADMIN");
     });
 
     it("School user is automatically scoped to their school and denied access to other schools", async () => {
       const schoolUser = await authenticateApplicationRequest({
         headers: { authorization: `Bearer ${schoolAToken}` },
       } as unknown as Request);
-
-      expect(schoolUser.role).toBe("SCHOOL_ADMIN");
-      expect(schoolUser.schoolId).toBe(testSchoolAId);
-      expect(schoolUser.schoolId).not.toBe(testSchoolBId);
+      expect(schoolUser).not.toBeNull();
+      expect(schoolUser!.role).toBe("SCHOOL_ADMIN");
+      expect(schoolUser!.schoolId).toBe(testSchoolAId);
+      expect(schoolUser!.schoolId).not.toBe(testSchoolBId);
     });
 
     it("prevents school user from overriding schoolId in request body", async () => {
@@ -268,11 +255,12 @@ describe("Application Authentication & School-Scoped Isolation", () => {
       const schoolUser = await authenticateApplicationRequest({
         headers: { authorization: `Bearer ${schoolAToken}` },
       } as unknown as Request);
+      expect(schoolUser).not.toBeNull();
 
       const requestedBodySchoolId = testSchoolBId; // Attacker tries to create card for School B
-      const assignedSchoolId = schoolUser.role === "SUPER_ADMIN"
+      const assignedSchoolId = schoolUser!.role === "SUPER_ADMIN"
         ? Number(requestedBodySchoolId)
-        : schoolUser.schoolId;
+        : schoolUser!.schoolId;
 
       // School user must always be pinned to their own school
       expect(assignedSchoolId).toBe(testSchoolAId);
@@ -284,6 +272,8 @@ describe("Application Authentication & School-Scoped Isolation", () => {
     if (db) {
       await db.delete(users).where(eq(users.openId, "test_admin"));
       await db.delete(users).where(eq(users.openId, "test_school_admin"));
+      if (testSchoolAId) await db.delete(schools).where(eq(schools.id, testSchoolAId));
+      if (testSchoolBId) await db.delete(schools).where(eq(schools.id, testSchoolBId));
     }
   });
 });

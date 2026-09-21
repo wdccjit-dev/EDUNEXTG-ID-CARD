@@ -506,4 +506,24 @@ describe("Visual ID Card Template Designer — Full Lifecycle & Isolation", () =
     });
     expect(postRes.status).toBe(403);
   });
+
+  afterAll(async () => {
+    if (server) {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+    const db = await getDb();
+    if (db) {
+      if (createdTemplateId) {
+        await db.delete(templateElements).where(eq(templateElements.templateId, createdTemplateId));
+        await db.delete(schoolTemplates).where(eq(schoolTemplates.templateId, createdTemplateId));
+        await db.delete(idCardTemplates).where(eq(idCardTemplates.id, createdTemplateId));
+      }
+      if (adminEmail) await db.delete(users).where(eq(users.email, adminEmail));
+      if (schoolEmail) await db.delete(users).where(eq(users.email, schoolEmail));
+      if (schoolId) {
+        await db.delete(users).where(eq(users.schoolId, schoolId));
+        await db.delete(schools).where(eq(schools.id, schoolId));
+      }
+    }
+  });
 });

@@ -16,7 +16,7 @@ export type ApiSchool = {
     password: string;
   };
 };
-export type ApiUser = { id: number; name: string | null; email: string | null; role: string; schoolId: number | null; isActive: boolean };
+export type ApiUser = { id: number; name: string | null; email: string | null; role: string; schoolId: number | null; isActive: boolean; openId?: string };
 export type ApiTemplate = {
   id: number;
   name: string;
@@ -202,7 +202,10 @@ export const api = {
     list: () => request<ApiNotification[]>("/api/notifications"),
     markRead: (id: number) => request<{ success: true }>(`/api/notifications/${id}/read`, json({})),
   },
-  auditLogs: { list: () => request<ApiActivity[]>("/api/audit-logs") },
+  auditLogs: {
+    list: () => request<ApiActivity[]>("/api/audit-logs"),
+    clear: () => request<{ success: true; message: string }>("/api/audit-logs", { method: "DELETE" }),
+  },
   upload: (filename: string, contentType: string, dataBase64: string) =>
     request<{ url: string }>("/api/upload", json({ filename, contentType, dataBase64 })),
   profile: {

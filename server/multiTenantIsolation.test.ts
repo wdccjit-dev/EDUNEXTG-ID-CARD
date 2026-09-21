@@ -634,4 +634,37 @@ describe("Strict Multi-Tenant Isolation & Comprehensive RBAC Verification", () =
     // Cleanup dummy request
     await db!.delete(idCardRequests).where(eq(idCardRequests.id, reqBId));
   });
+
+  afterAll(async () => {
+    if (server) {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+    const db = await getDb();
+    if (db) {
+      if (cardAId) await db.delete(idCards).where(eq(idCards.id, cardAId));
+      if (templateActiveId) {
+        await db.delete(templateElements).where(eq(templateElements.templateId, templateActiveId));
+        await db.delete(idCardTemplates).where(eq(idCardTemplates.id, templateActiveId));
+      }
+      if (templateUnusedId) {
+        await db.delete(templateElements).where(eq(templateElements.templateId, templateUnusedId));
+        await db.delete(idCardTemplates).where(eq(idCardTemplates.id, templateUnusedId));
+      }
+      if (schoolAId) {
+        await db.delete(idCardRequests).where(eq(idCardRequests.schoolId, schoolAId));
+        await db.delete(schoolTemplates).where(eq(schoolTemplates.schoolId, schoolAId));
+        await db.delete(users).where(eq(users.schoolId, schoolAId));
+        await db.delete(schools).where(eq(schools.id, schoolAId));
+      }
+      if (schoolBId) {
+        await db.delete(idCardRequests).where(eq(idCardRequests.schoolId, schoolBId));
+        await db.delete(schoolTemplates).where(eq(schoolTemplates.schoolId, schoolBId));
+        await db.delete(users).where(eq(users.schoolId, schoolBId));
+        await db.delete(schools).where(eq(schools.id, schoolBId));
+      }
+      if (adminUserId) await db.delete(users).where(eq(users.id, adminUserId));
+      if (schoolAUserId) await db.delete(users).where(eq(users.id, schoolAUserId));
+      if (schoolBUserId) await db.delete(users).where(eq(users.id, schoolBUserId));
+    }
+  });
 });

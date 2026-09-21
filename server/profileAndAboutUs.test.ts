@@ -333,4 +333,86 @@ describe("Super Admin Profile, About Us, and Test Account Isolation", () => {
       expect(res.body.title).toContain("About");
     });
   });
+
+  describe("6. Recent Activity / Audit Logs Clear Functionality", () => {
+    it("allows admin to clear recent activity via DELETE /api/audit-logs", async () => {
+      // First ensure there's at least one audit log entry
+      await makeRequest("PUT", "/api/profile", adminToken, { phone: "9876543210" });
+      const beforeRes = await makeRequest("GET", "/api/audit-logs", adminToken);
+      expect(beforeRes.status).toBe(200);
+
+      // Now clear logs
+      const deleteRes = await makeRequest("DELETE", "/api/audit-logs", adminToken);
+      expect(deleteRes.status).toBe(200);
+      expect(deleteRes.body.success).toBe(true);
+
+      // Verify audit logs are empty
+      const afterRes = await makeRequest("GET", "/api/audit-logs", adminToken);
+      expect(afterRes.status).toBe(200);
+      expect(afterRes.body.length).toBe(0);
+    });
+  });
+
+  describe("7. School Creation without Email & Automatic User Cleanup on School Deletion", () => {
+    let createdSchoolId: number;
+    let createdSchoolLoginId: string;
+
+    it("creates a school without email leaving user email null and not setting @edunextg", async () => {
+      const res = await makeRequest("POST", "/api/schools", adminToken, {
+        name: "Emerald High School",
+        shortCode: "EMERALD",
+        // Notice: NO email provided
+        phone: "555-0199",
+      });
+      expect(res.status).toBe(201);
+      createdSchoolId = res.body.id;
+      expect(createdSchoolId).toBeGreaterThan(0);
+      expect(res.body.email).toBeNull();
+      expect(res.body.credentials).toBeDefined();
+      expect(res.body.credentials.loginId).toBe("SCH_EMERALD");
+      expect(res.body.credentials.email).toBe(""); // Not random @edunextg
+      createdSchoolLoginId = res.body.credentials.loginId;
+
+      // Verify in DB users table that the school admin has email: null
+      const schoolAdminUser = (
+        await db!.select().from(users).where(eq(users.openId, createdSchoolLoginId))
+      )[0];
+      expect(schoolAdminUser).toBeDefined();
+      expect(schoolAdminUser.email).toBeNull();
+      expect(schoolAdminUser.schoolId).toBe(createdSchoolId);
+
+      // Verify school admin can log in with Login ID and password even without email
+      const schoolLogin = await loginUser(createdSchoolLoginId, res.body.credentials.password);
+      expect(schoolLogin).not.toBeNull();
+      expect(schoolLogin?.user.schoolId).toBe(createdSchoolId);
+    });
+
+    it("automatically deletes the associated school user when the school is deleted", async () => {
+      // Confirm user exists before deletion
+      const userBefore = (
+        await db!.select().from(users).where(eq(users.schoolId, createdSchoolId))
+      )[0];
+      expect(userBefore).toBeDefined();
+
+      // Delete the school
+      const deleteRes = await makeRequest("DELETE", `/api/schools/${createdSchoolId}`, adminToken);
+      expect(deleteRes.status).toBe(200);
+      expect(deleteRes.body.success).toBe(true);
+
+      // Verify school is deleted
+      const schoolAfter = (
+        await db!.select().from(schools).where(eq(schools.id, createdSchoolId))
+      )[0];
+      expect(schoolAfter).toBeUndefined();
+
+      // Verify associated user is automatically deleted (no orphaned users in users table)
+      const userAfter = (
+        await db!.select().from(users).where(eq(users.openId, createdSchoolLoginId))
+      )[0];
+      expect(userAfter).toBeUndefined();
+
+      const orphanedUsers = await db!.select().from(users).where(eq(users.schoolId, createdSchoolId));
+      expect(orphanedUsers.length).toBe(0);
+    });
+  });
 });

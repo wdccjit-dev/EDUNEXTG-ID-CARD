@@ -108,7 +108,18 @@ router.post("/auth/login", async (req, res) => {
   } catch (e) { fail(res, e); }
 });
 router.post("/auth/logout", (_req, res) => { clearApplicationSession(res); res.json({ success: true }); });
-router.get("/auth/me", async (req, res) => { try { const user = await authenticateApplicationRequest(req); const { passwordHash: _passwordHash, ...safeUser } = user; const db = await getDb(); const school = safeUser.schoolId && db ? (await db.select({ name: schools.name }).from(schools).where(eq(schools.id, safeUser.schoolId)))[0] : undefined; res.json({ ...safeUser, schoolName: school?.name ?? null }); } catch { res.status(401).json({ error: "Authentication required" }); } });
+router.get("/auth/me", async (req, res) => {
+  try {
+    const user = await authenticateApplicationRequest(req);
+    if (!user) return res.status(401).json({ error: "Authentication required" });
+    const { passwordHash: _passwordHash, ...safeUser } = user;
+    const db = await getDb();
+    const school = safeUser.schoolId && db ? (await db.select({ name: schools.name }).from(schools).where(eq(schools.id, safeUser.schoolId)))[0] : undefined;
+    res.json({ ...safeUser, schoolName: school?.name ?? null });
+  } catch {
+    res.status(401).json({ error: "Authentication required" });
+  }
+});
 router.post("/auth/forgot-password", async (req, res) => { try { const email = String(req.body.email ?? "").trim().toLowerCase(); if (!email) return res.status(400).json({ error: "Email is required" }); const token = await createPasswordReset(email); res.json({ success: true, ...(ENV.isProduction || !token ? {} : { developmentResetToken: token }) }); } catch (e) { fail(res, e); } });
 router.post("/auth/reset-password", async (req, res) => { try { const token = String(req.body.token ?? ""); const password = String(req.body.password ?? ""); if (!token || password.length < 8) return res.status(400).json({ error: "Token and a password of at least 8 characters are required" }); const success = await resetPassword(token, password); if (!success) return res.status(400).json({ error: "Invalid or expired reset token" }); res.json({ success: true }); } catch (e) { fail(res, e); } });
 
@@ -120,7 +131,6 @@ router.get("/about", async (_req, res) => {
     title: "About AtlasID & EduNextG",
     version: "2.4.0",
     description: "Enterprise Multi-Tenant School ID Card Issuance, Dynamic Template Design, & Verification Platform.",
-    contactEmail: "support@edunextg.com",
   });
 });
 
@@ -375,7 +385,7 @@ router.post("/schools", requireRole(adminRoles), async (req, res) => {
 
       const userEmail = req.body.email && String(req.body.email).trim()
         ? String(req.body.email).trim()
-        : `${loginId.toLowerCase()}@edunextg.com`;
+        : null;
 
       const passwordHash = await hashPassword(rawPassword);
 
@@ -402,7 +412,7 @@ router.post("/schools", requireRole(adminRoles), async (req, res) => {
       createdSchool = (await tx.select().from(schools).where(eq(schools.id, id)))[0];
       credentials = {
         loginId,
-        email: userEmail,
+        email: userEmail ?? "",
         password: rawPassword,
       };
     });
@@ -441,12 +451,12 @@ router.post("/schools/:id/credentials", requireRole(adminRoles), async (req, res
         .where(and(eq(users.schoolId, id), eq(users.role, "SCHOOL_ADMIN")))
     )[0];
 
-    let userEmail = school.email ? String(school.email).trim() : `${loginId.toLowerCase()}@edunextg.com`;
+    let userEmail = school.email && String(school.email).trim() ? String(school.email).trim() : null;
 
     if (existingUser) {
       await db.update(users).set({ passwordHash, updatedAt: new Date() }).where(eq(users.id, existingUser.id));
       loginId = existingUser.openId;
-      userEmail = existingUser.email || userEmail;
+      userEmail = existingUser.email ?? userEmail;
     } else {
       const existingWithOpenId = (await db.select({ id: users.id }).from(users).where(eq(users.openId, loginId)))[0];
       if (existingWithOpenId) loginId = `SCH_${cleanCode}_${id}`;
@@ -467,7 +477,7 @@ router.post("/schools/:id/credentials", requireRole(adminRoles), async (req, res
       success: true,
       credentials: {
         loginId,
-        email: userEmail,
+        email: userEmail ?? "",
         password: rawPassword,
       },
     });
@@ -498,7 +508,18 @@ router.put("/schools/:id", requireRole(adminRoles), async (req, res) => {
     if (!id) return res.status(400).json({ error: "Invalid school id" });
     const db = await getDb();
     if (!db) return res.status(503).json({ error: "Database not available" });
-    await db.update(schools).set({ name: req.body.name, shortCode: req.body.shortCode, email: req.body.email, phone: req.body.phone, address: req.body.address }).where(eq(schools.id, id));
+    const nextEmail = req.body.email && String(req.body.email).trim() ? String(req.body.email).trim() : null;
+    await db.update(schools).set({
+      name: req.body.name,
+      shortCode: req.body.shortCode,
+      email: nextEmail,
+      phone: req.body.phone,
+      address: req.body.address,
+    }).where(eq(schools.id, id));
+    // Keep school admin user email in sync if provided
+    if (req.body.email !== undefined) {
+      await db.update(users).set({ email: nextEmail }).where(and(eq(users.schoolId, id), eq(users.role, "SCHOOL_ADMIN")));
+    }
     await audit(user, "UPDATE_SCHOOL", "school", id, id, req.body);
     res.json((await db.select().from(schools).where(eq(schools.id, id)))[0]);
   } catch (e) { fail(res, e); }
@@ -523,12 +544,34 @@ router.delete("/schools/:id", requireRole(adminRoles), async (req, res) => {
     if (!id) return res.status(400).json({ error: "Invalid school id" });
     const db = await getDb();
     if (!db) return res.status(503).json({ error: "Database not available" });
-    // Audit before deletion so foreign key constraint on audit_logs.schoolId is valid
-    await audit(currentUser(res), "DELETE_SCHOOL", "school", id, null, null);
-    // Cleanly delete dependent idCardRequests and unbind users before school deletion
+
+    // Cleanly delete all dependent records and associated users so no orphaned users remain
+    const schoolCards = await db.select({ id: idCards.id }).from(idCards).where(eq(idCards.schoolId, id));
+    const cardIds = schoolCards.map((c) => c.id);
+    if (cardIds.length > 0) {
+      await db.delete(approvalHistory).where(inArray(approvalHistory.idCardId, cardIds));
+      await db.delete(idCardFiles).where(inArray(idCardFiles.idCardId, cardIds));
+      await db.delete(idCardData).where(inArray(idCardData.idCardId, cardIds));
+      await db.delete(idCards).where(eq(idCards.schoolId, id));
+    }
     await db.delete(idCardRequests).where(eq(idCardRequests.schoolId, id));
-    await db.update(users).set({ schoolId: null }).where(eq(users.schoolId, id));
+    await db.delete(schoolTemplates).where(eq(schoolTemplates.schoolId, id));
+    await db.delete(notifications).where(eq(notifications.schoolId, id));
+    await db.delete(auditLogs).where(eq(auditLogs.schoolId, id));
+
+    // Delete all associated users for this school
+    const schoolUsers = await db.select({ id: users.id }).from(users).where(eq(users.schoolId, id));
+    const schoolUserIds = schoolUsers.map((u) => u.id);
+    if (schoolUserIds.length > 0) {
+      await db.delete(approvalHistory).where(inArray(approvalHistory.actedByUserId, schoolUserIds));
+      await db.delete(notifications).where(inArray(notifications.userId, schoolUserIds));
+      await db.delete(auditLogs).where(inArray(auditLogs.userId, schoolUserIds));
+      await db.delete(users).where(eq(users.schoolId, id));
+    }
+
+    // Finally delete the school
     await db.delete(schools).where(eq(schools.id, id));
+    await audit(currentUser(res), "DELETE_SCHOOL", "school", id, null, null);
     res.status(200).json({ success: true });
   } catch (e) {
     fail(res, e);
@@ -1986,6 +2029,30 @@ router.get("/audit-logs", async (req, res) => {
       .orderBy(desc(auditLogs.id))
       .limit(200);
     res.json(rows);
+  } catch (e) {
+    fail(res, e);
+  }
+});
+
+router.delete("/audit-logs", async (req, res) => {
+  try {
+    const db = await getDb();
+    if (!db) return res.status(503).json({ error: "Database not available" });
+    const user = currentUser(res);
+
+    if (adminRoles.has(user.role)) {
+      if (req.query.schoolId) {
+        const sid = Number(req.query.schoolId);
+        await db.delete(auditLogs).where(eq(auditLogs.schoolId, sid));
+      } else {
+        await db.delete(auditLogs);
+      }
+      return res.json({ success: true, message: "Audit logs cleared" });
+    }
+
+    if (!user.schoolId) return res.json({ success: true, message: "No logs to clear" });
+    await db.delete(auditLogs).where(eq(auditLogs.schoolId, user.schoolId));
+    res.json({ success: true, message: "Audit logs cleared" });
   } catch (e) {
     fail(res, e);
   }

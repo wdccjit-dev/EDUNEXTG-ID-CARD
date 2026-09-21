@@ -674,4 +674,33 @@ describe("ID Card Management, Approval Workflow, PDF & Printing — 18 Scenarios
     });
     expect(badPrint.status).toBe(400);
   });
+
+  afterAll(async () => {
+    if (server) {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+    const db = await getDb();
+    if (db) {
+      if (schoolAId) {
+        await db.delete(idCards).where(eq(idCards.schoolId, schoolAId));
+        await db.delete(idCardRequests).where(eq(idCardRequests.schoolId, schoolAId));
+        await db.delete(schoolTemplates).where(eq(schoolTemplates.schoolId, schoolAId));
+        await db.delete(users).where(eq(users.schoolId, schoolAId));
+        await db.delete(schools).where(eq(schools.id, schoolAId));
+      }
+      if (schoolBId) {
+        await db.delete(idCards).where(eq(idCards.schoolId, schoolBId));
+        await db.delete(idCardRequests).where(eq(idCardRequests.schoolId, schoolBId));
+        await db.delete(schoolTemplates).where(eq(schoolTemplates.schoolId, schoolBId));
+        await db.delete(users).where(eq(users.schoolId, schoolBId));
+        await db.delete(schools).where(eq(schools.id, schoolBId));
+      }
+      if (templateId) {
+        await db.delete(templateElements).where(eq(templateElements.templateId, templateId));
+        await db.delete(schoolTemplates).where(eq(schoolTemplates.templateId, templateId));
+        await db.delete(idCardTemplates).where(eq(idCardTemplates.id, templateId));
+      }
+      if (adminEmail) await db.delete(users).where(eq(users.email, adminEmail));
+    }
+  });
 });

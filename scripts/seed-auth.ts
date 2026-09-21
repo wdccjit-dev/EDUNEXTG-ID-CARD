@@ -4,6 +4,12 @@ import { getDb } from "../server/db";
 import { hashPassword } from "../server/appAuth";
 import { schools, users } from "../drizzle/schema";
 
+// Strictly forbidden in production environments
+if (process.env.NODE_ENV === "production") {
+  console.error("[seed-auth] Refusing to run seed-auth script in production environment.");
+  process.exit(1);
+}
+
 const adminEmail = process.env.SEED_ADMIN_EMAIL ?? "admin@edunextg.com";
 const schoolEmail = process.env.SEED_SCHOOL_EMAIL ?? "school@example.test";
 const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? "Duronto321";
