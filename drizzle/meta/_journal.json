@@ -43,6 +43,13 @@
       "when": 1789538676302,
       "tag": "0005_foamy_thunderbird",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1789540000000,
+      "tag": "0006_longtext_id_card_data_files",
+      "breakpoints": true
     }
   ]
 }

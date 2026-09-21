@@ -9,7 +9,7 @@
     "start": "cross-env NODE_ENV=production node dist/index.js",
     "check": "tsc --noEmit",
     "format": "prettier --write .",
-    "test": "vitest run",
+    "test": "vitest run --fileParallelism=false",
     "db:push": "drizzle-kit generate && drizzle-kit migrate",
     "db:seed-auth": "tsx scripts/seed-auth.ts"
   },

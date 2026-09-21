@@ -626,6 +626,10 @@ export default function Home({
     if (authenticatedUser.role === "VIEWER") {
       return toast.error("Viewer accounts are read-only");
     }
+    const schoolToUse = activeSchoolId ?? schools[0]?.id;
+    if (!schoolToUse) {
+      return toast.error("Please create or select a school first before creating ID cards");
+    }
     setEditingCard(null);
     setIdCardFormOpen(true);
   };
@@ -1872,7 +1876,7 @@ export default function Home({
         open={idCardFormOpen}
         onOpenChange={setIdCardFormOpen}
         initialCard={editingCard}
-        schoolId={activeSchoolId ?? 1}
+        schoolId={activeSchoolId ?? schools[0]?.id ?? 0}
         schoolName={currentActiveSchool?.name}
         schoolCode={currentActiveSchool?.shortCode}
         availableTemplates={templates}

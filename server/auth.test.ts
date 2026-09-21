@@ -36,9 +36,11 @@ describe("Application Authentication & School-Scoped Isolation", () => {
       testSchoolBId = existingSchools[1].id;
     } else if (existingSchools.length === 1) {
       testSchoolAId = existingSchools[0].id;
+      const otherCode = existingSchools[0].shortCode === "TSB" ? "TSA" : "TSB";
+      const otherName = otherCode === "TSA" ? "Test School A" : "Test School B";
       const [resB] = await db.insert(schools).values({
-        name: "Test School B",
-        shortCode: "TSB",
+        name: otherName,
+        shortCode: otherCode,
         isActive: true,
       });
       testSchoolBId = Number(resB.insertId);

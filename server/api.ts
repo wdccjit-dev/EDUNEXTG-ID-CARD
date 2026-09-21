@@ -1,5 +1,5 @@
 import { Router, type NextFunction, type Request, type Response } from "express";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, ne } from "drizzle-orm";
 import {
   approvalHistory,
   auditLogs,
@@ -80,7 +80,13 @@ function requireRole(roles: Set<string>) {
 
 function fail(res: Response, error: unknown) {
   console.error("[API]", error);
-  return res.status(500).json({ error: "Database operation failed" });
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === "string"
+      ? error
+      : "Database operation failed";
+  return res.status(500).json({ error: message });
 }
 
 router.post("/auth/login", async (req, res) => {
@@ -560,6 +566,10 @@ router.post("/id-cards", requireRole(schoolWriteRoles), async (req, res) => {
 
     if (!schoolId) return res.status(400).json({ error: "schoolId is required" });
 
+    // Validate school exists
+    const school = (await db.select().from(schools).where(eq(schools.id, schoolId)))[0];
+    if (!school) return res.status(404).json({ error: `School with ID ${schoolId} not found` });
+
     // Identify template: explicit or school locked / default
     let templateId = Number(req.body.templateId);
     if (!templateId) {
@@ -577,6 +587,17 @@ router.post("/id-cards", requireRole(schoolWriteRoles), async (req, res) => {
     const cardNumber = req.body.cardNumber && String(req.body.cardNumber).trim()
       ? String(req.body.cardNumber).trim()
       : await generateCardNumber(schoolId);
+
+    // Validate card number uniqueness for this school
+    const existingCard = (
+      await db
+        .select({ id: idCards.id })
+        .from(idCards)
+        .where(and(eq(idCards.schoolId, schoolId), eq(idCards.cardNumber, cardNumber)))
+    )[0];
+    if (existingCard) {
+      return res.status(400).json({ error: `Card number '${cardNumber}' already exists in this school` });
+    }
 
     const r = await db.insert(idCards).values({
       schoolId,
@@ -850,17 +871,66 @@ router.post("/id-cards/:id/submit", requireRole(schoolWriteRoles), async (req, r
         })
         .where(eq(idCardRequests.id, requestId));
     } else {
-      const result = await db.insert(idCardRequests).values({
-        studentName,
-        admissionCode,
-        schoolId: card.schoolId,
-        status: targetStatus,
-        requestedByUserId: user.id,
-        templateId: card.templateId,
-        submittedAt: new Date(),
-      });
-      requestId = Number(result[0].insertId);
-      await db.update(idCards).set({ requestId }).where(eq(idCards.id, cardId));
+      // Check if a request already exists for this school and admissionCode
+      const existingReq = (
+        await db
+          .select()
+          .from(idCardRequests)
+          .where(
+            and(
+              eq(idCardRequests.schoolId, card.schoolId),
+              eq(idCardRequests.admissionCode, admissionCode)
+            )
+          )
+      )[0];
+
+      if (existingReq) {
+        // Check if another active card is currently linked to this request
+        const otherCard = (
+          await db
+            .select()
+            .from(idCards)
+            .where(
+              and(
+                eq(idCards.requestId, existingReq.id),
+                ne(idCards.id, cardId),
+                inArray(idCards.status, ["SUBMITTED", "UNDER_REVIEW", "APPROVED", "PRINTED"])
+              )
+            )
+        )[0];
+
+        if (otherCard) {
+          return res.status(400).json({
+            error: `An active ID card #${otherCard.cardNumber} with admission code '${admissionCode}' already exists (${otherCard.status})`,
+          });
+        }
+
+        // Re-use and update the existing request with the current card's details
+        requestId = existingReq.id;
+        await db
+          .update(idCardRequests)
+          .set({
+            studentName,
+            status: targetStatus,
+            submittedAt: new Date(),
+            requestedByUserId: user.id,
+            templateId: card.templateId,
+          })
+          .where(eq(idCardRequests.id, requestId));
+        await db.update(idCards).set({ requestId }).where(eq(idCards.id, cardId));
+      } else {
+        const result = await db.insert(idCardRequests).values({
+          studentName,
+          admissionCode,
+          schoolId: card.schoolId,
+          status: targetStatus,
+          requestedByUserId: user.id,
+          templateId: card.templateId,
+          submittedAt: new Date(),
+        });
+        requestId = Number(result[0].insertId);
+        await db.update(idCards).set({ requestId }).where(eq(idCards.id, cardId));
+      }
     }
 
     await db.update(idCards).set({ status: targetStatus, submittedByUserId: user.id }).where(eq(idCards.id, cardId));

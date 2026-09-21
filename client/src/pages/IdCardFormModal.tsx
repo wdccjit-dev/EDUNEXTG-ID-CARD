@@ -215,6 +215,10 @@ export default function IdCardFormModal({
 
   // Save card (either as draft or save & submit)
   const handleSave = async (submitAfterSave: boolean) => {
+    if (!schoolId) {
+      return toast.error("Please select a valid school");
+    }
+
     if (!selectedTemplateId) {
       return toast.error("Please select a template");
     }
