@@ -1618,9 +1618,20 @@ export default function Home({
                                 <Building2 className="h-5 w-5" />
                               </div>
                               <div>
-                                <div className="text-sm font-extrabold text-[#304541] flex items-center gap-2">
+                                <div className="text-sm font-extrabold text-[#304541] flex flex-wrap items-center gap-2">
                                   {school.name}
                                   <StatusPill tone="teal">Active</StatusPill>
+                                  {school.templateSelectionStatus === "Selected" ? (
+                                    <span className="inline-flex items-center gap-1 rounded-full border border-teal-200 bg-teal-50 px-2 py-0.5 text-[10px] font-bold text-teal-800">
+                                      <CheckCircle2 className="h-3 w-3 text-teal-600" />
+                                      Template: {school.selectedTemplateName || "Selected"}
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-800">
+                                      <AlertTriangle className="h-3 w-3 text-amber-600" />
+                                      Template: Not Selected
+                                    </span>
+                                  )}
                                 </div>
                                 <div className="text-[11px] text-[#8d9995] flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
                                   <span>Code: <b className="text-[#304541]">{school.shortCode}</b></span>
@@ -1632,6 +1643,14 @@ export default function Home({
                             </div>
 
                             <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                              <button
+                                onClick={() => handleGenerateCredentials(school)}
+                                className="flex items-center gap-1 rounded-lg border border-[#c3dfd9] bg-[#eef7f4] px-2.5 py-1.5 text-xs font-bold text-[#0f7f79] shadow-sm hover:bg-[#dff1ec]"
+                                title="View or regenerate school login credentials and ID pass"
+                              >
+                                <KeyRound className="h-3.5 w-3.5" />
+                                ID Pass
+                              </button>
                               <button
                                 onClick={() => handleEditSchool(school)}
                                 className="flex items-center gap-1 rounded-lg border border-[#d3ded8] bg-white px-3 py-1.5 text-xs font-bold text-[#304541] shadow-sm hover:bg-[#f2f7f4] hover:text-[#0f7f79]"
@@ -1940,6 +1959,111 @@ export default function Home({
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* School Credentials & ID Pass Modal */}
+      <Dialog open={credentialsModalOpen} onOpenChange={setCredentialsModalOpen}>
+        <DialogContent className="sm:max-w-md bg-white border border-[#e2e8e3] rounded-2xl shadow-xl">
+          <DialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#dff3ee] text-[#0f7f79]">
+                <KeyRound className="h-5 w-5" />
+              </div>
+              <div>
+                <DialogTitle className="text-base font-extrabold text-[#304541]">
+                  School ID Pass & Credentials
+                </DialogTitle>
+                <DialogDescription className="text-xs text-[#788784]">
+                  {credentialsData?.schoolName ? `Login credentials for ${credentialsData.schoolName}` : "School login credentials"}
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="rounded-xl border border-[#d8e8e3] bg-[#f7fbf9] p-3 text-xs text-[#304541]">
+              <p className="font-semibold text-[#0f7f79] flex items-center gap-1.5 mb-1">
+                <ShieldCheck className="h-4 w-4" /> School Portal Access
+              </p>
+              <p className="text-[#60716d]">
+                The school administrator can log in using this <strong>Login ID</strong> and <strong>ID Pass (Password)</strong> to preview templates, select a final template, and review & approve student ID cards.
+              </p>
+            </div>
+
+            {/* Login ID field */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-[#304541]">School Login ID</label>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 font-mono text-sm font-bold text-[#1f3a35] bg-[#edf3f0] px-3 py-2 rounded-xl border border-[#d5e2dc] select-all break-all">
+                  {credentialsData?.loginId || "—"}
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 h-9 rounded-xl border-[#cfded8] text-xs font-bold hover:bg-[#eef6f3] hover:text-[#0f7f79]"
+                  onClick={() => {
+                    if (credentialsData?.loginId) {
+                      navigator.clipboard.writeText(credentialsData.loginId);
+                      toast.success("Login ID copied to clipboard");
+                    }
+                  }}
+                >
+                  <Copy className="h-3.5 w-3.5 mr-1" /> Copy
+                </Button>
+              </div>
+            </div>
+
+            {/* Password / ID Pass field */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-[#304541]">Password / ID Pass</label>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 font-mono text-sm font-bold text-[#1f3a35] bg-[#edf3f0] px-3 py-2 rounded-xl border border-[#d5e2dc] select-all break-all">
+                  {credentialsData?.password || "••••••••••••"}
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 h-9 rounded-xl border-[#cfded8] text-xs font-bold hover:bg-[#eef6f3] hover:text-[#0f7f79]"
+                  onClick={() => {
+                    if (credentialsData?.password) {
+                      navigator.clipboard.writeText(credentialsData.password);
+                      toast.success("Password copied to clipboard");
+                    }
+                  }}
+                >
+                  <Copy className="h-3.5 w-3.5 mr-1" /> Copy
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:justify-between sm:items-center pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="rounded-xl border-[#cfded8] text-xs font-bold text-[#0f7f79] hover:bg-[#eef6f3]"
+              onClick={() => {
+                if (credentialsData) {
+                  const text = `School: ${credentialsData.schoolName}\nLogin ID: ${credentialsData.loginId}\nPassword: ${credentialsData.password || ""}\nPortal URL: ${window.location.origin}`;
+                  navigator.clipboard.writeText(text);
+                  toast.success("All credentials copied to clipboard");
+                }
+              }}
+            >
+              <Copy className="h-3.5 w-3.5 mr-1.5" /> Copy All Details
+            </Button>
+            <Button
+              type="button"
+              className="rounded-xl bg-[#0f7f79] text-xs font-bold text-white hover:bg-[#096c67]"
+              onClick={() => setCredentialsModalOpen(false)}
+            >
+              Done
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
