@@ -97,7 +97,18 @@ export type ApiApproval = {
 
 export type ApiActivity = { id: number; action: string; entityType: string; entityId: number | null; createdAt: string };
 export type ApiNotification = { id: number; type: string; title: string; message: string; isRead: boolean; createdAt: string };
-export type ApiAuthUser = { id: number; name: string | null; email: string | null; role: "SUPER_ADMIN" | "SCHOOL_ADMIN" | "SCHOOL_OPERATOR" | "VIEWER"; schoolId: number | null; schoolName?: string | null; isActive: boolean };
+export type ApiAuthUser = {
+  id: number;
+  openId?: string;
+  name: string | null;
+  email: string | null;
+  phone?: string | null;
+  avatarUrl?: string | null;
+  role: "SUPER_ADMIN" | "SCHOOL_ADMIN" | "SCHOOL_OPERATOR" | "VIEWER";
+  schoolId: number | null;
+  schoolName?: string | null;
+  isActive: boolean;
+};
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, { credentials: "include", ...init, headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) } });
@@ -194,4 +205,18 @@ export const api = {
   auditLogs: { list: () => request<ApiActivity[]>("/api/audit-logs") },
   upload: (filename: string, contentType: string, dataBase64: string) =>
     request<{ url: string }>("/api/upload", json({ filename, contentType, dataBase64 })),
+  profile: {
+    get: () => request<ApiAuthUser>("/api/profile"),
+    update: (data: { name?: string; email?: string; phone?: string }) =>
+      request<{ success: true; message: string; user: ApiAuthUser }>("/api/profile", put(data)),
+    updatePicture: (avatarUrl: string) =>
+      request<{ success: true; message: string; avatarUrl: string }>("/api/profile/picture", json({ avatarUrl })),
+    removePicture: () =>
+      request<{ success: true; message: string; avatarUrl: null }>("/api/profile/picture", { method: "DELETE" }),
+    changePassword: (data: { currentPassword: string; newPassword: string; confirmNewPassword: string }) =>
+      request<{ success: true; message: string }>("/api/profile/password", json(data)),
+  },
+  about: {
+    get: () => request<{ title: string; version: string; description: string; contactEmail?: string }>("/api/about"),
+  },
 };

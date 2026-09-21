@@ -24,6 +24,7 @@ import {
   FilePlus2,
   Filter,
   Grid2X2,
+  Info,
   KeyRound,
   LayoutDashboard,
   Loader2,
@@ -41,10 +42,13 @@ import {
   SlidersHorizontal,
   Sparkles,
   Trash2,
+  User,
   Users,
   X,
   XCircle,
 } from "lucide-react";
+import SuperAdminProfileDialog from "@/components/SuperAdminProfileDialog";
+import AboutUsSection from "@/components/AboutUsSection";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -114,7 +118,8 @@ type NavLabel =
   | "Reports"
   | "Users"
   | "Notifications"
-  | "Audit logs";
+  | "Audit logs"
+  | "About Us";
 
 type Tone = "teal" | "coral" | "indigo" | "yellow";
 
@@ -230,7 +235,7 @@ function StatusPill({
 }
 
 export default function Home({
-  authenticatedUser,
+  authenticatedUser: initialAuthenticatedUser,
   portal,
   initialNav = "Overview",
 }: {
@@ -238,6 +243,8 @@ export default function Home({
   portal: "admin" | "school";
   initialNav?: string;
 }) {
+  const [authenticatedUser, setAuthenticatedUser] = useState<ApiAuthUser>(initialAuthenticatedUser);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [activeNav, setActiveNav] = useState<NavLabel>(
     (initialNav as NavLabel) || "Overview",
   );
@@ -983,8 +990,16 @@ export default function Home({
 
         <div className="mx-5 mb-6 shrink-0 rounded-2xl border border-[#294344] bg-[#173534] p-3">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#f5c87b] text-sm font-extrabold text-[#5c4523]">
-              {authenticatedUser.role === "SUPER_ADMIN" ? "SA" : "SC"}
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[#f5c87b] text-sm font-extrabold text-[#5c4523]">
+              {authenticatedUser.avatarUrl ? (
+                <img
+                  src={authenticatedUser.avatarUrl}
+                  alt="Profile"
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                authenticatedUser.role === "SUPER_ADMIN" ? "SA" : "SC"
+              )}
             </div>
             <div className="min-w-0 flex-1">
               <div className="truncate text-xs font-bold text-white">
@@ -1012,6 +1027,16 @@ export default function Home({
               </div>
             </div>
           </div>
+          {authenticatedUser.role === "SUPER_ADMIN" && (
+            <button
+              type="button"
+              onClick={() => setProfileModalOpen(true)}
+              className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-xl border border-[#305250] bg-[#193d3c] py-1.5 text-[11px] font-bold text-[#a7dfd7] transition hover:bg-[#204948] hover:text-white"
+            >
+              <User className="h-3 w-3" />
+              Edit Profile
+            </button>
+          )}
         </div>
 
         <div className="px-5 shrink-0">
@@ -1053,6 +1078,24 @@ export default function Home({
         <div className="mt-auto shrink-0 px-5 pt-6">
           <div className="mb-4 border-t border-[#294344]" />
           <nav className="space-y-1 pb-5">
+            {/* About Us directly above Settings */}
+            <button
+              onClick={() => goTo("About Us")}
+              className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-[12px] font-semibold transition-colors ${
+                activeNav === "About Us"
+                  ? "bg-[#dff3ee] text-[#123b3b]"
+                  : "text-[#99b6b2] hover:bg-[#1b3a3a] hover:text-white"
+              }`}
+            >
+              <Info
+                className={`h-[17px] w-[17px] ${
+                  activeNav === "About Us" ? "text-[#0f7f79]" : "text-[#779b96]"
+                }`}
+                strokeWidth={activeNav === "About Us" ? 2.3 : 1.8}
+              />
+              <span className="flex-1 text-left">About Us</span>
+            </button>
+
             <button
               onClick={() => toast("Settings opened")}
               className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-[12px] font-semibold text-[#99b6b2] hover:bg-[#1b3a3a] hover:text-white"
@@ -1183,16 +1226,46 @@ export default function Home({
             <div className="hidden h-9 w-px bg-[#dfe6e1] sm:block" />
 
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => void logout()}
-                title="Sign out"
-                aria-label="User profile and sign out"
-                className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#f5c87b] text-xs font-extrabold text-[#5c4523] shadow-sm hover:ring-2 hover:ring-[#0f7f79]/30"
-              >
-                {initialsFor(
-                  authenticatedUser.name ?? authenticatedUser.email ?? "User",
-                )}
-              </button>
+              {authenticatedUser.role === "SUPER_ADMIN" ? (
+                <button
+                  type="button"
+                  onClick={() => setProfileModalOpen(true)}
+                  title="Super Admin Profile"
+                  aria-label="Super Admin Profile"
+                  className="flex items-center gap-2 rounded-xl border border-[#dfe6e1] bg-white p-1 pr-3 text-xs font-bold text-[#1f3733] shadow-sm transition hover:border-[#0f7f79]/50 hover:bg-[#f0faf7]"
+                >
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#f5c87b] text-xs font-extrabold text-[#5c4523]">
+                    {authenticatedUser.avatarUrl ? (
+                      <img
+                        src={authenticatedUser.avatarUrl}
+                        alt="Profile"
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      initialsFor(
+                        authenticatedUser.name ??
+                          authenticatedUser.email ??
+                          "Admin",
+                      )
+                    )}
+                  </div>
+                  <span className="hidden sm:inline font-bold text-xs">
+                    {authenticatedUser.name?.split(" ")[0] ?? "Admin"}
+                  </span>
+                  <span className="rounded-full bg-[#dff3ee] px-2 py-0.5 text-[9px] font-extrabold text-[#0f7f79] uppercase">
+                    Profile
+                  </span>
+                </button>
+              ) : (
+                <div
+                  className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#f5c87b] text-xs font-extrabold text-[#5c4523] shadow-sm"
+                  title={authenticatedUser.name ?? "User"}
+                >
+                  {initialsFor(
+                    authenticatedUser.name ?? authenticatedUser.email ?? "User",
+                  )}
+                </div>
+              )}
 
               <button
                 onClick={() => void logout()}
@@ -1675,6 +1748,8 @@ export default function Home({
                 )}
               </section>
             </>
+          ) : activeNav === "About Us" ? (
+            <AboutUsSection />
           ) : (
             <ModuleView
               label={activeNav}
@@ -1714,6 +1789,16 @@ export default function Home({
           )}
         </div>
       </main>
+
+      {/* Super Admin Profile Management Dialog */}
+      {authenticatedUser.role === "SUPER_ADMIN" && (
+        <SuperAdminProfileDialog
+          open={profileModalOpen}
+          onOpenChange={setProfileModalOpen}
+          currentUser={authenticatedUser}
+          onProfileUpdated={(updated) => setAuthenticatedUser(updated)}
+        />
+      )}
 
       {/* Dialog for Creating / Editing School */}
       <Dialog open={schoolModalOpen} onOpenChange={setSchoolModalOpen}>

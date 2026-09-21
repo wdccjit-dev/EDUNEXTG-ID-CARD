@@ -135,7 +135,7 @@ export default function Login({ initialRole = "school" }: LoginProps) {
                 type="text"
                 value={username}
                 onChange={(event) => setUsername(event.target.value)}
-                placeholder={selectedRole === "admin" ? "admin (or admin@edunextg.com)" : "school (or school@example.test)"}
+                placeholder={selectedRole === "admin" ? "Enter admin username or email" : "Enter school username or email"}
                 className="mt-2 h-11 rounded-xl"
                 autoComplete="username"
                 required

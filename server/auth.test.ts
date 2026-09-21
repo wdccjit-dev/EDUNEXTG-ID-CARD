@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { describe, expect, it, beforeAll } from "vitest";
+import { describe, expect, it, beforeAll, afterAll } from "vitest";
 import express, { type Request, type Response } from "express";
 import { COOKIE_NAME } from "../shared/const";
 import { apiRouter } from "./api";
@@ -278,5 +278,12 @@ describe("Application Authentication & School-Scoped Isolation", () => {
       expect(assignedSchoolId).toBe(testSchoolAId);
       expect(assignedSchoolId).not.toBe(testSchoolBId);
     });
+  });
+
+  afterAll(async () => {
+    if (db) {
+      await db.delete(users).where(eq(users.openId, "test_admin"));
+      await db.delete(users).where(eq(users.openId, "test_school_admin"));
+    }
   });
 });

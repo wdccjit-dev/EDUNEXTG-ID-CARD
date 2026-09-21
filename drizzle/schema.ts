@@ -37,6 +37,8 @@ export const users = mysqlTable(
     loginMethod: varchar("loginMethod", { length: 64 }),
     role: mysqlEnum("role", userRoleValues).default("VIEWER").notNull(),
     schoolId: int("schoolId").references(() => schools.id, { onDelete: "set null", onUpdate: "cascade" }),
+    phone: varchar("phone", { length: 32 }),
+    avatarUrl: longtext("avatarUrl"),
     isActive: boolean("isActive").default(true).notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),

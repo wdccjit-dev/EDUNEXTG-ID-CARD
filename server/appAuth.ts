@@ -80,9 +80,7 @@ export async function loginUser(identifier: string, password: string) {
         or(
           eq(users.email, clean),
           eq(users.openId, clean),
-          eq(users.openId, `seed_${clean}`),
-          eq(users.email, `${clean}@edunextg.com`),
-          eq(users.email, `${clean}@example.test`)
+          eq(users.email, `${clean}@edunextg.com`)
         )
       )
   )[0];
