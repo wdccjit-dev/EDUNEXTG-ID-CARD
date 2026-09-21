@@ -30,6 +30,7 @@ describe("ID Card Management, Approval Workflow, PDF & Printing — 18 Scenarios
   let templateId: number;
 
   let adminToken: string;
+  let adminEmail: string;
   let schoolAToken: string;
   let schoolBToken: string;
 
@@ -139,7 +140,7 @@ describe("ID Card Management, Approval Workflow, PDF & Printing — 18 Scenarios
     // Create users: Super Admin, School A Admin, School B Admin
     const pwdHash = await hashPassword("TestPass123!");
     const ts = Date.now();
-    const adminEmail = `admin_card_${ts}@test.local`;
+    adminEmail = `admin_card_${ts}@test.local`;
     const schoolAEmail = `school_a_${ts}@test.local`;
     const schoolBEmail = `school_b_${ts}@test.local`;
 
@@ -216,6 +217,9 @@ describe("ID Card Management, Approval Workflow, PDF & Printing — 18 Scenarios
       if (templateId) {
         await db.delete(templateElements).where(eq(templateElements.templateId, templateId));
         await db.delete(idCardTemplates).where(eq(idCardTemplates.id, templateId));
+      }
+      if (adminEmail) {
+        await db.delete(users).where(eq(users.email, adminEmail));
       }
     }
   });

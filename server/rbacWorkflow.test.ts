@@ -1,17 +1,20 @@
 import "dotenv/config";
-import { describe, expect, it, beforeAll } from "vitest";
+import { describe, expect, it, beforeAll, afterAll } from "vitest";
 import express from "express";
 import http from "http";
 import { apiRouter } from "./api";
-import { loginUser } from "./appAuth";
+import { loginUser, hashPassword } from "./appAuth";
 import { getDb } from "./db";
-import { schools, users, idCardTemplates, idCards, templateElements } from "../drizzle/schema";
+import { schools, users, idCardTemplates, idCards, templateElements, schoolTemplates, idCardRequests } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
 
 describe("Role-Based Permissions & ID Card Workflow Verification", () => {
   let server: http.Server;
   let baseUrl: string;
   let adminToken: string;
+  let testAdminUserId: number;
+  let testSchoolBUserId: number;
+  let schoolBToken: string;
   let db: NonNullable<Awaited<ReturnType<typeof getDb>>>;
 
   let createdSchoolId: number;
@@ -42,10 +45,43 @@ describe("Role-Based Permissions & ID Card Workflow Verification", () => {
     if (!addr || typeof addr === "string") throw new Error("Server failed to bind");
     baseUrl = `http://127.0.0.1:${addr.port}`;
 
+    const ts = Date.now();
+    const testAdminEmail = `admin_rbac_${ts}@test.local`;
+    const testSchoolBEmail = `school_b_rbac_${ts}@test.local`;
+    const pwdHash = await hashPassword("TestPass123!");
+
+    const [adminUserRes] = await db.insert(users).values({
+      openId: `admin_rbac_${ts}`,
+      email: testAdminEmail,
+      name: "RBAC Test Admin",
+      role: "SUPER_ADMIN",
+      schoolId: null,
+      passwordHash: pwdHash,
+      loginMethod: "local",
+      isActive: true,
+    });
+    testAdminUserId = Number(adminUserRes.insertId);
+
+    const [schoolBUserRes] = await db.insert(users).values({
+      openId: `school_b_rbac_${ts}`,
+      email: testSchoolBEmail,
+      name: "RBAC School B Admin",
+      role: "SCHOOL_ADMIN",
+      schoolId: null,
+      passwordHash: pwdHash,
+      loginMethod: "local",
+      isActive: true,
+    });
+    testSchoolBUserId = Number(schoolBUserRes.insertId);
+
     // Login as Super Admin
-    const adminLogin = await loginUser("admin@example.test", "TestPass123!");
+    const adminLogin = await loginUser(testAdminEmail, "TestPass123!");
     if (!adminLogin) throw new Error("Could not log in as super admin");
     adminToken = adminLogin.token;
+
+    const schoolBLogin = await loginUser(testSchoolBEmail, "TestPass123!");
+    if (!schoolBLogin) throw new Error("Could not log in as School B");
+    schoolBToken = schoolBLogin.token;
 
     // Create a template for testing
     const [tmplRes] = await db.insert(idCardTemplates).values({
@@ -414,11 +450,6 @@ describe("Role-Based Permissions & ID Card Workflow Verification", () => {
   });
 
   it("Cross-school isolation: Another school user CANNOT view or approve this card", async () => {
-    // School B
-    const otherLogin = await loginUser("school@example.test", "TestPass123!");
-    if (!otherLogin) throw new Error("Could not log in as School B");
-    const schoolBToken = otherLogin.token;
-
     // School B attempts to view School A's card
     const viewRes = await fetch(`${baseUrl}/api/id-cards/${cardId}`, {
       headers: { Authorization: `Bearer ${schoolBToken}` },
@@ -431,5 +462,27 @@ describe("Role-Based Permissions & ID Card Workflow Verification", () => {
       headers: { Authorization: `Bearer ${schoolBToken}` },
     });
     expect(approveRes.status).toBe(403);
+  });
+
+  afterAll(async () => {
+    if (server) {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+    if (db) {
+      if (cardId) await db.delete(idCards).where(eq(idCards.id, cardId));
+      if (secondCardId) await db.delete(idCards).where(eq(idCards.id, secondCardId));
+      if (createdSchoolId) {
+        await db.delete(idCardRequests).where(eq(idCardRequests.schoolId, createdSchoolId));
+        await db.delete(schoolTemplates).where(eq(schoolTemplates.schoolId, createdSchoolId));
+        await db.delete(users).where(eq(users.schoolId, createdSchoolId));
+        await db.delete(schools).where(eq(schools.id, createdSchoolId));
+      }
+      if (templateId) {
+        await db.delete(templateElements).where(eq(templateElements.templateId, templateId));
+        await db.delete(idCardTemplates).where(eq(idCardTemplates.id, templateId));
+      }
+      if (testAdminUserId) await db.delete(users).where(eq(users.id, testAdminUserId));
+      if (testSchoolBUserId) await db.delete(users).where(eq(users.id, testSchoolBUserId));
+    }
   });
 });

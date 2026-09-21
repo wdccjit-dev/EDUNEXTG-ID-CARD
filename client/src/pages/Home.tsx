@@ -2521,6 +2521,10 @@ function ModuleView({
   const isNotifications = label === "Notifications";
   const isAudit = label === "Audit logs";
 
+  const [userRoleFilter, setUserRoleFilter] = useState<string>("All");
+  const [usersPage, setUsersPage] = useState<number>(1);
+  const USERS_PAGE_SIZE = 10;
+
   // Filtered lists for ID cards
   const requestCards = useMemo(() => {
     return idCards
@@ -2548,6 +2552,23 @@ function ModuleView({
   }, [idCards, searchTerm]);
 
   const allApprovedCardIds = useMemo(() => approvedCards.map((c) => c.id), [approvedCards]);
+
+  const filteredUsers = useMemo(() => {
+    return users
+      .filter((u) => userRoleFilter === "All" || u.role === userRoleFilter)
+      .filter(
+        (u) =>
+          !searchTerm ||
+          (u.name?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
+          (u.email?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false),
+      );
+  }, [users, userRoleFilter, searchTerm]);
+
+  const totalUserPages = Math.ceil(filteredUsers.length / USERS_PAGE_SIZE) || 1;
+  const paginatedUsers = useMemo(() => {
+    const start = (usersPage - 1) * USERS_PAGE_SIZE;
+    return filteredUsers.slice(start, start + USERS_PAGE_SIZE);
+  }, [filteredUsers, usersPage]);
 
   const getStatusTone = (status: string): Tone => {
     switch (status) {
@@ -3154,22 +3175,90 @@ function ModuleView({
                   </div>
                 ))
             ) : isUsers ? (
-              users.map((user) => (
-                <div key={user.id} className="flex items-center justify-between p-4 hover:bg-[#fbfdfb]">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#e9ebfa] text-[#5c64b7] font-bold text-xs">
-                      {user.name ? user.name[0]?.toUpperCase() : "U"}
+              <>
+                <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-[#fbfdfb] border-b border-[#edf0ed]">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-[#4e5c59] mr-1">Role:</span>
+                    {["All", "SUPER_ADMIN", "SCHOOL_ADMIN", "VIEWER"].map((role) => (
+                      <button
+                        key={role}
+                        onClick={() => {
+                          setUserRoleFilter(role);
+                          setUsersPage(1);
+                        }}
+                        className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${
+                          userRoleFilter === role
+                            ? "bg-[#0f7f79] text-white shadow-sm"
+                            : "bg-[#edf3f0] text-[#55605d] hover:bg-[#e2ebe6]"
+                        }`}
+                      >
+                        {role === "All" ? "All Roles" : role.replace(/_/g, " ")}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="text-xs text-[#788784]">
+                    Showing <b>{filteredUsers.length}</b> {filteredUsers.length === 1 ? "user" : "users"}
+                  </div>
+                </div>
+
+                {paginatedUsers.length === 0 ? (
+                  <div className="p-8 text-center text-xs text-[#98a4a1]">
+                    No users matching the selected filter or search term.
+                  </div>
+                ) : (
+                  paginatedUsers.map((user) => (
+                    <div key={user.id} className="flex items-center justify-between p-4 hover:bg-[#fbfdfb] transition-colors">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#e9ebfa] text-[#5c64b7] font-bold text-xs shrink-0">
+                          {user.name ? user.name[0]?.toUpperCase() : "U"}
+                        </div>
+                        <div>
+                          <div className="text-sm font-extrabold text-[#304541] flex items-center gap-2">
+                            {user.name || user.email}
+                            {user.schoolId && (
+                              <span className="text-[10px] font-semibold text-[#0f7f79] bg-[#eef7f4] px-2 py-0.5 rounded-full">
+                                School #{user.schoolId}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-[#8d9995]">{user.email}</div>
+                        </div>
+                      </div>
+                      <StatusPill tone={user.role === "SUPER_ADMIN" ? "indigo" : "teal"}>
+                        {user.role.replace(/_/g, " ")}
+                      </StatusPill>
                     </div>
-                    <div>
-                      <div className="text-sm font-extrabold text-[#304541]">{user.name || user.email}</div>
-                      <div className="text-[10px] text-[#8d9995]">{user.email} · Role: {user.role}</div>
+                  ))
+                )}
+
+                {totalUserPages > 1 && (
+                  <div className="flex items-center justify-between p-4 border-t border-[#edf0ed] bg-[#fbfdfb]">
+                    <div className="text-xs text-[#788784]">
+                      Page {usersPage} of {totalUserPages}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={usersPage <= 1}
+                        onClick={() => setUsersPage((p) => Math.max(1, p - 1))}
+                        className="h-8 rounded-lg text-xs font-bold"
+                      >
+                        Previous
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={usersPage >= totalUserPages}
+                        onClick={() => setUsersPage((p) => Math.min(totalUserPages, p + 1))}
+                        className="h-8 rounded-lg text-xs font-bold"
+                      >
+                        Next
+                      </Button>
                     </div>
                   </div>
-                  <StatusPill tone={user.role === "SUPER_ADMIN" ? "indigo" : "teal"}>
-                    {user.role}
-                  </StatusPill>
-                </div>
-              ))
+                )}
+              </>
             ) : (
               <div className="px-5 py-10 text-center text-[#98a4a1] text-xs">
                 Analytics and summary export reports module.

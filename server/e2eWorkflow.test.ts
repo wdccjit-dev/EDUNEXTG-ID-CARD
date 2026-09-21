@@ -27,6 +27,7 @@ describe("Complete 16-Step End-to-End Real Workflow QA", () => {
 
   // Track created entities through the 16 steps
   let adminToken: string;
+  let masterAdminEmail: string;
   let schoolId: number;
   let schoolUserEmail: string;
   const schoolUserPassword = "SchoolPass123!";
@@ -55,12 +56,12 @@ describe("Complete 16-Step End-to-End Real Workflow QA", () => {
 
     // Seed master admin for login
     const ts = Date.now();
-    const adminEmail = `admin_e2e_${ts}@test.local`;
+    masterAdminEmail = `admin_e2e_${ts}@test.local`;
     const pwdHash = await hashPassword("MasterAdmin123!");
 
     await db.insert(users).values({
       openId: `admin_openid_${ts}`,
-      email: adminEmail,
+      email: masterAdminEmail,
       name: "Master Admin",
       role: "SUPER_ADMIN",
       schoolId: null,
@@ -70,7 +71,7 @@ describe("Complete 16-Step End-to-End Real Workflow QA", () => {
     });
 
     // Step 1 helper: credentials for test
-    (globalThis as any).__E2E_ADMIN_EMAIL = adminEmail;
+    (globalThis as any).__E2E_ADMIN_EMAIL = masterAdminEmail;
   });
 
   afterAll(async () => {
@@ -90,6 +91,9 @@ describe("Complete 16-Step End-to-End Real Workflow QA", () => {
     if (db && templateId) {
       await db.delete(templateElements).where(eq(templateElements.templateId, templateId));
       await db.delete(idCardTemplates).where(eq(idCardTemplates.id, templateId));
+    }
+    if (db && masterAdminEmail) {
+      await db.delete(users).where(eq(users.email, masterAdminEmail));
     }
   });
 

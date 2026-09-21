@@ -12,7 +12,9 @@ describe("Visual ID Card Template Designer — Full Lifecycle & Isolation", () =
   let server: http.Server;
   let baseUrl: string;
   let adminToken: string;
+  let adminEmail: string;
   let schoolToken: string;
+  let schoolEmail: string;
   let schoolId: number;
   let createdTemplateId: number;
   let originalElementIds: number[] = [];
@@ -51,8 +53,8 @@ describe("Visual ID Card Template Designer — Full Lifecycle & Isolation", () =
 
     // Create dedicated test users for this suite to isolate from concurrent tests
     const pwdHash = await hashPassword("TemplatePass123!");
-    const adminEmail = `tmpl_admin_${Date.now()}@test.local`;
-    const schoolEmail = `tmpl_school_${Date.now()}@test.local`;
+    adminEmail = `tmpl_admin_${Date.now()}@test.local`;
+    schoolEmail = `tmpl_school_${Date.now()}@test.local`;
 
     await db.insert(users).values({
       openId: `tmpl_admin_openid_${Date.now()}`,
@@ -96,6 +98,8 @@ describe("Visual ID Card Template Designer — Full Lifecycle & Isolation", () =
         await db.delete(templateElements).where(eq(templateElements.templateId, createdTemplateId));
         await db.delete(idCardTemplates).where(eq(idCardTemplates.id, createdTemplateId));
       }
+      if (adminEmail) await db.delete(users).where(eq(users.email, adminEmail));
+      if (schoolEmail) await db.delete(users).where(eq(users.email, schoolEmail));
     }
   });
 
