@@ -309,12 +309,16 @@ export default function IdCardFormModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100%-1rem)] max-w-6xl max-h-[92vh] flex flex-col gap-0 p-4 sm:p-6">
-        <DialogHeader className="border-b pb-3">
+      <DialogContent className="w-[96vw] max-w-[96vw] sm:max-w-[96vw] md:max-w-[94vw] lg:max-w-[92vw] xl:max-w-[1450px] 2xl:max-w-[1600px] max-h-[92vh] h-[92vh] flex flex-col gap-0 p-4 sm:p-6 sm:rounded-2xl">
+        <DialogHeader className="border-b pb-3 shrink-0">
           <div className="flex flex-col items-start justify-between gap-3 pr-2 sm:flex-row sm:items-center sm:pr-6">
             <div>
               <DialogTitle className="text-xl font-bold flex items-center gap-2">
-                {initialCard ? "Edit ID Card" : "Create New ID Card"}
+                {initialCard
+                  ? initialCard.status === "DRAFT"
+                    ? "Edit ID Card Draft"
+                    : "Edit ID Card"
+                  : "New ID Card Draft"}
                 {isLockedTemplate && (
                   <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-teal-800 bg-teal-50 border border-teal-200 px-2 py-0.5 rounded-md">
                     <Lock className="h-3 w-3" /> Locked Template
@@ -350,9 +354,9 @@ export default function IdCardFormModal({
         </DialogHeader>
 
         {/* Two-Column Split Layout */}
-        <div className="grid min-h-0 grid-cols-1 gap-5 overflow-hidden pt-4 lg:grid-cols-12">
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-6 overflow-hidden pt-4 lg:grid-cols-12">
           {/* LEFT: Dynamic Template-Driven Form */}
-          <div className="min-h-0 overflow-y-auto pr-1 space-y-5 sm:pr-3 lg:col-span-6">
+          <div className="min-h-0 overflow-y-auto pr-1 space-y-5 sm:pr-4 lg:col-span-7">
             {loadingTemplate ? (
               <div className="flex items-center justify-center py-16 text-sm text-gray-400">
                 <Loader2 className="h-5 w-5 animate-spin mr-2" /> Loading template fields…
@@ -462,8 +466,8 @@ export default function IdCardFormModal({
                   <div className="text-xs font-bold uppercase tracking-wider text-teal-800 border-b pb-1">
                     Student Details
                   </div>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div className="col-span-2">
+                  <div className="space-y-3">
+                    <div>
                       <Label className="text-xs font-bold text-gray-700">
                         Student Full Name {requiredDynamicFields.includes("student_name") && <span className="text-red-500">*</span>}
                       </Label>
@@ -475,80 +479,84 @@ export default function IdCardFormModal({
                       />
                     </div>
 
-                    <div>
-                      <Label className="text-xs font-bold text-gray-700">Class</Label>
-                      <Input
-                        className="mt-1 text-xs"
-                        placeholder="e.g. 10"
-                        value={formData.class ?? ""}
-                        onChange={(e) => handleFieldChange("class", e.target.value)}
-                      />
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                      <div>
+                        <Label className="text-xs font-bold text-gray-700">Class</Label>
+                        <Input
+                          className="mt-1 text-xs"
+                          placeholder="e.g. 10"
+                          value={formData.class ?? ""}
+                          onChange={(e) => handleFieldChange("class", e.target.value)}
+                        />
+                      </div>
+
+                      <div>
+                        <Label className="text-xs font-bold text-gray-700">Section</Label>
+                        <Input
+                          className="mt-1 text-xs"
+                          placeholder="e.g. A"
+                          value={formData.section ?? ""}
+                          onChange={(e) => handleFieldChange("section", e.target.value)}
+                        />
+                      </div>
+
+                      <div>
+                        <Label className="text-xs font-bold text-gray-700">Roll Number</Label>
+                        <Input
+                          className="mt-1 text-xs"
+                          placeholder="e.g. 15"
+                          value={formData.roll_number ?? ""}
+                          onChange={(e) => handleFieldChange("roll_number", e.target.value)}
+                        />
+                      </div>
                     </div>
 
-                    <div>
-                      <Label className="text-xs font-bold text-gray-700">Section</Label>
-                      <Input
-                        className="mt-1 text-xs"
-                        placeholder="e.g. A"
-                        value={formData.section ?? ""}
-                        onChange={(e) => handleFieldChange("section", e.target.value)}
-                      />
-                    </div>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                      <div>
+                        <Label className="text-xs font-bold text-gray-700">Date of Birth</Label>
+                        <Input
+                          className="mt-1 text-xs"
+                          placeholder="DD/MM/YYYY"
+                          value={formData.dob ?? ""}
+                          onChange={(e) => handleFieldChange("dob", e.target.value)}
+                        />
+                      </div>
 
-                    <div>
-                      <Label className="text-xs font-bold text-gray-700">Roll Number</Label>
-                      <Input
-                        className="mt-1 text-xs"
-                        placeholder="e.g. 15"
-                        value={formData.roll_number ?? ""}
-                        onChange={(e) => handleFieldChange("roll_number", e.target.value)}
-                      />
-                    </div>
+                      <div>
+                        <Label className="text-xs font-bold text-gray-700">Gender</Label>
+                        <Select
+                          value={formData.gender || "Male"}
+                          onValueChange={(val) => handleFieldChange("gender", val)}
+                        >
+                          <SelectTrigger className="mt-1 text-xs h-9">
+                            <SelectValue placeholder="Gender" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Male">Male</SelectItem>
+                            <SelectItem value="Female">Female</SelectItem>
+                            <SelectItem value="Other">Other</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
 
-                    <div>
-                      <Label className="text-xs font-bold text-gray-700">Date of Birth</Label>
-                      <Input
-                        className="mt-1 text-xs"
-                        placeholder="DD/MM/YYYY"
-                        value={formData.dob ?? ""}
-                        onChange={(e) => handleFieldChange("dob", e.target.value)}
-                      />
-                    </div>
-
-                    <div>
-                      <Label className="text-xs font-bold text-gray-700">Gender</Label>
-                      <Select
-                        value={formData.gender || "Male"}
-                        onValueChange={(val) => handleFieldChange("gender", val)}
-                      >
-                        <SelectTrigger className="mt-1 text-xs h-9">
-                          <SelectValue placeholder="Gender" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Male">Male</SelectItem>
-                          <SelectItem value="Female">Female</SelectItem>
-                          <SelectItem value="Other">Other</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div>
-                      <Label className="text-xs font-bold text-gray-700">Blood Group</Label>
-                      <Select
-                        value={formData.blood_group || "B+"}
-                        onValueChange={(val) => handleFieldChange("blood_group", val)}
-                      >
-                        <SelectTrigger className="mt-1 text-xs h-9">
-                          <SelectValue placeholder="Blood group" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"].map((bg) => (
-                            <SelectItem key={bg} value={bg}>
-                              {bg}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <div>
+                        <Label className="text-xs font-bold text-gray-700">Blood Group</Label>
+                        <Select
+                          value={formData.blood_group || "B+"}
+                          onValueChange={(val) => handleFieldChange("blood_group", val)}
+                        >
+                          <SelectTrigger className="mt-1 text-xs h-9">
+                            <SelectValue placeholder="Blood group" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"].map((bg) => (
+                              <SelectItem key={bg} value={bg}>
+                                {bg}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -613,8 +621,8 @@ export default function IdCardFormModal({
                 </div>
 
                 {/* Extra dynamic fields discovered from template */}
-                {requiredDynamicFields
-                  .filter(
+                {(() => {
+                  const extraFields = requiredDynamicFields.filter(
                     (f) =>
                       ![
                         "student_name",
@@ -633,25 +641,36 @@ export default function IdCardFormModal({
                         "school_name",
                         "school_code",
                       ].includes(f),
-                  )
-                  .map((customField) => (
-                    <div key={customField} className="space-y-1">
-                      <Label className="text-xs font-bold text-gray-700 capitalize">
-                        {customField.replaceAll("_", " ")} <span className="text-red-500">*</span>
-                      </Label>
-                      <Input
-                        className="text-xs"
-                        value={formData[customField] ?? ""}
-                        onChange={(e) => handleFieldChange(customField, e.target.value)}
-                      />
+                  );
+                  if (extraFields.length === 0) return null;
+                  return (
+                    <div className="space-y-3">
+                      <div className="text-xs font-bold uppercase tracking-wider text-teal-800 border-b pb-1">
+                        Additional Template Fields
+                      </div>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        {extraFields.map((customField) => (
+                          <div key={customField} className="space-y-1">
+                            <Label className="text-xs font-bold text-gray-700 capitalize">
+                              {customField.replaceAll("_", " ")} <span className="text-red-500">*</span>
+                            </Label>
+                            <Input
+                              className="text-xs"
+                              value={formData[customField] ?? ""}
+                              onChange={(e) => handleFieldChange(customField, e.target.value)}
+                            />
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  ))}
+                  );
+                })()}
               </>
             )}
           </div>
 
           {/* RIGHT: Live Interactive CardRenderer Preview */}
-          <div className="lg:col-span-6 bg-gray-100/70 rounded-2xl p-4 flex flex-col items-center justify-between border border-gray-200">
+          <div className="lg:col-span-5 bg-gray-100/70 rounded-2xl p-4 flex flex-col items-center justify-between border border-gray-200">
             {/* Toolbar */}
             <div className="w-full flex items-center justify-between pb-3 border-b border-gray-200">
               {/* Side toggle */}
@@ -745,7 +764,7 @@ export default function IdCardFormModal({
         </div>
 
         {/* Footer Actions */}
-        <DialogFooter className="border-t pt-4 mt-2 flex items-center justify-between">
+        <DialogFooter className="border-t pt-4 mt-2 shrink-0 w-full flex items-center justify-between sm:justify-between">
           <Button
             type="button"
             variant="outline"
