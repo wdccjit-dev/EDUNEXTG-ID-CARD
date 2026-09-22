@@ -149,5 +149,6 @@ The application will be available at `http://localhost:3000`.
 
 ## License
 MIT License
+
 DEVELOPED BY [r1shurajak](https://github.com/r1shurajak)!
 
