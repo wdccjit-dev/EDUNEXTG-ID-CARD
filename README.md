@@ -1,6 +1,6 @@
 # Atlas ID · School ID Card Management System
 
-A multi-tenant, enterprise-grade ID card design, generation, approval, and printing platform built with React, Express, tRPC, MySQL, and Drizzle ORM.
+A multi-tenant, INTERNAL-grade ID card design, generation, approval, and printing platform built with React, Express, tRPC, MySQL, and Drizzle ORM.
 
 ---
 
@@ -149,3 +149,4 @@ The application will be available at `http://localhost:3000`.
 
 ## License
 MIT License
+DEVELOPED BY RISHU RAJAK
