@@ -57,6 +57,13 @@
       "when": 1789993883114,
       "tag": "0007_vengeful_red_ghost",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1790158997524,
+      "tag": "0008_add_token_prefix",
+      "breakpoints": true
     }
   ]
 }

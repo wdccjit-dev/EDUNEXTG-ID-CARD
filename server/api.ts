@@ -152,12 +152,15 @@ function requireRole(roles: Set<string>) {
 
 function fail(res: Response, error: unknown) {
   console.error("[API]", error);
-  const message =
+  // In production, avoid leaking internal error details to the client
+  const isProduction = process.env.NODE_ENV === "production";
+  const rawMessage =
     error instanceof Error
       ? error.message
       : typeof error === "string"
       ? error
       : "Database operation failed";
+  const message = isProduction ? "An internal error occurred. Please try again or contact support." : rawMessage;
   return res.status(500).json({ error: message });
 }
 
@@ -663,33 +666,39 @@ router.delete("/schools/:id", requireRole(adminRoles), async (req, res) => {
     const db = await getDb();
     if (!db) return res.status(503).json({ error: "Database not available" });
 
-    // Cleanly delete all dependent records and associated users so no orphaned users remain
-    const schoolCards = await db.select({ id: idCards.id }).from(idCards).where(eq(idCards.schoolId, id));
-    const cardIds = schoolCards.map((c) => c.id);
-    if (cardIds.length > 0) {
-      await db.delete(approvalHistory).where(inArray(approvalHistory.idCardId, cardIds));
-      await db.delete(idCardFiles).where(inArray(idCardFiles.idCardId, cardIds));
-      await db.delete(idCardData).where(inArray(idCardData.idCardId, cardIds));
-      await db.delete(idCards).where(eq(idCards.schoolId, id));
-    }
-    await db.delete(idCardRequests).where(eq(idCardRequests.schoolId, id));
-    await db.delete(schoolTemplates).where(eq(schoolTemplates.schoolId, id));
-    await db.delete(notifications).where(eq(notifications.schoolId, id));
-    await db.delete(auditLogs).where(eq(auditLogs.schoolId, id));
+    const actor = currentUser(res);
 
-    // Delete all associated users for this school
-    const schoolUsers = await db.select({ id: users.id }).from(users).where(eq(users.schoolId, id));
-    const schoolUserIds = schoolUsers.map((u) => u.id);
-    if (schoolUserIds.length > 0) {
-      await db.delete(approvalHistory).where(inArray(approvalHistory.actedByUserId, schoolUserIds));
-      await db.delete(notifications).where(inArray(notifications.userId, schoolUserIds));
-      await db.delete(auditLogs).where(inArray(auditLogs.userId, schoolUserIds));
-      await db.delete(users).where(eq(users.schoolId, id));
-    }
+    // Wrap entire cascade in a transaction to prevent partial deletes
+    await db.transaction(async (tx) => {
+      // Cleanly delete all dependent records and associated users so no orphaned users remain
+      const schoolCards = await tx.select({ id: idCards.id }).from(idCards).where(eq(idCards.schoolId, id));
+      const cardIdList = schoolCards.map((c) => c.id);
+      if (cardIdList.length > 0) {
+        await tx.delete(approvalHistory).where(inArray(approvalHistory.idCardId, cardIdList));
+        await tx.delete(idCardFiles).where(inArray(idCardFiles.idCardId, cardIdList));
+        await tx.delete(idCardData).where(inArray(idCardData.idCardId, cardIdList));
+        await tx.delete(idCards).where(eq(idCards.schoolId, id));
+      }
+      await tx.delete(idCardRequests).where(eq(idCardRequests.schoolId, id));
+      await tx.delete(schoolTemplates).where(eq(schoolTemplates.schoolId, id));
+      await tx.delete(notifications).where(eq(notifications.schoolId, id));
+      await tx.delete(auditLogs).where(eq(auditLogs.schoolId, id));
 
-    // Finally delete the school
-    await db.delete(schools).where(eq(schools.id, id));
-    await audit(currentUser(res), "DELETE_SCHOOL", "school", id, null, null);
+      // Delete all associated users for this school
+      const schoolUsers = await tx.select({ id: users.id }).from(users).where(eq(users.schoolId, id));
+      const schoolUserIds = schoolUsers.map((u) => u.id);
+      if (schoolUserIds.length > 0) {
+        await tx.delete(approvalHistory).where(inArray(approvalHistory.actedByUserId, schoolUserIds));
+        await tx.delete(notifications).where(inArray(notifications.userId, schoolUserIds));
+        await tx.delete(auditLogs).where(inArray(auditLogs.userId, schoolUserIds));
+        await tx.delete(users).where(eq(users.schoolId, id));
+      }
+
+      // Finally delete the school
+      await tx.delete(schools).where(eq(schools.id, id));
+    });
+
+    await audit(actor, "DELETE_SCHOOL", "school", id, null, null);
     res.status(200).json({ success: true });
   } catch (e) {
     fail(res, e);
@@ -717,8 +726,16 @@ router.post("/users", requireRole(adminRoles), async (req, res) => {
     if (String(req.body.password ?? "").length < 8) return res.status(400).json({ error: "A password of at least 8 characters is required" });
     const db = await getDb();
     if (!db) return res.status(503).json({ error: "Database not available" });
+
+    // Generate or validate openId uniqueness
+    const openId = String(req.body.openId ?? `local_${Date.now()}`);
+    const existingOpenId = (await db.select({ id: users.id }).from(users).where(eq(users.openId, openId)))[0];
+    if (existingOpenId) {
+      return res.status(409).json({ error: `Login ID "${openId}" is already in use. Please choose a different one.` });
+    }
+
     const result = await db.insert(users).values({
-      openId: String(req.body.openId ?? `local_${Date.now()}`),
+      openId,
       name: req.body.name ?? null,
       email: req.body.email ?? null,
       loginMethod: "local",
@@ -858,6 +875,16 @@ const updateTemplateStatusHandler = async (req: Request, res: Response) => {
     const id = Number(req.params.id);
     const db = await getDb();
     if (!db) return res.status(503).json({ error: "Database not available" });
+
+    // Validate status is a valid enum value
+    const validStatuses = ["DRAFT", "ACTIVE", "INACTIVE", "ARCHIVED"];
+    if (!req.body.status || !validStatuses.includes(req.body.status)) {
+      return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(", ")}` });
+    }
+
+    const template = (await db.select().from(idCardTemplates).where(eq(idCardTemplates.id, id)))[0];
+    if (!template) return res.status(404).json({ error: "Template not found" });
+
     await db.update(idCardTemplates).set({ status: req.body.status }).where(eq(idCardTemplates.id, id));
     await audit(currentUser(res), "UPDATE_TEMPLATE_STATUS", "template", id, null, req.body);
     res.json({ success: true });
@@ -871,8 +898,13 @@ router.post("/templates/:id/status", requireRole(adminRoles), updateTemplateStat
 router.put("/templates/:id", requireRole(adminRoles), async (req, res) => {
   try {
     const id = Number(req.params.id);
+    if (!id || isNaN(id)) return res.status(400).json({ error: "Invalid template ID" });
     const db = await getDb();
     if (!db) return res.status(503).json({ error: "Database not available" });
+
+    const existingTemplate = (await db.select().from(idCardTemplates).where(eq(idCardTemplates.id, id)))[0];
+    if (!existingTemplate) return res.status(404).json({ error: "Template not found" });
+
     const updateSet: Record<string, unknown> = {};
     if (req.body.name !== undefined) updateSet.name = req.body.name;
     if (req.body.meta !== undefined) updateSet.meta = req.body.meta;
@@ -1858,14 +1890,15 @@ async function transitionApproval(
 }
 
 // Approval endpoints (both /api/approvals and /api/id-cards)
-router.post("/approvals/:id/review", async (req, res) => {
+// RBAC: review/approve/reject/request-changes require at least school manager role
+router.post("/approvals/:id/review", requireRole(schoolManagerRoles), async (req, res) => {
   try {
     await transitionApproval(req, res, "UNDER_REVIEW", "START_REVIEW");
   } catch (e) {
     fail(res, e);
   }
 });
-router.post("/approvals/:id/request-changes", async (req, res) => {
+router.post("/approvals/:id/request-changes", requireRole(schoolManagerRoles), async (req, res) => {
   try {
     await transitionApproval(req, res, "CHANGES_REQUIRED", "REQUEST_CHANGES", req.body.comment || req.body.note);
   } catch (e) {
@@ -1879,14 +1912,14 @@ router.post("/approvals/:id/resubmit", requireRole(adminRoles), async (req, res)
     fail(res, e);
   }
 });
-router.post("/approvals/:id/approve", async (req, res) => {
+router.post("/approvals/:id/approve", requireRole(schoolManagerRoles), async (req, res) => {
   try {
     await transitionApproval(req, res, "APPROVED", "APPROVE_ID_CARD");
   } catch (e) {
     fail(res, e);
   }
 });
-router.post("/approvals/:id/reject", async (req, res) => {
+router.post("/approvals/:id/reject", requireRole(schoolManagerRoles), async (req, res) => {
   try {
     await transitionApproval(req, res, "REJECTED", "REJECT_ID_CARD", req.body.reason || req.body.comment);
   } catch (e) {
@@ -1894,14 +1927,14 @@ router.post("/approvals/:id/reject", async (req, res) => {
   }
 });
 
-router.post("/id-cards/:id/review", async (req, res) => {
+router.post("/id-cards/:id/review", requireRole(schoolManagerRoles), async (req, res) => {
   try {
     await transitionApproval(req, res, "UNDER_REVIEW", "START_REVIEW");
   } catch (e) {
     fail(res, e);
   }
 });
-router.post("/id-cards/:id/request-changes", async (req, res) => {
+router.post("/id-cards/:id/request-changes", requireRole(schoolManagerRoles), async (req, res) => {
   try {
     await transitionApproval(req, res, "CHANGES_REQUIRED", "REQUEST_CHANGES", req.body.comment || req.body.note);
   } catch (e) {
@@ -1915,14 +1948,14 @@ router.post("/id-cards/:id/resubmit", requireRole(adminRoles), async (req, res) 
     fail(res, e);
   }
 });
-router.post("/id-cards/:id/approve", async (req, res) => {
+router.post("/id-cards/:id/approve", requireRole(schoolManagerRoles), async (req, res) => {
   try {
     await transitionApproval(req, res, "APPROVED", "APPROVE_ID_CARD");
   } catch (e) {
     fail(res, e);
   }
 });
-router.post("/id-cards/:id/reject", async (req, res) => {
+router.post("/id-cards/:id/reject", requireRole(schoolManagerRoles), async (req, res) => {
   try {
     await transitionApproval(req, res, "REJECTED", "REJECT_ID_CARD", req.body.reason || req.body.comment);
   } catch (e) {

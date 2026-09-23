@@ -259,12 +259,13 @@ export const passwordResets = mysqlTable(
     id: int("id").autoincrement().primaryKey(),
     userId: int("user_id").notNull().references(() => users.id, { onDelete: "cascade", onUpdate: "cascade" }),
     tokenHash: varchar("token_hash", { length: 255 }).notNull().unique(),
+    tokenPrefix: varchar("token_prefix", { length: 16 }),
     expiresAt: timestamp("expires_at").notNull(),
     usedAt: timestamp("used_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
   },
-  (table) => [index("password_resets_user_idx").on(table.userId), index("password_resets_expires_idx").on(table.expiresAt)],
+  (table) => [index("password_resets_user_idx").on(table.userId), index("password_resets_expires_idx").on(table.expiresAt), index("password_resets_prefix_idx").on(table.tokenPrefix)],
 );
 
 export const usersRelations = relations(users, ({ one, many }) => ({ school: one(schools, { fields: [users.schoolId], references: [schools.id] }), permissions: many(schoolPermissions) }));

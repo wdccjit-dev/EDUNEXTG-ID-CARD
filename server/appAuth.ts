@@ -1,5 +1,5 @@
 import { promisify } from "node:util";
-import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
 import { parse as parseCookieHeader } from "cookie";
 import { SignJWT, jwtVerify } from "jose";
 import type { Request, Response } from "express";
@@ -172,14 +172,23 @@ export async function createPasswordReset(email: string) {
   const user = (await db.select().from(users).where(eq(users.email, email.trim().toLowerCase())))[0];
   if (!user) return null;
   const rawToken = randomBytes(32).toString("base64url");
-  await db.insert(passwordResets).values({ userId: user.id, tokenHash: (await hashPassword(rawToken)), expiresAt: new Date(Date.now() + RESET_TTL_MS) });
+  // Store a SHA-256 prefix for efficient lookup (avoids O(N) scrypt on all tokens)
+  const tokenPrefix = createHash("sha256").update(rawToken).digest("hex").slice(0, 16);
+  await db.insert(passwordResets).values({ userId: user.id, tokenHash: (await hashPassword(rawToken)), tokenPrefix, expiresAt: new Date(Date.now() + RESET_TTL_MS) });
   return rawToken;
 }
 
 export async function resetPassword(rawToken: string, newPassword: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const candidates = await db.select().from(passwordResets).where(gt(passwordResets.expiresAt, new Date()));
+  // Use the prefix for efficient lookup instead of iterating all unexpired tokens
+  const tokenPrefix = createHash("sha256").update(rawToken).digest("hex").slice(0, 16);
+  const candidates = await db.select().from(passwordResets).where(
+    and(
+      gt(passwordResets.expiresAt, new Date()),
+      eq(passwordResets.tokenPrefix, tokenPrefix)
+    )
+  );
   for (const reset of candidates) {
     if (reset.usedAt || !(await verifyPassword(rawToken, reset.tokenHash))) continue;
     await db.update(users).set({ passwordHash: await hashPassword(newPassword) }).where(eq(users.id, reset.userId));

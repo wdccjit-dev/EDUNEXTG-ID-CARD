@@ -1036,10 +1036,13 @@ export default function Home({
   const goTo = (label: NavLabel) => {
     setActiveNav(label);
     setSidebarOpen(false);
-    if (label !== "Overview")
-      toast(`${label} module opened`, {
-        description: "This workspace is connected to MySQL.",
-      });
+  };
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good morning";
+    if (hour < 17) return "Good afternoon";
+    return "Good evening";
   };
 
   return (
@@ -1143,13 +1146,6 @@ export default function Home({
               <Settings2 className="h-[17px] w-[17px] text-[#779b96]" />
               Settings
             </button>
-            <button
-              onClick={() => void logout()}
-              className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-[12px] font-semibold text-[#f87171] hover:bg-[#341b1b] hover:text-[#fca5a5]"
-            >
-              <LogOut className="h-[17px] w-[17px]" />
-              Sign out
-            </button>
           </nav>
           <div className="flex items-center justify-between border-t border-[#294344] py-4">
             <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-[#6e928d]">
@@ -1183,7 +1179,7 @@ export default function Home({
             <div>
               <h1 className="text-[22px] font-extrabold tracking-[-0.05em]">
                 {activeNav === "Overview"
-                  ? `Good morning, ${authenticatedUser.name?.split(" ")[0] ?? "there"}`
+                  ? `${getGreeting()}, ${authenticatedUser.name?.split(" ")[0] ?? "there"}`
                   : activeNav}
               </h1>
             </div>
@@ -1584,8 +1580,8 @@ export default function Home({
                         </button>
                       )}
                       <button
-                        onClick={() => toast("Audit logs opened")}
-                        className="text-[10px] font-extrabold text-[#0f7f79] hover:underline"
+                        onClick={() => goTo("Audit logs")}
+                        className="text-[10px] font-extrabold text-[#0f7f79] hover:underline cursor-pointer"
                       >
                         View log
                       </button>
@@ -1681,10 +1677,9 @@ export default function Home({
                           </div>
                         </div>
                         <button
-                          onClick={() =>
-                            toast(`${template.name} preview opened`)
-                          }
-                          className="rounded-lg p-2 text-[#a1ada9] hover:bg-[#edf6f1] hover:text-[#0f7f79]"
+                          onClick={() => void handlePreviewTemplate(template)}
+                          className="rounded-lg p-2 text-[#a1ada9] hover:bg-[#edf6f1] hover:text-[#0f7f79] cursor-pointer"
+                          title={`Preview ${template.name}`}
                         >
                           <ArrowUpRight className="h-4 w-4" />
                         </button>
