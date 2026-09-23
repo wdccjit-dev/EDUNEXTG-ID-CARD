@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import CardRenderer from "@/components/CardRenderer";
 import IdCardFormModal from "./IdCardFormModal";
@@ -81,7 +81,7 @@ import {
   type ApiApproval,
   type ApiAuthUser,
 } from "@/lib/api";
-import { formatDistanceToNow, format } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 
 const navItems = [
@@ -245,6 +245,23 @@ export default function Home({
 }) {
   const [authenticatedUser, setAuthenticatedUser] = useState<ApiAuthUser>(initialAuthenticatedUser);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
+        setProfileMenuOpen(false);
+      }
+    }
+    if (profileMenuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [profileMenuOpen]);
+
   const [activeNav, setActiveNav] = useState<NavLabel>(
     (initialNav as NavLabel) || "Overview",
   );
@@ -538,6 +555,9 @@ export default function Home({
   };
 
   const handleClearActivity = async () => {
+    if (authenticatedUser.role !== "SUPER_ADMIN") {
+      return toast.error("Only administrators can clear audit logs");
+    }
     try {
       await api.auditLogs.clear();
       setActivity([]);
@@ -991,15 +1011,18 @@ export default function Home({
       >
         <div className="flex h-[76px] shrink-0 items-center justify-between px-6">
           <div className="flex items-center gap-3">
-            <div className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-[#40c8bb] text-[#092a2b]">
-              <ShieldCheck className="h-5 w-5" strokeWidth={2.4} />
-              <span className="absolute -bottom-1 -right-1 h-2.5 w-2.5 rounded-full border-2 border-[#102728] bg-[#f2c94c]" />
+            <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-white p-1 shadow-sm">
+              <img
+                src="/insight-education-logo.png"
+                alt="Insight Education"
+                className="h-full w-full object-contain"
+              />
             </div>
             <div>
-              <div className="font-extrabold tracking-[-0.05em] text-white">
-                atlas<span className="text-[#40c8bb]">id</span>
+              <div className="font-extrabold tracking-[-0.03em] text-white text-[15px] leading-tight">
+                Insight <span className="text-[#40c8bb]">Education</span>
               </div>
-              <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-[#7fa09c]">
+              <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#7fa09c]">
                 {portal === "admin" ? "admin console" : "school portal"}
               </div>
             </div>
@@ -1012,58 +1035,7 @@ export default function Home({
           </button>
         </div>
 
-        <div className="mx-5 mb-6 shrink-0 rounded-2xl border border-[#294344] bg-[#173534] p-3">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[#f5c87b] text-sm font-extrabold text-[#5c4523]">
-              {authenticatedUser.avatarUrl ? (
-                <img
-                  src={authenticatedUser.avatarUrl}
-                  alt="Profile"
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                authenticatedUser.role === "SUPER_ADMIN" ? "SA" : "SC"
-              )}
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-xs font-bold text-white">
-                {authenticatedUser.name ??
-                  authenticatedUser.email ??
-                  "Authenticated user"}
-              </div>
-              <div className="mt-0.5 text-[10px] text-[#8bb2ac]">
-                {authenticatedUser.role} ·{" "}
-                {authenticatedUser.role === "SUPER_ADMIN"
-                  ? currentActiveSchool
-                    ? currentActiveSchool.name
-                    : "All schools"
-                  : authenticatedUser.schoolName ??
-                  `School #${authenticatedUser.schoolId}`}
-                <div className="mt-0.5 text-[9px] text-[#6f9892]">
-                  {authenticatedUser.role === "VIEWER"
-                    ? "Read only"
-                    : authenticatedUser.role === "SCHOOL_OPERATOR"
-                      ? "Cards and submissions"
-                      : authenticatedUser.role === "SUPER_ADMIN"
-                        ? "Super Administrator"
-                        : "Full school permissions"}
-                </div>
-              </div>
-            </div>
-          </div>
-          {authenticatedUser.role === "SUPER_ADMIN" && (
-            <button
-              type="button"
-              onClick={() => setProfileModalOpen(true)}
-              className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-xl border border-[#305250] bg-[#193d3c] py-1.5 text-[11px] font-bold text-[#a7dfd7] transition hover:bg-[#204948] hover:text-white"
-            >
-              <User className="h-3 w-3" />
-              Edit Profile
-            </button>
-          )}
-        </div>
-
-        <div className="px-5 shrink-0">
+        <div className="px-5 pt-2 shrink-0">
           <div className="mb-3 px-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[#6e928d]">
             workspace
           </div>
@@ -1127,15 +1099,6 @@ export default function Home({
               <Settings2 className="h-[17px] w-[17px] text-[#779b96]" />
               Settings
             </button>
-            {authenticatedUser.role === "SUPER_ADMIN" && (
-              <button
-                onClick={() => toast("Audit logs opened")}
-                className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-[12px] font-semibold text-[#99b6b2] hover:bg-[#1b3a3a] hover:text-white"
-              >
-                <BookOpenCheck className="h-[17px] w-[17px] text-[#779b96]" />
-                Audit logs
-              </button>
-            )}
             <button
               onClick={() => void logout()}
               className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-[12px] font-semibold text-[#f87171] hover:bg-[#341b1b] hover:text-[#fca5a5]"
@@ -1146,7 +1109,7 @@ export default function Home({
           </nav>
           <div className="flex items-center justify-between border-t border-[#294344] py-4">
             <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-[#6e928d]">
-              Atlas ID v1.0
+              Insight Education v1.0
             </span>
             <span className="flex items-center gap-1.5 text-[10px] font-semibold text-[#71c4a8]">
               <span className="h-1.5 w-1.5 rounded-full bg-[#71c4a8]" />
@@ -1174,10 +1137,7 @@ export default function Home({
               <Menu className="h-5 w-5" />
             </button>
             <div>
-              <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#82908e]">
-                {format(new Date(), "EEEE · d MMMM yyyy")}
-              </div>
-              <h1 className="mt-1 text-[22px] font-extrabold tracking-[-0.05em]">
+              <h1 className="text-[22px] font-extrabold tracking-[-0.05em]">
                 {activeNav === "Overview"
                   ? `Good morning, ${authenticatedUser.name?.split(" ")[0] ?? "there"}`
                   : activeNav}
@@ -1235,70 +1195,77 @@ export default function Home({
               />
             </div>
 
-            <button
-              onClick={() =>
-                toast("No new notifications", {
-                  description: "You are all caught up.",
-                })
-              }
-              aria-label="Open notifications" className="icon-button relative rounded-xl border border-[#e0e6e1] bg-white p-2.5 text-[#74817f] shadow-sm hover:text-[#0f7f79]"
-            >
-              <Bell className="h-4 w-4" />
-              <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-[#e78362] ring-2 ring-white" />
-            </button>
-
-            <div className="hidden h-9 w-px bg-[#dfe6e1] sm:block" />
-
-            <div className="flex items-center gap-2">
-              {authenticatedUser.role === "SUPER_ADMIN" ? (
-                <button
-                  type="button"
-                  onClick={() => setProfileModalOpen(true)}
-                  title="Super Admin Profile"
-                  aria-label="Super Admin Profile"
-                  className="flex items-center gap-2 rounded-xl border border-[#dfe6e1] bg-white p-1 pr-3 text-xs font-bold text-[#1f3733] shadow-sm transition hover:border-[#0f7f79]/50 hover:bg-[#f0faf7]"
-                >
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#f5c87b] text-xs font-extrabold text-[#5c4523]">
-                    {authenticatedUser.avatarUrl ? (
-                      <img
-                        src={authenticatedUser.avatarUrl}
-                        alt="Profile"
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      initialsFor(
-                        authenticatedUser.name ??
-                          authenticatedUser.email ??
-                          "Admin",
-                      )
-                    )}
-                  </div>
-                  <span className="hidden sm:inline font-bold text-xs">
-                    {authenticatedUser.name?.split(" ")[0] ?? "Admin"}
-                  </span>
-                  <span className="rounded-full bg-[#dff3ee] px-2 py-0.5 text-[9px] font-extrabold text-[#0f7f79] uppercase">
-                    Profile
-                  </span>
-                </button>
-              ) : (
-                <div
-                  className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#f5c87b] text-xs font-extrabold text-[#5c4523] shadow-sm"
-                  title={authenticatedUser.name ?? "User"}
-                >
-                  {initialsFor(
-                    authenticatedUser.name ?? authenticatedUser.email ?? "User",
+            <div ref={profileMenuRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setProfileMenuOpen((prev) => !prev)}
+                title="Profile Menu"
+                aria-label="Profile Menu"
+                aria-haspopup="menu"
+                aria-expanded={profileMenuOpen}
+                className="flex items-center gap-2 rounded-xl border border-[#dfe6e1] bg-white p-1.5 pr-2.5 text-xs font-bold text-[#1f3733] shadow-sm transition hover:border-[#0f7f79]/50 hover:bg-[#f0faf7] cursor-pointer"
+              >
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#f5c87b] text-xs font-extrabold text-[#5c4523]">
+                  {authenticatedUser.avatarUrl ? (
+                    <img
+                      src={authenticatedUser.avatarUrl}
+                      alt="Profile"
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    initialsFor(
+                      authenticatedUser.name ??
+                        authenticatedUser.email ??
+                        (authenticatedUser.role === "SUPER_ADMIN" ? "Admin" : "User"),
+                    )
                   )}
                 </div>
-              )}
-
-              <button
-                onClick={() => void logout()}
-                title="Log out"
-                className="flex items-center gap-1.5 rounded-xl border border-[#e0e6e1] bg-white px-3 py-2 text-xs font-bold text-[#4c5c59] shadow-sm transition hover:bg-[#fff5f5] hover:border-[#fca5a5] hover:text-[#dc2626]"
-              >
-                <LogOut className="h-3.5 w-3.5" />
-                <span className="hidden md:inline">Log out</span>
+                <span className="hidden sm:inline font-bold text-xs">
+                  {authenticatedUser.name?.split(" ")[0] ?? (authenticatedUser.role === "SUPER_ADMIN" ? "Admin" : "User")}
+                </span>
+                <ChevronDown
+                  className={`h-3 w-3 text-[#74817f] transition-transform duration-200 ${
+                    profileMenuOpen ? "rotate-180" : ""
+                  }`}
+                />
               </button>
+
+              {profileMenuOpen && (
+                <div
+                  role="menu"
+                  aria-orientation="vertical"
+                  className="absolute right-0 top-full mt-2 w-48 rounded-xl border border-[#dfe6e1] bg-white p-1.5 shadow-[0_12px_32px_rgba(31,55,51,0.12)] z-50 animate-in fade-in zoom-in-95 duration-100"
+                >
+                  <button
+                    role="menuitem"
+                    type="button"
+                    onClick={() => {
+                      setProfileMenuOpen(false);
+                      if (authenticatedUser.role === "SUPER_ADMIN") {
+                        setProfileModalOpen(true);
+                      } else {
+                        toast.info("Profile details are managed by your administrator.");
+                      }
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-semibold text-[#1f3733] transition hover:bg-[#f0faf7] hover:text-[#0f7f79] cursor-pointer"
+                  >
+                    <User className="h-3.5 w-3.5 text-[#0f7f79]" />
+                    <span>Edit Profile</span>
+                  </button>
+                  <button
+                    role="menuitem"
+                    type="button"
+                    onClick={() => {
+                      setProfileMenuOpen(false);
+                      void logout();
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-semibold text-[#dc2626] transition hover:bg-[#fef2f2] cursor-pointer"
+                  >
+                    <LogOut className="h-3.5 w-3.5 text-[#dc2626]" />
+                    <span>Log Out</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </header>
@@ -1366,50 +1333,51 @@ export default function Home({
               </section>
 
               <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <div
-                  onClick={() => authenticatedUser.role === "SUPER_ADMIN" && goTo("Schools")}
-                  className={authenticatedUser.role === "SUPER_ADMIN" ? "cursor-pointer transition-transform hover:-translate-y-0.5" : ""}
-                >
-                  <MetricCard
-                    label={authenticatedUser.role === "SUPER_ADMIN" ? "Active schools" : "My School"}
-                    value={
-                      authenticatedUser.role === "SUPER_ADMIN"
-                        ? String(schools.filter((school) => school.isActive).length)
-                        : (currentActiveSchool?.shortCode || "Connected")
+                <MetricCard
+                  label={authenticatedUser.role === "SUPER_ADMIN" ? "Active schools" : "My School"}
+                  value={
+                    authenticatedUser.role === "SUPER_ADMIN"
+                      ? String(schools.filter((school) => school.isActive).length)
+                      : (currentActiveSchool?.shortCode || "Connected")
+                  }
+                  change="Click to view"
+                  icon={Building2}
+                  tone="teal"
+                  onClick={() => {
+                    if (authenticatedUser.role === "SUPER_ADMIN") {
+                      goTo("Schools");
+                    } else {
+                      goTo("ID card requests");
                     }
-                    change={
-                      authenticatedUser.role === "SUPER_ADMIN"
-                        ? "Click to manage schools →"
-                        : (currentActiveSchool?.name || "Active")
-                    }
-                    icon={Building2}
-                    tone="teal"
-                  />
-                </div>
+                  }}
+                />
                 <MetricCard
                   label="Cards in review"
                   value={String(pendingRequests.length)}
-                  change={`${pendingRequests.filter((r) => r.status === "SUBMITTED").length} pending`}
+                  change="Click to view"
                   icon={Clock3}
                   tone="coral"
+                  onClick={() => goTo("ID card requests")}
                 />
                 <MetricCard
                   label="Approved cards"
                   value={String(
                     approvals.filter((request) => request.status === "APPROVED").length,
                   )}
-                  change="Live from MySQL"
+                  change="Click to view"
                   icon={FileCheck2}
                   tone="indigo"
+                  onClick={() => goTo("Approved cards")}
                 />
                 <MetricCard
                   label="Print-ready cards"
                   value={String(
                     idCards.filter((card) => card.status === "PRINTED").length,
                   )}
-                  change="Live from MySQL"
+                  change="Click to view"
                   icon={Printer}
                   tone="yellow"
+                  onClick={() => goTo("Approved cards")}
                 />
               </section>
 
@@ -1563,7 +1531,7 @@ export default function Home({
                       </p>
                     </div>
                     <div className="flex items-center gap-3">
-                      {activity.length > 0 && (
+                      {activity.length > 0 && authenticatedUser.role === "SUPER_ADMIN" && (
                         <button
                           onClick={() => void handleClearActivity()}
                           className="text-[10px] font-extrabold text-[#dc2626] hover:underline cursor-pointer"
@@ -1608,14 +1576,17 @@ export default function Home({
                         ))}
                       </div>
                     )}
-                    <div className="mt-6 rounded-xl border border-dashed border-[#d6e4dc] bg-[#f7fbf8] p-3 text-center">
-                      <div className="font-mono text-[9px] uppercase tracking-[0.12em] text-[#8ea49d]">
-                        All systems operational
+                    {apiError ? (
+                      <div className="mt-6 rounded-xl border border-dashed border-[#fca5a5] bg-[#fff5f5] p-3 text-center">
+                        <div className="text-[10px] text-[#dc2626]">{apiError}</div>
                       </div>
-                      <div className="mt-1 text-[10px] text-[#6c827c]">
-                        {apiError ?? "Synced from MySQL"}
+                    ) : (
+                      <div className="mt-6 rounded-xl border border-dashed border-[#d6e4dc] bg-[#f7fbf8] p-3 text-center">
+                        <div className="font-mono text-[9px] uppercase tracking-[0.12em] text-[#8ea49d]">
+                          All systems operational
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </CardContent>
                 </Card>
               </section>
@@ -2536,15 +2507,24 @@ function MetricCard({
   change,
   icon,
   tone,
+  onClick,
 }: {
   label: string;
   value: string;
   change: string;
   icon: typeof Bell;
   tone: Tone;
+  onClick?: () => void;
 }) {
   return (
-    <Card className="rounded-2xl border-[#e2e8e3] bg-[#fffefa] shadow-[0_12px_35px_rgba(38,71,65,0.045)]">
+    <Card
+      onClick={onClick}
+      className={`rounded-2xl border-[#e2e8e3] bg-[#fffefa] shadow-[0_12px_35px_rgba(38,71,65,0.045)] ${
+        onClick
+          ? "cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_40px_rgba(38,71,65,0.09)] hover:border-[#0f7f79]/40"
+          : ""
+      }`}
+    >
       <CardContent className="p-5">
         <div className="flex items-start justify-between">
           <div>
@@ -2559,7 +2539,7 @@ function MetricCard({
           className={`mt-5 flex items-center gap-1 text-[10px] font-bold ${toneStyles[tone].fg}`}
         >
           <ArrowUpRight className="h-3 w-3" />
-          {change}
+          <span className={onClick ? "hover:underline" : ""}>{change}</span>
         </div>
       </CardContent>
     </Card>

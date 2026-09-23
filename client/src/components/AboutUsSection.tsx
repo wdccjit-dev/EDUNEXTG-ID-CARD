@@ -27,7 +27,7 @@ export default function AboutUsSection() {
         <div className="relative z-10 max-w-3xl space-y-4">
           <div className="inline-flex items-center gap-2 rounded-full border border-[#40c8bb]/30 bg-[#40c8bb]/10 px-3 py-1 text-xs font-bold text-[#40c8bb]">
             <Sparkles className="h-3.5 w-3.5" />
-            AtlasID Enterprise Platform
+            Insight Education Platform
           </div>
 
           <h1 className="text-3xl font-black tracking-tight sm:text-5xl leading-[1.1]">
@@ -36,7 +36,7 @@ export default function AboutUsSection() {
           </h1>
 
           <p className="text-sm sm:text-base leading-relaxed text-[#c1d7d2] max-w-2xl">
-            AtlasID by EduNextG is the next-generation multi-tenant identity lifecycle platform.
+            Insight Education by EduNextG is the next-generation multi-tenant identity lifecycle platform.
             From drag-and-drop dynamic card templates to cryptographic QR verification and bulk print production,
             we empower schools and educational administrators with effortless identity management.
           </p>
@@ -89,7 +89,7 @@ export default function AboutUsSection() {
               Partnership & Trust
             </h2>
             <p className="text-sm leading-relaxed text-[#5e716e]">
-              Trusted by leading academies, K-12 institutions, and university networks. AtlasID is engineered
+              Trusted by leading academies, K-12 institutions, and university networks. Insight Education is engineered
               for seamless school onboarding, where administrators generate custom credentials for each school in seconds,
               giving schools autonomous template selection while centralizing approval governance.
             </p>
@@ -166,7 +166,7 @@ export default function AboutUsSection() {
             Enterprise-Grade Protection & Cryptography
           </h2>
           <p className="text-xs sm:text-sm text-[#5e716e] leading-relaxed">
-            AtlasID enforces state-of-the-art security practices across all layers. All passwords are protected
+            Insight Education enforces state-of-the-art security practices across all layers. All passwords are protected
             using salted Scrypt key derivation. Application sessions utilize secure, signed JSON Web Tokens with HTTP-only
             cookie storage. Every administrative change is logged to an immutable append-only audit trail.
           </p>
@@ -200,7 +200,7 @@ export default function AboutUsSection() {
               EduNextG
             </div>
             <h3 className="text-lg font-black text-[#182326]">
-              AtlasID Management Suite
+              Insight Education Management Suite
             </h3>
             <p className="text-xs text-[#778381]">
               Version 1.1.0 (Internal Build) · Developed by Rishu Rajak.

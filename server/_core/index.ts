@@ -38,9 +38,35 @@ async function startServer() {
   app.use("/api/trpc", createExpressMiddleware({ router: appRouter, createContext }));
   if (process.env.NODE_ENV === "development") await setupVite(app, server);
   else serveStatic(app);
-  const preferredPort = parseInt(process.env.PORT || "3000");
-  const port = await findAvailablePort(preferredPort);
-  if (port !== preferredPort) console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
+  const rawPort = process.env.PORT?.trim();
+  const isDev = process.env.NODE_ENV === "development";
+
+  let port: number;
+  if (rawPort) {
+    const configuredPort = parseInt(rawPort, 10);
+    if (isNaN(configuredPort) || configuredPort <= 0 || configuredPort > 65535) {
+      throw new Error(`Invalid PORT configuration: "${rawPort}"`);
+    }
+    const available = await isPortAvailable(configuredPort);
+    if (!available) {
+      throw new Error(
+        `Configured port ${configuredPort} is already in use. Please free the port or update configuration.`
+      );
+    }
+    port = configuredPort;
+  } else if (isDev) {
+    port = await findAvailablePort(3000);
+    if (port !== 3000) console.log(`Port 3000 is busy, using port ${port} instead for development`);
+  } else {
+    const defaultPort = 3000;
+    const available = await isPortAvailable(defaultPort);
+    if (!available) {
+      throw new Error(
+        `Default port ${defaultPort} is already in use. Configure PORT environment variable to specify another port.`
+      );
+    }
+    port = defaultPort;
+  }
   server.listen(port, () => console.log(`Server running on http://localhost:${port}/`));
 }
 

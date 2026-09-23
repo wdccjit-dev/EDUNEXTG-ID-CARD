@@ -59,5 +59,30 @@ export function ResetPassword() {
 }
 
 function AuthShell({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
-  return <main className="flex min-h-screen items-center justify-center bg-[#eef4f1] px-4 py-6 sm:px-5"><section className="w-full max-w-md rounded-3xl border border-[#dfe7e2] bg-[#fffefa] p-6 shadow-[0_18px_50px_rgba(38,71,65,0.10)] sm:p-8"><div className="mb-8 flex items-center gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#40c8bb] text-[#092a2b]"><ShieldCheck className="h-6 w-6" /></div><div><div className="font-extrabold text-[#182326]">atlas<span className="text-[#0f7f79]">id</span></div><div className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#82908e]">account security</div></div></div><h1 className="text-2xl font-extrabold tracking-[-0.05em] text-[#203734]">{title}</h1><p className="mt-2 text-sm text-[#778381]">{subtitle}</p><div className="mt-7">{children}</div></section></main>;
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-[#eef4f1] px-4 py-6 sm:px-5">
+      <section className="w-full max-w-md rounded-3xl border border-[#dfe7e2] bg-[#fffefa] p-6 shadow-[0_18px_50px_rgba(38,71,65,0.10)] sm:p-8">
+        <div className="mb-8 flex items-center gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white p-1 shadow-sm border border-[#dfe7e2]">
+            <img
+              src="/insight-education-logo.png"
+              alt="Insight Education"
+              className="h-full w-full object-contain"
+            />
+          </div>
+          <div>
+            <div className="font-extrabold text-[#182326]">
+              Insight <span className="text-[#0f7f79]">Education</span>
+            </div>
+            <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#82908e]">
+              account security
+            </div>
+          </div>
+        </div>
+        <h1 className="text-2xl font-extrabold tracking-[-0.05em] text-[#203734]">{title}</h1>
+        <p className="mt-2 text-sm text-[#778381]">{subtitle}</p>
+        <div className="mt-7">{children}</div>
+      </section>
+    </main>
+  );
 }

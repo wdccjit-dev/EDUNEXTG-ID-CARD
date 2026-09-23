@@ -1,4 +1,4 @@
-# Atlas ID · School ID Card Management System
+# Insight Education · School ID Card Management System
 
 A multi-tenant, INTERNAL-grade ID card design, generation, approval, and printing platform built with React, Express, tRPC, MySQL, and Drizzle ORM.
 
@@ -58,14 +58,18 @@ A multi-tenant, INTERNAL-grade ID card design, generation, approval, and printin
 │       ├── pages/          # Portal pages (Home, Login, Designer, etc.)
 │       └── App.tsx         # Route definitions and RBAC router guards
 ├── drizzle/                # Database schema definitions and migrations
+│   ├── meta/               # Drizzle migration journal and snapshots
+│   ├── *.sql               # Sequential migration scripts (0000 - 0007)
 │   └── schema.ts           # Drizzle MySQL schema definition
 ├── server/                 # Backend server application
 │   ├── _core/              # Framework core, server initialization & auth middleware
-│   ├── api.ts              # RESTful API handlers (schools, users, cards, templates)
+│   ├── api.ts              # RESTful API handlers (schools, users, cards, templates, upload)
 │   ├── appAuth.ts          # Authentication, password hashing, and session logic
 │   ├── db.ts               # Drizzle connection & database helper queries
-│   ├── pdfGenerator.ts     # Server-side ID card PDF generation
+│   ├── idCards.ts          # ID card helper utilities & status transitions
+│   ├── pdf.ts              # Server-side ID card PDF generation (PDFKit)
 │   ├── routers.ts          # tRPC root router
+│   ├── storage.ts          # Storage integration (Forge S3 / local fallback)
 │   └── *.test.ts           # Vitest integration and isolation test suite
 ├── scripts/                # Utility and development scripts
 │   └── seed-auth.ts        # Development-only account seeder (blocked in production)

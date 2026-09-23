@@ -1,3 +1,4 @@
+import path from "node:path";
 import { Router, type NextFunction, type Request, type Response } from "express";
 import { and, desc, eq, inArray, isNull, ne } from "drizzle-orm";
 import {
@@ -25,6 +26,52 @@ const router = Router();
 const adminRoles = new Set(["SUPER_ADMIN"]);
 const schoolManagerRoles = new Set(["SUPER_ADMIN", "SCHOOL_ADMIN"]);
 const schoolWriteRoles = new Set(["SUPER_ADMIN", "SCHOOL_ADMIN", "SCHOOL_OPERATOR"]);
+
+function detectImageMimeType(buffer: Buffer): "image/png" | "image/jpeg" | "image/webp" | "image/gif" | null {
+  if (buffer.length < 12) return null;
+  // PNG: 89 50 4E 47 0D 0A 1A 0A
+  if (
+    buffer[0] === 0x89 &&
+    buffer[1] === 0x50 &&
+    buffer[2] === 0x4e &&
+    buffer[3] === 0x47 &&
+    buffer[4] === 0x0d &&
+    buffer[5] === 0x0a &&
+    buffer[6] === 0x1a &&
+    buffer[7] === 0x0a
+  ) {
+    return "image/png";
+  }
+  // JPEG: FF D8 FF
+  if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+    return "image/jpeg";
+  }
+  // GIF: GIF87a or GIF89a
+  if (
+    buffer[0] === 0x47 &&
+    buffer[1] === 0x49 &&
+    buffer[2] === 0x46 &&
+    buffer[3] === 0x38 &&
+    (buffer[4] === 0x37 || buffer[4] === 0x39) &&
+    buffer[5] === 0x61
+  ) {
+    return "image/gif";
+  }
+  // WEBP: RIFF....WEBP
+  if (
+    buffer[0] === 0x52 &&
+    buffer[1] === 0x49 &&
+    buffer[2] === 0x46 &&
+    buffer[3] === 0x46 &&
+    buffer[8] === 0x57 &&
+    buffer[9] === 0x45 &&
+    buffer[10] === 0x42 &&
+    buffer[11] === 0x50
+  ) {
+    return "image/webp";
+  }
+  return null;
+}
 
 function currentUser(res: Response) {
   return res.locals.user as User;
@@ -69,7 +116,11 @@ async function notify(userId: number, schoolId: number | null, type: string, tit
 
 async function auth(req: Request, res: Response, next: NextFunction) {
   try {
-    res.locals.user = await authenticateApplicationRequest(req);
+    const user = await authenticateApplicationRequest(req);
+    if (!user) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+    res.locals.user = user;
     next();
   } catch {
     res.status(401).json({ error: "Authentication required" });
@@ -129,7 +180,7 @@ router.use(auth);
 // --- About Us ---------------------------------------------------------------
 router.get("/about", async (_req, res) => {
   res.json({
-    title: "About AtlasID & EduNextG",
+    title: "About Insight Education & EduNextG",
     version: "2.4.0",
     description: "Enterprise Multi-Tenant School ID Card Issuance, Dynamic Template Design, & Verification Platform.",
   });
@@ -865,28 +916,88 @@ router.delete("/templates/:id", requireRole(adminRoles), async (req, res) => {
 
 router.post("/upload", async (req, res) => {
   try {
-    const { filename, contentType, dataBase64 } = req.body;
-    if (!dataBase64) return res.status(400).json({ error: "dataBase64 is required" });
-    const mime = String(contentType || "image/png").toLowerCase();
-    if (!mime.startsWith("image/")) {
-      return res.status(400).json({ error: "Invalid file type. Only image uploads are allowed." });
+    const user = currentUser(res);
+    if (!user) {
+      return res.status(401).json({ error: "Authentication required" });
     }
-    if (typeof dataBase64 === "string" && dataBase64.length > 7 * 1024 * 1024) {
+
+    if (!schoolWriteRoles.has(user.role)) {
+      return res.status(403).json({ error: "Insufficient permissions: upload is restricted to administrators and operators" });
+    }
+
+    // Preserve school / tenant isolation
+    const targetSchoolId = req.body?.schoolId ? Number(req.body.schoolId) : user.schoolId;
+    if (!adminRoles.has(user.role)) {
+      if (!user.schoolId || (req.body?.schoolId && targetSchoolId !== user.schoolId)) {
+        return res.status(403).json({ error: "School access denied" });
+      }
+    }
+
+    const { filename, contentType, dataBase64 } = req.body || {};
+    if (!dataBase64 || typeof dataBase64 !== "string") {
+      return res.status(400).json({ error: "dataBase64 is required" });
+    }
+
+    const cleanBase64 = dataBase64.includes(",") ? dataBase64.split(",")[1] : dataBase64;
+    if (!cleanBase64.trim()) {
+      return res.status(400).json({ error: "File content is empty" });
+    }
+
+    let buffer: Buffer;
+    try {
+      buffer = Buffer.from(cleanBase64, "base64");
+    } catch {
+      return res.status(400).json({ error: "Invalid base64 payload" });
+    }
+
+    if (buffer.length === 0) {
+      return res.status(400).json({ error: "File content is empty" });
+    }
+
+    const MAX_SIZE = 5 * 1024 * 1024; // 5MB
+    if (buffer.length > MAX_SIZE) {
       return res.status(400).json({ error: "File exceeds 5MB size limit" });
     }
-    const buffer = Buffer.from(dataBase64, "base64");
-    const name = filename || `upload_${Date.now()}.png`;
+
+    // Safe MIME type detection via magic numbers - do not rely solely on client MIME
+    const detectedMime = detectImageMimeType(buffer);
+    if (!detectedMime) {
+      return res.status(400).json({
+        error: "Invalid file type. Only PNG, JPEG, WEBP, and GIF images are allowed",
+      });
+    }
+
+    // If client supplied a contentType, ensure it is an image and doesn't conflict maliciously
+    if (contentType && typeof contentType === "string") {
+      const clientMime = contentType.toLowerCase().trim();
+      if (!clientMime.startsWith("image/")) {
+        return res.status(400).json({ error: "Invalid file type. Only image uploads are allowed" });
+      }
+    }
+
+    // Sanitize filename and prevent directory traversal
+    const extMap: Record<string, string> = {
+      "image/png": ".png",
+      "image/jpeg": ".jpg",
+      "image/webp": ".webp",
+      "image/gif": ".gif",
+    };
+    const safeExt = extMap[detectedMime] || ".png";
+    const rawName = typeof filename === "string" ? filename.replace(/[^a-zA-Z0-9._-]/g, "_") : `upload_${Date.now()}`;
+    const baseName = path.basename(rawName).replace(/^\.+/, "") || `upload_${Date.now()}`;
+    const finalName = baseName.toLowerCase().endsWith(safeExt) ? baseName : `${baseName}${safeExt}`;
 
     if (ENV.forgeApiUrl && ENV.forgeApiKey) {
       try {
         const { storagePut } = await import("./storage");
-        const stored = await storagePut(`templates/${name}`, buffer, mime);
+        const folder = targetSchoolId ? `schools/${targetSchoolId}` : "templates";
+        const stored = await storagePut(`${folder}/${finalName}`, buffer, detectedMime);
         return res.json({ url: stored.url });
       } catch (err) {
         console.warn("[Upload] Storage failed, falling back to data URL", err);
       }
     }
-    const dataUrl = `data:${mime};base64,${dataBase64}`;
+    const dataUrl = `data:${detectedMime};base64,${cleanBase64}`;
     return res.json({ url: dataUrl });
   } catch (e) {
     fail(res, e);
@@ -2049,19 +2160,17 @@ router.delete("/audit-logs", async (req, res) => {
     if (!db) return res.status(503).json({ error: "Database not available" });
     const user = currentUser(res);
 
-    if (adminRoles.has(user.role)) {
-      if (req.query.schoolId) {
-        const sid = Number(req.query.schoolId);
-        await db.delete(auditLogs).where(eq(auditLogs.schoolId, sid));
-      } else {
-        await db.delete(auditLogs);
-      }
-      return res.json({ success: true, message: "Audit logs cleared" });
+    if (!adminRoles.has(user.role)) {
+      return res.status(403).json({ error: "Insufficient permissions: audit logs cannot be cleared by school users" });
     }
 
-    if (!user.schoolId) return res.json({ success: true, message: "No logs to clear" });
-    await db.delete(auditLogs).where(eq(auditLogs.schoolId, user.schoolId));
-    res.json({ success: true, message: "Audit logs cleared" });
+    if (req.query.schoolId) {
+      const sid = Number(req.query.schoolId);
+      await db.delete(auditLogs).where(eq(auditLogs.schoolId, sid));
+    } else {
+      await db.delete(auditLogs);
+    }
+    return res.json({ success: true, message: "Audit logs cleared" });
   } catch (e) {
     fail(res, e);
   }

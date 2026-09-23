@@ -97,16 +97,16 @@ export default function Login({ initialRole = "school" }: LoginProps) {
         >
           <div className="mb-6 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#40c8bb] text-[#092a2b]">
-                {selectedRole === "admin" ? (
-                  <ShieldCheck className="h-6 w-6" />
-                ) : (
-                  <Building2 className="h-6 w-6" />
-                )}
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white p-1 shadow-sm border border-[#dfe7e2]">
+                <img
+                  src="/insight-education-logo.png"
+                  alt="Insight Education"
+                  className="h-full w-full object-contain"
+                />
               </div>
               <div>
                 <div className="font-extrabold text-[#182326]">
-                  atlas<span className="text-[#0f7f79]">id</span>
+                  Insight <span className="text-[#0f7f79]">Education</span>
                 </div>
                 <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#82908e]">
                   {selectedRole === "admin" ? "Admin Console" : "School Management"}
