@@ -618,6 +618,9 @@ export default function Home({
         setSchoolModalOpen(false);
         setEditingSchool(null);
         toast.success(`School "${updated.name}" updated successfully`);
+        // Background sync to ensure total synchronization
+        const freshSchools = await api.schools.list().catch(() => null);
+        if (freshSchools) setSchools(freshSchools);
       } else {
         const created = await api.schools.create({
           name: schoolNameInput.trim(),
@@ -643,6 +646,10 @@ export default function Home({
         }
       }
     } catch (error) {
+      if (editingSchool) {
+        const fresh = await api.schools.list().catch(() => null);
+        if (fresh) setSchools(fresh);
+      }
       toast.error(editingSchool ? "Could not update school" : "Could not create school", {
         description: error instanceof Error ? error.message : "Request failed",
       });
@@ -2713,6 +2720,39 @@ function ModuleView({
   const [usersPage, setUsersPage] = useState<number>(1);
   const USERS_PAGE_SIZE = 10;
 
+  // Schools table pagination & status filtering
+  const [schoolsStatusFilter, setSchoolsStatusFilter] = useState<"All" | "Active" | "Inactive">("All");
+  const [schoolsPage, setSchoolsPage] = useState<number>(1);
+  const SCHOOLS_PAGE_SIZE = 10;
+
+  useEffect(() => {
+    setSchoolsPage(1);
+  }, [searchTerm, schoolsStatusFilter]);
+
+  const filteredSchools = useMemo(() => {
+    return schools
+      .filter((s) => {
+        if (schoolsStatusFilter === "Active") return s.isActive;
+        if (schoolsStatusFilter === "Inactive") return !s.isActive;
+        return true;
+      })
+      .filter(
+        (s) =>
+          !searchTerm ||
+          s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          s.shortCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (s.email?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
+          (s.phone?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
+          (s.address?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false),
+      );
+  }, [schools, schoolsStatusFilter, searchTerm]);
+
+  const totalSchoolPages = Math.ceil(filteredSchools.length / SCHOOLS_PAGE_SIZE) || 1;
+  const paginatedSchools = useMemo(() => {
+    const start = (schoolsPage - 1) * SCHOOLS_PAGE_SIZE;
+    return filteredSchools.slice(start, start + SCHOOLS_PAGE_SIZE);
+  }, [filteredSchools, schoolsPage]);
+
   // Filtered lists for ID cards
   const requestCards = useMemo(() => {
     return idCards
@@ -3278,14 +3318,230 @@ function ModuleView({
         </Card>
       )}
 
-      {/* 6. Schools & Users Standard Tables */}
-      {(isSchools || isUsers || label === "Reports") && (
+      {/* 6. Schools Table View */}
+      {isSchools && (
+        <Card className="rounded-2xl border-[#e2e8e3] bg-[#fffefa] shadow-[0_12px_35px_rgba(38,71,65,0.05)] overflow-hidden">
+          <div className="flex flex-col gap-3 border-b border-[#edf0ed] p-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="relative w-full max-w-sm">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#98a4a1]" />
+              <Input
+                placeholder="Search schools by name, code, email..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="h-10 rounded-xl border-[#e2e8e3] pl-9 text-xs shadow-none"
+              />
+            </div>
+            <div className="flex flex-wrap items-center justify-between sm:justify-end gap-3 w-full sm:w-auto">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-[#4e5c59] mr-1">Status:</span>
+                {(["All", "Active", "Inactive"] as const).map((status) => (
+                  <button
+                    key={status}
+                    type="button"
+                    onClick={() => {
+                      setSchoolsStatusFilter(status);
+                      setSchoolsPage(1);
+                    }}
+                    className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${
+                      schoolsStatusFilter === status
+                        ? "bg-[#0f7f79] text-white shadow-sm"
+                        : "bg-[#edf3f0] text-[#55605d] hover:bg-[#e2ebe6]"
+                    }`}
+                  >
+                    {status === "All" ? "All Schools" : status}
+                  </button>
+                ))}
+              </div>
+              <div className="text-xs text-[#788784]">
+                Showing <b>{filteredSchools.length}</b> {filteredSchools.length === 1 ? "school" : "schools"}
+              </div>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs min-w-[700px]">
+              <thead className="bg-[#f8faf8] border-b border-[#edf0ed] text-[#84918e] uppercase tracking-wider font-semibold text-[11px]">
+                <tr>
+                  <th className="px-5 py-3.5">School Name</th>
+                  <th className="px-5 py-3.5">School Code / ID</th>
+                  <th className="px-5 py-3.5">Template</th>
+                  <th className="px-5 py-3.5">Status</th>
+                  <th className="px-5 py-3.5 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#edf0ed]">
+                {paginatedSchools.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="p-12 text-center text-sm text-[#8d9995]">
+                      <Building2 className="mx-auto mb-3 h-8 w-8 text-[#98a4a1]" />
+                      <p className="font-semibold text-[#304541]">
+                        {searchTerm || schoolsStatusFilter !== "All"
+                          ? "No schools matching your search or filter"
+                          : "No schools registered yet"}
+                      </p>
+                      <p className="mt-1 text-xs text-[#98a4a1]">
+                        {searchTerm || schoolsStatusFilter !== "All"
+                          ? "Try changing your search term or filter options."
+                          : 'Click "Create new" above to add a new school and generate its credentials.'}
+                      </p>
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedSchools.map((school) => (
+                    <tr key={school.id} className="hover:bg-[#fbfdfb] transition-colors">
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#dff3ee] text-[#0b716b] shrink-0">
+                            <Building2 className="h-5 w-5" />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-sm font-extrabold text-[#304541] flex items-center gap-2">
+                              {school.name}
+                            </div>
+                            <div className="text-[11px] text-[#8d9995] flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
+                              {school.email && <span>Email: {school.email}</span>}
+                              {school.email && (school.phone || school.address) && <span>·</span>}
+                              {school.phone && <span>Phone: {school.phone}</span>}
+                              {school.phone && school.address && <span>·</span>}
+                              {school.address && (
+                                <span className="truncate max-w-[220px]" title={school.address}>
+                                  Address: {school.address}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-5 py-4 whitespace-nowrap">
+                        <div className="flex flex-col gap-0.5">
+                          <div>
+                            <span className="font-mono font-bold text-[#0f7f79] bg-[#eef7f4] px-2 py-0.5 rounded text-xs">
+                              {school.shortCode}
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-[#8d9995] font-mono">
+                            ID: #{school.id}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-5 py-4 whitespace-nowrap">
+                        {school.templateSelectionStatus === "Selected" ? (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-teal-200 bg-teal-50 px-2.5 py-0.5 text-[10px] font-bold text-teal-800">
+                            <CheckCircle2 className="h-3 w-3 text-teal-600" />
+                            {school.selectedTemplateName || "Selected"}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[10px] font-bold text-amber-800">
+                            <AlertTriangle className="h-3 w-3 text-amber-600" />
+                            Not Selected
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-5 py-4 whitespace-nowrap">
+                        <StatusPill tone={school.isActive ? "teal" : "coral"}>
+                          {school.isActive ? "Active" : "Inactive"}
+                        </StatusPill>
+                      </td>
+                      <td className="px-5 py-4 text-right whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {authenticatedUser.role === "SUPER_ADMIN" && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => onToggleSchoolStatus?.(school)}
+                                className={`group flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-bold transition-all shadow-sm ${
+                                  school.isActive
+                                    ? "border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
+                                    : "border-neutral-300 bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
+                                }`}
+                                title={school.isActive ? "Click to deactivate school" : "Click to activate school"}
+                              >
+                                <span className="text-[11px] font-extrabold">
+                                  {school.isActive ? "Active" : "Inactive"}
+                                </span>
+                                <span
+                                  className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out ${
+                                    school.isActive ? "bg-emerald-600" : "bg-neutral-400"
+                                  }`}
+                                >
+                                  <span
+                                    className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out mt-0.5 ml-0.5 ${
+                                      school.isActive ? "translate-x-3" : "translate-x-0"
+                                    }`}
+                                  />
+                                </span>
+                              </button>
+                              <button
+                                onClick={() => onGenerateCredentials?.(school)}
+                                className="flex items-center gap-1 rounded-lg border border-[#c3dfd9] bg-[#eef7f4] px-2.5 py-1.5 text-xs font-bold text-[#0f7f79] shadow-sm hover:bg-[#dff1ec]"
+                                title="View or regenerate school login credentials and ID pass"
+                              >
+                                <KeyRound className="h-3.5 w-3.5" />
+                                ID Pass
+                              </button>
+                              <button
+                                onClick={() => onEditSchool?.(school)}
+                                className="flex items-center gap-1 rounded-lg border border-[#d3ded8] bg-white px-2.5 py-1.5 text-xs font-bold text-[#304541] shadow-sm hover:bg-[#f2f7f4] hover:text-[#0f7f79]"
+                              >
+                                <FileEdit className="h-3.5 w-3.5" />
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => onDeleteSchool?.(school.id, school.name)}
+                                className="flex items-center gap-1 rounded-lg border border-[#fecaca] bg-white px-2.5 py-1.5 text-xs font-bold text-[#dc2626] shadow-sm hover:bg-[#fef2f2]"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                                Delete
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {totalSchoolPages > 1 && (
+            <div className="flex items-center justify-between p-4 border-t border-[#edf0ed] bg-[#fbfdfb]">
+              <div className="text-xs text-[#788784]">
+                Page {schoolsPage} of {totalSchoolPages} ({filteredSchools.length} {filteredSchools.length === 1 ? "school" : "schools"})
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={schoolsPage <= 1}
+                  onClick={() => setSchoolsPage((p) => Math.max(1, p - 1))}
+                  className="h-8 rounded-lg text-xs font-bold"
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={schoolsPage >= totalSchoolPages}
+                  onClick={() => setSchoolsPage((p) => Math.min(totalSchoolPages, p + 1))}
+                  className="h-8 rounded-lg text-xs font-bold"
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* 7. Users & Reports Standard Tables */}
+      {(isUsers || label === "Reports") && (
         <Card className="rounded-2xl border-[#e2e8e3] bg-[#fffefa] shadow-[0_12px_35px_rgba(38,71,65,0.05)]">
           <div className="flex flex-col gap-3 border-b border-[#edf0ed] p-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="relative w-full max-w-sm">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#98a4a1]" />
               <Input
-                placeholder={`Search ${isSchools ? "schools by name or code" : "users"}...`}
+                placeholder="Search users..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="h-10 rounded-xl border-[#e2e8e3] pl-9 text-xs shadow-none"
@@ -3293,118 +3549,7 @@ function ModuleView({
             </div>
           </div>
           <div className="divide-y divide-[#edf0ed]">
-            {isSchools ? (
-              schools.filter(
-                (s) =>
-                  !searchTerm ||
-                  s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                  s.shortCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                  (s.email?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false),
-              ).length === 0 ? (
-                <div className="p-12 text-center text-sm text-[#8d9995]">
-                  <Building2 className="mx-auto mb-3 h-8 w-8 text-[#98a4a1]" />
-                  <p className="font-semibold text-[#304541]">No schools registered yet</p>
-                  <p className="mt-1 text-xs text-[#98a4a1]">Click &ldquo;Create new&rdquo; above to add a new school and generate its credentials.</p>
-                </div>
-              ) : (
-                schools
-                  .filter(
-                    (s) =>
-                      !searchTerm ||
-                      s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                      s.shortCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                      (s.email?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false),
-                  )
-                  .map((school) => (
-                    <div key={school.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 gap-3 hover:bg-[#fbfdfb] transition-colors">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#dff3ee] text-[#0b716b] shrink-0">
-                          <Building2 className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <div className="text-sm font-extrabold text-[#304541] flex flex-wrap items-center gap-2">
-                            {school.name}
-                            <StatusPill tone={school.isActive ? "teal" : "coral"}>
-                              {school.isActive ? "Active" : "Inactive"}
-                            </StatusPill>
-                            {school.templateSelectionStatus === "Selected" ? (
-                              <span className="inline-flex items-center gap-1 rounded-full border border-teal-200 bg-teal-50 px-2.5 py-0.5 text-[10px] font-bold text-teal-800">
-                                <CheckCircle2 className="h-3 w-3 text-teal-600" />
-                                Template: {school.selectedTemplateName || "Selected"}
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[10px] font-bold text-amber-800">
-                                <AlertTriangle className="h-3 w-3 text-amber-600" />
-                                Template: Not Selected
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-[11px] text-[#8d9995] flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
-                            <span>Code: <b className="text-[#304541]">{school.shortCode}</b></span>
-                            {school.email && <span>Email: {school.email}</span>}
-                            {school.phone && <span>Phone: {school.phone}</span>}
-                            {school.address && <span>Address: {school.address}</span>}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
-                        {authenticatedUser.role === "SUPER_ADMIN" && (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => onToggleSchoolStatus?.(school)}
-                              className={`group flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-bold transition-all shadow-sm ${
-                                school.isActive
-                                  ? "border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
-                                  : "border-neutral-300 bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
-                              }`}
-                              title={school.isActive ? "Click to deactivate school" : "Click to activate school"}
-                            >
-                              <span className="text-[11px] font-extrabold">
-                                {school.isActive ? "Active" : "Inactive"}
-                              </span>
-                              <span
-                                className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out ${
-                                  school.isActive ? "bg-emerald-600" : "bg-neutral-400"
-                                }`}
-                              >
-                                <span
-                                  className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out mt-0.5 ml-0.5 ${
-                                    school.isActive ? "translate-x-3" : "translate-x-0"
-                                  }`}
-                                />
-                              </span>
-                            </button>
-                            <button
-                              onClick={() => onGenerateCredentials?.(school)}
-                              className="flex items-center gap-1 rounded-lg border border-[#c3dfd9] bg-[#eef7f4] px-2.5 py-1.5 text-xs font-bold text-[#0f7f79] shadow-sm hover:bg-[#dff1ec]"
-                              title="View or regenerate school login credentials and ID pass"
-                            >
-                              <KeyRound className="h-3.5 w-3.5" />
-                              ID Pass
-                            </button>
-                            <button
-                              onClick={() => onEditSchool?.(school)}
-                              className="flex items-center gap-1 rounded-lg border border-[#d3ded8] bg-white px-2.5 py-1.5 text-xs font-bold text-[#304541] shadow-sm hover:bg-[#f2f7f4] hover:text-[#0f7f79]"
-                            >
-                              <FileEdit className="h-3.5 w-3.5" />
-                              Edit
-                            </button>
-                            <button
-                              onClick={() => onDeleteSchool?.(school.id, school.name)}
-                              className="flex items-center gap-1 rounded-lg border border-[#fecaca] bg-white px-2.5 py-1.5 text-xs font-bold text-[#dc2626] shadow-sm hover:bg-[#fef2f2]"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                              Delete
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  ))
-              )
-            ) : isUsers ? (
+            {isUsers ? (
               <>
                 <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-[#fbfdfb] border-b border-[#edf0ed]">
                   <div className="flex items-center gap-1.5">

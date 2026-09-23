@@ -100,8 +100,24 @@ function requestedSchoolId(user: User, value: unknown) {
 
 async function audit(user: User, action: string, entityType: string, entityId: number | null, schoolId: number | null, newValues?: unknown) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  await db.insert(auditLogs).values({ userId: user.id > 0 ? user.id : null, schoolId, action, entityType, entityId, newValues: newValues as never });
+  if (!db) return;
+  try {
+    let validSchoolId = schoolId;
+    if (validSchoolId) {
+      const [exists] = await db.select({ id: schools.id }).from(schools).where(eq(schools.id, validSchoolId)).limit(1);
+      if (!exists) validSchoolId = null;
+    }
+    await db.insert(auditLogs).values({
+      userId: user.id > 0 ? user.id : null,
+      schoolId: validSchoolId,
+      action,
+      entityType,
+      entityId,
+      newValues: newValues as never,
+    });
+  } catch (err) {
+    console.warn("[Audit] Could not record audit log:", err);
+  }
 }
 
 async function notify(userId: number, schoolId: number | null, type: string, title: string, message: string, entityType?: string, entityId?: number) {
@@ -566,29 +582,56 @@ router.get("/schools/:id", async (req, res) => {
   }
 });
 
-router.put("/schools/:id", requireRole(adminRoles), async (req, res) => {
+const handleUpdateSchool = async (req: Request, res: Response) => {
   try {
     const user = currentUser(res);
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: "Invalid school id" });
     const db = await getDb();
     if (!db) return res.status(503).json({ error: "Database not available" });
+
+    const existing = (await db.select().from(schools).where(eq(schools.id, id)))[0];
+    if (!existing) {
+      return res.status(404).json({ error: "School not found. It may have been removed or deleted." });
+    }
+
+    const nextName = req.body.name && String(req.body.name).trim() ? String(req.body.name).trim() : existing.name;
+    const nextCode = req.body.shortCode && String(req.body.shortCode).trim() ? String(req.body.shortCode).trim().toUpperCase() : existing.shortCode;
     const nextEmail = req.body.email && String(req.body.email).trim() ? String(req.body.email).trim() : null;
+    const nextPhone = req.body.phone && String(req.body.phone).trim() ? String(req.body.phone).trim() : null;
+    const nextAddress = req.body.address && String(req.body.address).trim() ? String(req.body.address).trim() : null;
+
+    if (nextCode !== existing.shortCode) {
+      const [conflict] = await db.select().from(schools).where(eq(schools.shortCode, nextCode)).limit(1);
+      if (conflict && conflict.id !== id) {
+        return res.status(409).json({ error: `School code "${nextCode}" is already in use by another school.` });
+      }
+    }
+
     await db.update(schools).set({
-      name: req.body.name,
-      shortCode: req.body.shortCode,
+      name: nextName,
+      shortCode: nextCode,
       email: nextEmail,
-      phone: req.body.phone,
-      address: req.body.address,
+      phone: nextPhone,
+      address: nextAddress,
+      updatedAt: new Date(),
     }).where(eq(schools.id, id));
+
     // Keep school admin user email in sync if provided
     if (req.body.email !== undefined) {
       await db.update(users).set({ email: nextEmail }).where(and(eq(users.schoolId, id), eq(users.role, "SCHOOL_ADMIN")));
     }
+
     await audit(user, "UPDATE_SCHOOL", "school", id, id, req.body);
-    res.json((await db.select().from(schools).where(eq(schools.id, id)))[0]);
+    const updated = (await attachSchoolTemplateMeta(db, [
+      (await db.select().from(schools).where(eq(schools.id, id)))[0]
+    ]))[0];
+    res.json(updated);
   } catch (e) { fail(res, e); }
-});
+};
+
+router.put("/schools/:id", requireRole(adminRoles), handleUpdateSchool);
+router.patch("/schools/:id", requireRole(adminRoles), handleUpdateSchool);
 
 const handleSchoolStatusUpdate = async (req: any, res: any) => {
   try {
@@ -660,7 +703,7 @@ router.get("/users", requireRole(adminRoles), async (_req, res) => {
     const rows = await db
       .select()
       .from(users)
-      .where(sql`${users.email} IS NULL OR (${users.email} NOT LIKE '%@test.local')`)
+      .where(sql`${users.email} IS NULL OR (${users.email} NOT LIKE '%@test.local' AND ${users.email} NOT LIKE '%@example.test' AND ${users.openId} NOT LIKE 'seed_%')`)
       .orderBy(desc(users.createdAt));
     res.json(rows.map(safeUser));
   } catch (e) { fail(res, e); }

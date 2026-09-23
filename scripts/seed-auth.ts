@@ -70,3 +70,4 @@ const adminId = await upsertAccount({ openId: "seed_admin", email: adminEmail, n
 const schoolAdminId = await upsertAccount({ openId: "seed_school_admin", email: schoolEmail, name: "Development School Admin", role: "SCHOOL_ADMIN", schoolId: school.id, password: schoolPassword });
 console.log(`Seeded admin #${adminId}: ${adminEmail} / ${adminPassword}`);
 console.log(`Seeded school admin #${schoolAdminId}: ${schoolEmail} / ${schoolPassword} (school #${school.id}: ${school.name})`);
+process.exit(0);
