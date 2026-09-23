@@ -293,6 +293,14 @@ export default function Home({
   const [approvalsLoading, setApprovalsLoading] = useState(true);
   const [approveLoading, setApproveLoading] = useState(false);
 
+  // Overview Active Schools display options & filtering
+  const [overviewActiveSchoolsLimit, setOverviewActiveSchoolsLimit] = useState<number>(5);
+  const activeSchools = useMemo(() => schools.filter((s) => s.isActive), [schools]);
+  const displayedActiveSchools = useMemo(
+    () => activeSchools.slice(0, overviewActiveSchoolsLimit),
+    [activeSchools, overviewActiveSchoolsLimit],
+  );
+
   // Super Admin explicit school selection
   const [selectedSchoolId, setSelectedSchoolId] = useState<number | null>(
     authenticatedUser.schoolId,
@@ -510,6 +518,29 @@ export default function Home({
     setSchoolPhoneInput(school.phone ?? "");
     setSchoolAddressInput(school.address ?? "");
     setSchoolModalOpen(true);
+  };
+
+  const handleToggleSchoolStatus = async (school: ApiSchool) => {
+    if (authenticatedUser.role !== "SUPER_ADMIN") {
+      return toast.error("Only Super Admins can manage school status");
+    }
+    const nextStatus = !school.isActive;
+    setSchools((prev) =>
+      prev.map((s) => (s.id === school.id ? { ...s, isActive: nextStatus } : s))
+    );
+    try {
+      await api.schools.setStatus(school.id, nextStatus);
+      toast.success(`School "${school.name}" is now ${nextStatus ? "Active" : "Inactive"}`);
+      const freshSchools = await api.schools.list().catch(() => null);
+      if (freshSchools) setSchools(freshSchools);
+    } catch (err) {
+      setSchools((prev) =>
+        prev.map((s) => (s.id === school.id ? { ...s, isActive: school.isActive } : s))
+      );
+      toast.error("Could not update school status", {
+        description: err instanceof Error ? err.message : "Request failed",
+      });
+    }
   };
 
   const handleDeleteSchool = async (schoolId: number, schoolName: string) => {
@@ -1019,10 +1050,15 @@ export default function Home({
               />
             </div>
             <div>
-              <div className="font-extrabold tracking-[-0.03em] text-white text-[15px] leading-tight">
-                Insight <span className="text-[#40c8bb]">Education</span>
+              <div className="text-[15.5px] font-bold tracking-tight leading-tight select-none font-serif drop-shadow-sm">
+                <span className="bg-gradient-to-r from-[#007a3d] via-[#109648] to-[#22ab55] bg-clip-text text-transparent font-extrabold">
+                  Insight{" "}
+                </span>
+                <span className="bg-gradient-to-r from-[#ea580c] via-[#f97316] to-[#fb923c] bg-clip-text text-transparent font-extrabold">
+                  Education
+                </span>
               </div>
-              <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#7fa09c]">
+              <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#7fa09c] mt-0.5">
                 {portal === "admin" ? "admin console" : "school portal"}
               </div>
             </div>
@@ -1676,27 +1712,50 @@ export default function Home({
 
                 {authenticatedUser.role === "SUPER_ADMIN" && (
                   <Card className="ui-card xl:col-span-2 rounded-2xl border-[#e2e8e3] bg-[#fffefa] shadow-[0_14px_40px_rgba(38,71,65,0.05)]">
-                    <CardHeader className="flex flex-row items-center justify-between px-6 pb-3 pt-6 border-b border-[#edf0ed]">
+                    <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-6 pb-3 pt-6 border-b border-[#edf0ed]">
                       <div>
                         <CardTitle className="text-[15px] font-extrabold tracking-[-0.02em]">
-                          Registered Schools ({schools.length})
+                          Active Schools ({displayedActiveSchools.length})
                         </CardTitle>
                         <p className="mt-1 text-xs text-[#84918e]">
-                          Super Admin directory to edit, update, or remove schools
+                          Showing {displayedActiveSchools.length} of {activeSchools.length} active schools
                         </p>
                       </div>
-                      <Button
-                        onClick={openCreateSchool}
-                        className="h-8 rounded-xl bg-[#0f7f79] px-3 text-xs font-bold text-white hover:bg-[#096c67]"
-                      >
-                        <Building2 className="mr-1.5 h-3.5 w-3.5" /> Add school
-                      </Button>
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1.5">
+                          <label htmlFor="overview-schools-limit" className="text-xs font-semibold text-[#627571]">
+                            Show:
+                          </label>
+                          <select
+                            id="overview-schools-limit"
+                            aria-label="Display count for active schools"
+                            value={overviewActiveSchoolsLimit}
+                            onChange={(e) => setOverviewActiveSchoolsLimit(Number(e.target.value))}
+                            className="h-8 rounded-xl border border-[#d3ded8] bg-white px-2.5 text-xs font-bold text-[#304541] shadow-sm hover:border-[#0f7f79] focus:outline-none focus:ring-1 focus:ring-[#0f7f79] cursor-pointer"
+                          >
+                            <option value={5}>5</option>
+                            <option value={10}>10</option>
+                            <option value={50}>50</option>
+                            <option value={100}>100</option>
+                          </select>
+                        </div>
+                        <Button
+                          onClick={openCreateSchool}
+                          className="h-8 rounded-xl bg-[#0f7f79] px-3 text-xs font-bold text-white hover:bg-[#096c67]"
+                        >
+                          <Building2 className="mr-1.5 h-3.5 w-3.5" /> Add school
+                        </Button>
+                      </div>
                     </CardHeader>
                     <CardContent className="divide-y divide-[#edf0ed] p-0">
-                      {schools.length === 0 ? (
-                        <div className="p-6 text-center text-xs text-[#98a4a1]">No schools found. Click "Add school" to create one.</div>
+                      {displayedActiveSchools.length === 0 ? (
+                        <div className="p-6 text-center text-xs text-[#98a4a1]">
+                          {activeSchools.length === 0
+                            ? "No active schools found. All registered schools may be inactive, or click \"Add school\" to create one."
+                            : "No active schools to display."}
+                        </div>
                       ) : (
-                        schools.map((school) => (
+                        displayedActiveSchools.map((school) => (
                           <div key={school.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 px-6 gap-3 hover:bg-[#fbfdfb] transition-colors">
                             <div className="flex items-center gap-3">
                               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#dff3ee] text-[#0b716b] shrink-0">
@@ -1705,7 +1764,9 @@ export default function Home({
                               <div>
                                 <div className="text-sm font-extrabold text-[#304541] flex flex-wrap items-center gap-2">
                                   {school.name}
-                                  <StatusPill tone="teal">Active</StatusPill>
+                                  <StatusPill tone="teal">
+                                    Active
+                                  </StatusPill>
                                   {school.templateSelectionStatus === "Selected" ? (
                                     <span className="inline-flex items-center gap-1 rounded-full border border-teal-200 bg-teal-50 px-2 py-0.5 text-[10px] font-bold text-teal-800">
                                       <CheckCircle2 className="h-3 w-3 text-teal-600" />
@@ -1729,6 +1790,31 @@ export default function Home({
 
                             <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
                               <button
+                                type="button"
+                                onClick={() => handleToggleSchoolStatus(school)}
+                                className={`group flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-bold transition-all shadow-sm ${
+                                  school.isActive
+                                    ? "border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
+                                    : "border-neutral-300 bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
+                                }`}
+                                title={school.isActive ? "Click to deactivate school" : "Click to activate school"}
+                              >
+                                <span className="text-[11px] font-extrabold">
+                                  {school.isActive ? "Active" : "Inactive"}
+                                </span>
+                                <span
+                                  className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out ${
+                                    school.isActive ? "bg-emerald-600" : "bg-neutral-400"
+                                  }`}
+                                >
+                                  <span
+                                    className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out mt-0.5 ml-0.5 ${
+                                      school.isActive ? "translate-x-3" : "translate-x-0"
+                                    }`}
+                                  />
+                                </span>
+                              </button>
+                              <button
                                 onClick={() => handleGenerateCredentials(school)}
                                 className="flex items-center gap-1 rounded-lg border border-[#c3dfd9] bg-[#eef7f4] px-2.5 py-1.5 text-xs font-bold text-[#0f7f79] shadow-sm hover:bg-[#dff1ec]"
                                 title="View or regenerate school login credentials and ID pass"
@@ -1742,13 +1828,6 @@ export default function Home({
                               >
                                 <FileEdit className="h-3.5 w-3.5" />
                                 Edit
-                              </button>
-                              <button
-                                onClick={() => handleDeleteSchool(school.id, school.name)}
-                                className="flex items-center gap-1 rounded-lg border border-[#fecaca] bg-white px-3 py-1.5 text-xs font-bold text-[#dc2626] shadow-sm hover:bg-[#fef2f2]"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                                Delete
                               </button>
                             </div>
                           </div>
@@ -1791,6 +1870,7 @@ export default function Home({
               onMarkNotificationRead={handleMarkNotificationRead}
               onEditSchool={handleEditSchool}
               onDeleteSchool={handleDeleteSchool}
+              onToggleSchoolStatus={handleToggleSchoolStatus}
               onDeleteTemplate={handleDeleteTemplate}
               activeSchool={currentActiveSchool}
               onGenerateCredentials={handleGenerateCredentials}
@@ -2575,6 +2655,7 @@ function ModuleView({
   onMarkNotificationRead,
   onEditSchool,
   onDeleteSchool,
+  onToggleSchoolStatus,
   onDeleteTemplate,
   activeSchool,
   onGenerateCredentials,
@@ -2609,6 +2690,7 @@ function ModuleView({
   onMarkNotificationRead: (id: number) => void;
   onEditSchool?: (school: ApiSchool) => void;
   onDeleteSchool?: (schoolId: number, schoolName: string) => void;
+  onToggleSchoolStatus?: (school: ApiSchool) => void;
   onDeleteTemplate?: (templateId: number, templateName: string) => void;
   activeSchool?: ApiSchool;
   onGenerateCredentials?: (school: ApiSchool) => void;
@@ -3209,14 +3291,6 @@ function ModuleView({
                 className="h-10 rounded-xl border-[#e2e8e3] pl-9 text-xs shadow-none"
               />
             </div>
-            {isSchools && authenticatedUser.role === "SUPER_ADMIN" && (
-              <Button
-                onClick={onCreate}
-                className="h-10 rounded-xl bg-[#0f7f79] px-4 text-xs font-bold text-white hover:bg-[#096c67] self-start sm:self-auto"
-              >
-                <Building2 className="mr-2 h-4 w-4" /> Add school
-              </Button>
-            )}
           </div>
           <div className="divide-y divide-[#edf0ed]">
             {isSchools ? (
@@ -3230,7 +3304,7 @@ function ModuleView({
                 <div className="p-12 text-center text-sm text-[#8d9995]">
                   <Building2 className="mx-auto mb-3 h-8 w-8 text-[#98a4a1]" />
                   <p className="font-semibold text-[#304541]">No schools registered yet</p>
-                  <p className="mt-1 text-xs text-[#98a4a1]">Click &ldquo;Add school&rdquo; above to add a new school and generate its credentials.</p>
+                  <p className="mt-1 text-xs text-[#98a4a1]">Click &ldquo;Create new&rdquo; above to add a new school and generate its credentials.</p>
                 </div>
               ) : (
                 schools
@@ -3250,7 +3324,9 @@ function ModuleView({
                         <div>
                           <div className="text-sm font-extrabold text-[#304541] flex flex-wrap items-center gap-2">
                             {school.name}
-                            <StatusPill tone="teal">Active</StatusPill>
+                            <StatusPill tone={school.isActive ? "teal" : "coral"}>
+                              {school.isActive ? "Active" : "Inactive"}
+                            </StatusPill>
                             {school.templateSelectionStatus === "Selected" ? (
                               <span className="inline-flex items-center gap-1 rounded-full border border-teal-200 bg-teal-50 px-2.5 py-0.5 text-[10px] font-bold text-teal-800">
                                 <CheckCircle2 className="h-3 w-3 text-teal-600" />
@@ -3275,6 +3351,31 @@ function ModuleView({
                       <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
                         {authenticatedUser.role === "SUPER_ADMIN" && (
                           <>
+                            <button
+                              type="button"
+                              onClick={() => onToggleSchoolStatus?.(school)}
+                              className={`group flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-bold transition-all shadow-sm ${
+                                school.isActive
+                                  ? "border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
+                                  : "border-neutral-300 bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
+                              }`}
+                              title={school.isActive ? "Click to deactivate school" : "Click to activate school"}
+                            >
+                              <span className="text-[11px] font-extrabold">
+                                {school.isActive ? "Active" : "Inactive"}
+                              </span>
+                              <span
+                                className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out ${
+                                  school.isActive ? "bg-emerald-600" : "bg-neutral-400"
+                                }`}
+                              >
+                                <span
+                                  className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out mt-0.5 ml-0.5 ${
+                                    school.isActive ? "translate-x-3" : "translate-x-0"
+                                  }`}
+                                />
+                              </span>
+                            </button>
                             <button
                               onClick={() => onGenerateCredentials?.(school)}
                               className="flex items-center gap-1 rounded-lg border border-[#c3dfd9] bg-[#eef7f4] px-2.5 py-1.5 text-xs font-bold text-[#0f7f79] shadow-sm hover:bg-[#dff1ec]"

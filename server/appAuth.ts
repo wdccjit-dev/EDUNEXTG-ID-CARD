@@ -5,7 +5,7 @@ import { SignJWT, jwtVerify } from "jose";
 import type { Request, Response } from "express";
 import { eq, gt, and, or, sql } from "drizzle-orm";
 import { COOKIE_NAME } from "@shared/const";
-import { passwordResets, users, type User } from "../drizzle/schema";
+import { passwordResets, users, schools, type User } from "../drizzle/schema";
 import { getDb } from "./db";
 import { ENV } from "./_core/env";
 
@@ -83,6 +83,12 @@ export async function authenticateApplicationRequest(req: Request): Promise<User
       user = (await db.select().from(users).where(eq(users.openId, String(payload.openId))))[0];
     }
     if (!user || !user.isActive) return null;
+    if (user.schoolId && user.role !== "SUPER_ADMIN") {
+      const school = (await db.select({ isActive: schools.isActive }).from(schools).where(eq(schools.id, user.schoolId)))[0];
+      if (school && !school.isActive) {
+        return null;
+      }
+    }
     if (payload.pwdHash && typeof payload.pwdHash === "string") {
       const currentFingerprint = getPasswordFingerprint(user.passwordHash);
       if (payload.pwdHash !== currentFingerprint) {
@@ -147,6 +153,15 @@ export async function loginUser(identifier: string, password: string) {
       )
   )[0];
   if (!user || !user.isActive || !(await verifyPassword(password, user.passwordHash))) return null;
+  if (user.schoolId && user.role !== "SUPER_ADMIN") {
+    const school = (await db.select({ isActive: schools.isActive }).from(schools).where(eq(schools.id, user.schoolId)))[0];
+    if (school && !school.isActive) {
+      const err: any = new Error("This school account is currently inactive. Please contact the administrator.");
+      err.statusCode = 403;
+      err.isSchoolInactive = true;
+      throw err;
+    }
+  }
   const token = await signApplicationSession(user);
   return { user, token };
 }

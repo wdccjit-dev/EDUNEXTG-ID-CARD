@@ -1,6 +1,6 @@
 import path from "node:path";
 import { Router, type NextFunction, type Request, type Response } from "express";
-import { and, desc, eq, inArray, isNull, ne } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import {
   approvalHistory,
   auditLogs,
@@ -157,7 +157,12 @@ router.post("/auth/login", async (req, res) => {
     const db = await getDb();
     const school = safeUser.schoolId && db ? (await db.select({ name: schools.name }).from(schools).where(eq(schools.id, safeUser.schoolId)))[0] : undefined;
     res.json({ user: { ...safeUser, schoolName: school?.name ?? null }, token: result.token });
-  } catch (e) { fail(res, e); }
+  } catch (e: any) {
+    if (e?.isSchoolInactive) {
+      return res.status(403).json({ error: e.message });
+    }
+    fail(res, e);
+  }
 });
 router.post("/auth/logout", (_req, res) => { clearApplicationSession(res); res.json({ success: true }); });
 router.get("/auth/me", async (req, res) => {
@@ -585,18 +590,28 @@ router.put("/schools/:id", requireRole(adminRoles), async (req, res) => {
   } catch (e) { fail(res, e); }
 });
 
-router.patch("/schools/:id/status", requireRole(adminRoles), async (req, res) => {
+const handleSchoolStatusUpdate = async (req: any, res: any) => {
   try {
     const user = currentUser(res);
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: "Invalid school id" });
     const db = await getDb();
     if (!db) return res.status(503).json({ error: "Database not available" });
-    await db.update(schools).set({ isActive: Boolean(req.body.isActive) }).where(eq(schools.id, id));
-    await audit(user, "UPDATE_SCHOOL_STATUS", "school", id, id, req.body);
-    res.json({ success: true });
+    const existing = (await db.select().from(schools).where(eq(schools.id, id)))[0];
+    if (!existing) return res.status(404).json({ error: "School not found" });
+
+    const nextIsActive = Boolean(req.body.isActive);
+    await db.update(schools).set({ isActive: nextIsActive, updatedAt: new Date() }).where(eq(schools.id, id));
+    await audit(user, "UPDATE_SCHOOL_STATUS", "school", id, id, { isActive: nextIsActive });
+    const updated = (await attachSchoolTemplateMeta(db, [
+      (await db.select().from(schools).where(eq(schools.id, id)))[0]
+    ]))[0];
+    res.json({ success: true, school: updated });
   } catch (e) { fail(res, e); }
-});
+};
+
+router.patch("/schools/:id/status", requireRole(adminRoles), handleSchoolStatusUpdate);
+router.post("/schools/:id/status", requireRole(adminRoles), handleSchoolStatusUpdate);
 
 router.delete("/schools/:id", requireRole(adminRoles), async (req, res) => {
   try {
@@ -642,7 +657,11 @@ router.get("/users", requireRole(adminRoles), async (_req, res) => {
   try {
     const db = await getDb();
     if (!db) return res.status(503).json({ error: "Database not available" });
-    const rows = await db.select().from(users).orderBy(desc(users.createdAt));
+    const rows = await db
+      .select()
+      .from(users)
+      .where(sql`${users.email} IS NULL OR (${users.email} NOT LIKE '%@test.local')`)
+      .orderBy(desc(users.createdAt));
     res.json(rows.map(safeUser));
   } catch (e) { fail(res, e); }
 });

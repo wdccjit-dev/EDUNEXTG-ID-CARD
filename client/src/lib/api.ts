@@ -118,6 +118,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 const json = (body: unknown): RequestInit => ({ method: "POST", body: JSON.stringify(body) });
 const put = (body: unknown): RequestInit => ({ method: "PUT", body: JSON.stringify(body) });
+const patch = (body: unknown): RequestInit => ({ method: "PATCH", body: JSON.stringify(body) });
 
 export const api = {
   auth: {
@@ -133,7 +134,8 @@ export const api = {
     create: (body: Partial<ApiSchool>) => request<ApiSchool>("/api/schools", json(body)),
     update: (id: number, body: Partial<ApiSchool>) => request<ApiSchool>(`/api/schools/${id}`, put(body)),
     delete: (id: number) => request<void>(`/api/schools/${id}`, { method: "DELETE" }),
-    setStatus: (id: number, isActive: boolean) => request<void>(`/api/schools/${id}/status`, json({ isActive })),
+    setStatus: (id: number, isActive: boolean) =>
+      request<{ success: true; school?: ApiSchool }>(`/api/schools/${id}/status`, patch({ isActive })),
     generateCredentials: (id: number) =>
       request<{ success: true; credentials: { loginId: string; email: string; password: string } }>(`/api/schools/${id}/credentials`, json({})),
   },
