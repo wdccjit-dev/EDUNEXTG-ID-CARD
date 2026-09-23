@@ -203,6 +203,7 @@ export const api = {
   notifications: {
     list: () => request<ApiNotification[]>("/api/notifications"),
     markRead: (id: number) => request<{ success: true }>(`/api/notifications/${id}/read`, json({})),
+    clear: () => request<{ success: true; message: string }>("/api/notifications", { method: "DELETE" }),
   },
   auditLogs: {
     list: () => request<ApiActivity[]>("/api/audit-logs"),

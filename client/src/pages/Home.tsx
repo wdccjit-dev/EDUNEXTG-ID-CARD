@@ -933,6 +933,19 @@ export default function Home({
     } catch { }
   };
 
+  const handleClearNotifications = async () => {
+    if (notifications.length === 0) return;
+    try {
+      await api.notifications.clear();
+      setNotifications([]);
+      toast.success("Notifications cleared");
+    } catch (err) {
+      toast.error("Failed to clear notifications", {
+        description: err instanceof Error ? err.message : "Request failed",
+      });
+    }
+  };
+
   const handleSelectTemplate = async (template: ApiTemplate) => {
     if (authenticatedUser.role === "VIEWER") {
       return toast.error("Viewer accounts are read-only");
@@ -1112,6 +1125,11 @@ export default function Home({
                     strokeWidth={active ? 2.3 : 1.8}
                   />
                   <span className="flex-1">{displayLabel}</span>
+                  {label === "Notifications" && notifications.filter((n) => !n.isRead).length > 0 && (
+                    <span className="rounded-full bg-[#0f7f79] px-2 py-0.5 text-[10px] font-extrabold text-white">
+                      {notifications.filter((n) => !n.isRead).length}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -1871,6 +1889,7 @@ export default function Home({
               onToggleSelectApproved={handleToggleSelectApproved}
               onSelectAllApproved={handleSelectAllApproved}
               onMarkNotificationRead={handleMarkNotificationRead}
+              onClearNotifications={handleClearNotifications}
               onEditSchool={handleEditSchool}
               onDeleteSchool={handleDeleteSchool}
               onToggleSchoolStatus={handleToggleSchoolStatus}
@@ -2656,6 +2675,7 @@ function ModuleView({
   onToggleSelectApproved,
   onSelectAllApproved,
   onMarkNotificationRead,
+  onClearNotifications,
   onEditSchool,
   onDeleteSchool,
   onToggleSchoolStatus,
@@ -2691,6 +2711,7 @@ function ModuleView({
   onToggleSelectApproved: (cardId: number) => void;
   onSelectAllApproved: (ids: number[]) => void;
   onMarkNotificationRead: (id: number) => void;
+  onClearNotifications?: () => void;
   onEditSchool?: (school: ApiSchool) => void;
   onDeleteSchool?: (schoolId: number, schoolName: string) => void;
   onToggleSchoolStatus?: (school: ApiSchool) => void;
@@ -2858,6 +2879,15 @@ function ModuleView({
             >
               <FileText className="h-4 w-4" /> View Demo Templates
             </a>
+          )}
+          {isNotifications && notifications.length > 0 && onClearNotifications && (
+            <Button
+              variant="outline"
+              onClick={onClearNotifications}
+              className="h-10 rounded-xl border-[#fca5a5] text-xs font-bold text-[#dc2626] hover:bg-[#fef2f2] hover:text-[#b91c1c] shadow-sm"
+            >
+              <Trash2 className="mr-2 h-4 w-4" /> Clear All Notifications
+            </Button>
           )}
           {((isRequests && authenticatedUser.role === "SUPER_ADMIN") ||
             (isSchools && authenticatedUser.role === "SUPER_ADMIN") ||
@@ -3243,8 +3273,16 @@ function ModuleView({
       {/* 4. Notifications Tab */}
       {isNotifications && (
         <Card className="rounded-2xl border-[#e2e8e3] bg-[#fffefa] shadow-[0_12px_35px_rgba(38,71,65,0.05)]">
-          <div className="p-5 border-b border-[#edf0ed]">
+          <div className="p-5 border-b border-[#edf0ed] flex items-center justify-between">
             <h3 className="text-sm font-bold text-[#304541]">Notifications Inbox</h3>
+            {notifications.length > 0 && onClearNotifications && (
+              <button
+                onClick={onClearNotifications}
+                className="text-[11px] font-extrabold text-[#dc2626] hover:underline cursor-pointer flex items-center gap-1"
+              >
+                <Trash2 className="h-3 w-3" /> Clear all
+              </button>
+            )}
           </div>
           <div className="divide-y divide-[#edf0ed]">
             {notifications.length === 0 ? (

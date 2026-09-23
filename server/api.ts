@@ -2186,6 +2186,18 @@ router.post("/notifications/:id/read", async (req, res) => {
   }
 });
 
+router.delete("/notifications", async (_req, res) => {
+  try {
+    const db = await getDb();
+    if (!db) return res.status(503).json({ error: "Database not available" });
+    const user = currentUser(res);
+    await db.delete(notifications).where(eq(notifications.userId, user.id));
+    res.json({ success: true, message: "Notifications cleared" });
+  } catch (e) {
+    fail(res, e);
+  }
+});
+
 router.get("/audit-logs", async (req, res) => {
   try {
     const db = await getDb();
