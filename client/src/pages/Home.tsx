@@ -22,6 +22,7 @@ import {
   FileCheck2,
   FileEdit,
   FilePlus2,
+  FileText,
   Filter,
   Grid2X2,
   Info,
@@ -2851,18 +2852,31 @@ function ModuleView({
                   : "A focused workspace for managing your school identity operations."}
           </p>
         </div>
-        {((isRequests && authenticatedUser.role === "SUPER_ADMIN") ||
-          (isSchools && authenticatedUser.role === "SUPER_ADMIN") ||
-          (isTemplates && authenticatedUser.role === "SUPER_ADMIN") ||
-          (isUsers && authenticatedUser.role === "SUPER_ADMIN")) && (
-          <Button
-            onClick={onCreate}
-            className="h-10 rounded-xl bg-[#0f7f79] text-xs font-bold text-white hover:bg-[#096c67]"
-          >
-            <FilePlus2 className="mr-2 h-4 w-4" />{" "}
-            {isRequests ? "New ID Card Draft" : isUsers ? "New User" : "Create new"}
-          </Button>
-        )}
+        <div className="flex flex-wrap items-center gap-2.5">
+          {isTemplates && (
+            <a
+              href="/demo-templates/Update-Catalog-ID-Card-and-Ribbon.pdf"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[#0f7f79]/30 bg-[#eef7f4] px-4 text-xs font-bold text-[#0f7f79] shadow-sm transition-all hover:border-[#0f7f79] hover:bg-[#dff1ec]"
+              data-testid="button-view-demo-templates"
+            >
+              <FileText className="h-4 w-4" /> View Demo Templates
+            </a>
+          )}
+          {((isRequests && authenticatedUser.role === "SUPER_ADMIN") ||
+            (isSchools && authenticatedUser.role === "SUPER_ADMIN") ||
+            (isTemplates && authenticatedUser.role === "SUPER_ADMIN") ||
+            (isUsers && authenticatedUser.role === "SUPER_ADMIN")) && (
+            <Button
+              onClick={onCreate}
+              className="h-10 rounded-xl bg-[#0f7f79] text-xs font-bold text-white hover:bg-[#096c67]"
+            >
+              <FilePlus2 className="mr-2 h-4 w-4" />{" "}
+              {isRequests ? "New ID Card Draft" : isUsers ? "New User" : "Create new"}
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* 1. Templates Tab */}
