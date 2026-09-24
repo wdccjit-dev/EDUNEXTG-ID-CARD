@@ -11,6 +11,7 @@
     "format": "prettier --write .",
     "test": "vitest run --fileParallelism=false",
     "db:push": "drizzle-kit generate && drizzle-kit migrate",
+    "db:migrate": "tsx scripts/migrate-database.ts",
     "db:setup": "tsx scripts/setup-database.ts",
     "db:seed-auth": "tsx scripts/seed-auth.ts"
   },
