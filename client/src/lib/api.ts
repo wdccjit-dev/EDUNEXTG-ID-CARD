@@ -199,6 +199,8 @@ export const api = {
     resubmit: (id: number) => request<{ success: true; status: string }>(`/api/approvals/${id}/resubmit`, json({})),
     approve: (id: number) => request<{ success: true; status: string }>(`/api/approvals/${id}/approve`, json({})),
     reject: (id: number, reason: string) => request<{ success: true; status: string }>(`/api/approvals/${id}/reject`, json({ reason })),
+    bulkApprove: (cardIds: number[]) => request<{ success: true; processed: number; errors?: string[] }>("/api/approvals/bulk-approve", json({ cardIds })),
+    bulkReject: (cardIds: number[], reason?: string) => request<{ success: true; processed: number; errors?: string[] }>("/api/approvals/bulk-reject", json({ cardIds, reason })),
   },
   notifications: {
     list: () => request<ApiNotification[]>("/api/notifications"),

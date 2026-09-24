@@ -67,11 +67,10 @@ export default function Login({ initialRole = "school" }: LoginProps) {
           <button
             type="button"
             onClick={() => handleRoleChange("school")}
-            className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold transition-all ${
-              selectedRole === "school"
+            className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold transition-all ${selectedRole === "school"
                 ? "bg-white text-[#0f7f79] shadow-sm"
                 : "text-[#5e716e] hover:text-[#182326]"
-            }`}
+              }`}
           >
             <Building2 className="h-4 w-4" />
             School Portal
@@ -79,11 +78,10 @@ export default function Login({ initialRole = "school" }: LoginProps) {
           <button
             type="button"
             onClick={() => handleRoleChange("admin")}
-            className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold transition-all ${
-              selectedRole === "admin"
+            className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold transition-all ${selectedRole === "admin"
                 ? "bg-white text-[#0f7f79] shadow-sm"
                 : "text-[#5e716e] hover:text-[#182326]"
-            }`}
+              }`}
           >
             <ShieldCheck className="h-4 w-4" />
             Admin Portal

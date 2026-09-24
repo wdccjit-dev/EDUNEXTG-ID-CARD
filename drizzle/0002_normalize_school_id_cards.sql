@@ -131,11 +131,11 @@ CREATE TABLE `template_elements` (
 	CONSTRAINT `template_elements_template_key_unique` UNIQUE(`template_id`,`element_key`)
 );
 --> statement-breakpoint
-ALTER TABLE `users` MODIFY COLUMN `role` enum('user','admin','SUPER_ADMIN','SCHOOL_ADMIN','SCHOOL_OPERATOR','VIEWER') NOT NULL DEFAULT 'VIEWER';
+ALTER TABLE `users` MODIFY COLUMN `role` enum('user','admin','SUPER_ADMIN','SCHOOL_ADMIN','SCHOOL_OPERATOR','VIEWER') CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT 'VIEWER';
 --> statement-breakpoint
-ALTER TABLE `idCardTemplates` MODIFY COLUMN `status` enum('active','draft','DRAFT','ACTIVE','INACTIVE','ARCHIVED') NOT NULL DEFAULT 'DRAFT';
+ALTER TABLE `idCardTemplates` MODIFY COLUMN `status` enum('active','draft','DRAFT','ACTIVE','INACTIVE','ARCHIVED') CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT 'DRAFT';
 --> statement-breakpoint
-ALTER TABLE `idCardRequests` MODIFY COLUMN `status` enum('pending','approved','changes_requested','DRAFT','SUBMITTED','UNDER_REVIEW','CHANGES_REQUIRED','RESUBMITTED','APPROVED','REJECTED','PRINTED') NOT NULL DEFAULT 'DRAFT';
+ALTER TABLE `idCardRequests` MODIFY COLUMN `status` enum('pending','approved','changes_requested','DRAFT','SUBMITTED','UNDER_REVIEW','CHANGES_REQUIRED','RESUBMITTED','APPROVED','REJECTED','PRINTED') CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT 'DRAFT';
 --> statement-breakpoint
 UPDATE `users` SET `role` = 'SUPER_ADMIN' WHERE `role` = 'admin';
 --> statement-breakpoint

@@ -1978,6 +1978,156 @@ router.post("/id-cards/:id/reject", requireRole(schoolManagerRoles), async (req,
   }
 });
 
+// Bulk Approve and Reject Endpoints (available to both Super Admin and School Managers for their schools)
+async function handleBulkApprovalTransition(
+  req: Request,
+  res: Response,
+  targetStatus: "APPROVED" | "REJECTED",
+  action: string,
+  comment?: string
+) {
+  try {
+    const user = currentUser(res);
+    const db = await getDb();
+    if (!db) return res.status(503).json({ error: "Database not available" });
+
+    const cardIds: number[] = Array.isArray(req.body.cardIds) ? req.body.cardIds.map(Number) : [];
+    if (cardIds.length === 0) return res.status(400).json({ error: "cardIds array is required" });
+
+    const isSuperAdmin = adminRoles.has(user.role);
+    let successCount = 0;
+    const errors: string[] = [];
+
+    for (const cardId of cardIds) {
+      if (!cardId || isNaN(cardId)) continue;
+      let request = (await db.select().from(idCardRequests).where(eq(idCardRequests.id, cardId)))[0];
+      let card = (await db.select().from(idCards).where(eq(idCards.id, cardId)))[0];
+
+      if (request && !card) {
+        card = (await db.select().from(idCards).where(eq(idCards.requestId, request.id)))[0];
+      } else if (card && !request && card.requestId) {
+        request = (await db.select().from(idCardRequests).where(eq(idCardRequests.id, card.requestId)))[0];
+      }
+
+      const schoolId = card?.schoolId ?? request?.schoolId;
+      if (!schoolId) {
+        errors.push(`Card #${cardId} not found`);
+        continue;
+      }
+
+      const isCardSchool = user.schoolId !== null && user.schoolId === schoolId;
+      if (!isSuperAdmin && !isCardSchool) {
+        errors.push(`Access denied for card #${cardId}`);
+        continue;
+      }
+
+      const currentStatus = card?.status ?? request?.status ?? "DRAFT";
+      // Allow approving/rejecting cards that are pending review/action
+      if (
+        currentStatus !== "UNDER_REVIEW" &&
+        currentStatus !== "SUBMITTED" &&
+        currentStatus !== "RESUBMITTED"
+      ) {
+        // If already in target status, count as handled
+        if (currentStatus === targetStatus) {
+          successCount++;
+          continue;
+        }
+        errors.push(`Card #${card?.cardNumber ?? cardId} cannot be ${targetStatus.toLowerCase()}d from ${currentStatus}`);
+        continue;
+      }
+
+      await db.transaction(async (tx) => {
+        if (request) {
+          await tx
+            .update(idCardRequests)
+            .set({
+              status: targetStatus,
+              reviewNote: comment ?? (targetStatus === "APPROVED" ? null : request.reviewNote),
+              reviewedByUserId: user.id,
+              reviewedAt: new Date(),
+            })
+            .where(eq(idCardRequests.id, request.id));
+        }
+
+        if (card) {
+          await tx
+            .update(idCards)
+            .set({
+              status: targetStatus,
+              approvedByUserId: targetStatus === "APPROVED" ? user.id : card.approvedByUserId,
+            })
+            .where(eq(idCards.id, card.id));
+
+          await tx.insert(approvalHistory).values({
+            idCardId: card.id,
+            fromStatus: currentStatus,
+            toStatus: targetStatus,
+            action,
+            comments: comment ?? (targetStatus === "APPROVED" ? "Bulk approved" : "Bulk rejected"),
+            actedByUserId: user.id,
+          });
+
+          await tx.insert(auditLogs).values({
+            userId: user.id > 0 ? user.id : null,
+            schoolId: card.schoolId,
+            action,
+            entityType: "id_card",
+            entityId: card.id,
+            newValues: {
+              requestId: request?.id,
+              fromStatus: currentStatus,
+              toStatus: targetStatus,
+              comment,
+              isBulk: true,
+            } as never,
+          });
+        }
+      });
+
+      // Notification
+      const adminUsers = await db.select({ id: users.id }).from(users).where(eq(users.role, "SUPER_ADMIN"));
+      for (const a of adminUsers) {
+        if (a.id !== user.id) {
+          await notify(
+            a.id,
+            schoolId,
+            action,
+            `ID card ${targetStatus === "APPROVED" ? "approved" : "rejected"}: #${card?.cardNumber ?? request?.admissionCode}`,
+            comment ?? `ID card #${card?.cardNumber ?? request?.admissionCode} was ${targetStatus.toLowerCase()}d`,
+            "id_card",
+            card?.id ?? request?.id,
+          );
+        }
+      }
+
+      successCount++;
+    }
+
+    res.json({
+      success: true,
+      processed: successCount,
+      totalRequested: cardIds.length,
+      errors: errors.length > 0 ? errors : undefined,
+    });
+  } catch (e) {
+    fail(res, e);
+  }
+}
+
+router.post("/approvals/bulk-approve", requireRole(schoolManagerRoles), async (req, res) => {
+  await handleBulkApprovalTransition(req, res, "APPROVED", "APPROVE_ID_CARD", req.body.comment);
+});
+router.post("/approvals/bulk-reject", requireRole(schoolManagerRoles), async (req, res) => {
+  await handleBulkApprovalTransition(req, res, "REJECTED", "REJECT_ID_CARD", req.body.reason || req.body.comment || "Rejected via bulk action");
+});
+router.post("/id-cards/bulk-approve", requireRole(schoolManagerRoles), async (req, res) => {
+  await handleBulkApprovalTransition(req, res, "APPROVED", "APPROVE_ID_CARD", req.body.comment);
+});
+router.post("/id-cards/bulk-reject", requireRole(schoolManagerRoles), async (req, res) => {
+  await handleBulkApprovalTransition(req, res, "REJECTED", "REJECT_ID_CARD", req.body.reason || req.body.comment || "Rejected via bulk action");
+});
+
 // ─── PRINTING ─────────────────────────────────────────────────────────────
 router.post("/id-cards/:id/print", requireRole(adminRoles), async (req, res) => {
   try {

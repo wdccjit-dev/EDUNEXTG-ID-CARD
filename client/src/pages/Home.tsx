@@ -55,6 +55,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -313,6 +314,10 @@ export default function Home({
     schoolName: string;
     loginId: string;
     password?: string;
+    email?: string | null;
+    phone?: string | null;
+    address?: string | null;
+    shortCode?: string | null;
   } | null>(null);
 
   // Modal dialog states replacing browser prompts
@@ -355,6 +360,12 @@ export default function Home({
 
   // Approved cards multi-selection
   const [selectedApprovedCardIds, setSelectedApprovedCardIds] = useState<number[]>([]);
+
+  // ID card requests multi-selection
+  const [selectedRequestCardIds, setSelectedRequestCardIds] = useState<number[]>([]);
+  const [bulkRejectModalOpen, setBulkRejectModalOpen] = useState(false);
+  const [bulkRejectReason, setBulkRejectReason] = useState("");
+  const [bulkActionLoading, setBulkActionLoading] = useState(false);
 
   // Preview & template preview
   const [previewModalTemplate, setPreviewModalTemplate] = useState<ApiTemplate | null>(null);
@@ -642,6 +653,10 @@ export default function Home({
             schoolName: created.name,
             loginId: created.credentials.loginId,
             password: created.credentials.password,
+            email: created.email,
+            phone: created.phone,
+            address: created.address,
+            shortCode: created.shortCode,
           });
           setCredentialsModalOpen(true);
         }
@@ -667,6 +682,10 @@ export default function Home({
         schoolName: school.name,
         loginId: creds.credentials.loginId,
         password: creds.credentials.password,
+        email: school.email,
+        phone: school.phone,
+        address: school.address,
+        shortCode: school.shortCode,
       });
       setCredentialsModalOpen(true);
       toast.success(`Credentials generated for ${school.name}`);
@@ -924,6 +943,64 @@ export default function Home({
     );
   };
 
+  const handleToggleSelectRequest = (cardId: number) => {
+    setSelectedRequestCardIds((prev) =>
+      prev.includes(cardId) ? prev.filter((id) => id !== cardId) : [...prev, cardId],
+    );
+  };
+
+  const handleSelectAllRequests = (allIds: number[]) => {
+    setSelectedRequestCardIds((prev) =>
+      prev.length === allIds.length ? [] : [...allIds],
+    );
+  };
+
+  const handleBulkApproveRequests = async () => {
+    if (selectedRequestCardIds.length === 0) {
+      return toast.error("Please select at least one card to approve");
+    }
+    if (!window.confirm(`Are you sure you want to approve ${selectedRequestCardIds.length} selected ID card(s)?`)) {
+      return;
+    }
+    setBulkActionLoading(true);
+    try {
+      const res = await api.approvals.bulkApprove(selectedRequestCardIds);
+      toast.success(`${res.processed} ID card(s) approved successfully!`);
+      setSelectedRequestCardIds([]);
+      reloadWorkspace();
+    } catch (e) {
+      toast.error("Bulk approval failed", {
+        description: e instanceof Error ? e.message : "Request failed",
+      });
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
+  const handleBulkRejectRequestsSubmit = async () => {
+    if (selectedRequestCardIds.length === 0) {
+      return toast.error("Please select at least one card to reject");
+    }
+    if (!bulkRejectReason.trim()) {
+      return toast.error("Please provide a rejection reason");
+    }
+    setBulkActionLoading(true);
+    try {
+      const res = await api.approvals.bulkReject(selectedRequestCardIds, bulkRejectReason.trim());
+      toast.success(`${res.processed} ID card(s) rejected successfully`);
+      setBulkRejectModalOpen(false);
+      setBulkRejectReason("");
+      setSelectedRequestCardIds([]);
+      reloadWorkspace();
+    } catch (e) {
+      toast.error("Bulk rejection failed", {
+        description: e instanceof Error ? e.message : "Request failed",
+      });
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
   const handleMarkNotificationRead = async (notifId: number) => {
     try {
       await api.notifications.markRead(notifId);
@@ -941,6 +1018,20 @@ export default function Home({
       toast.success("Notifications cleared");
     } catch (err) {
       toast.error("Failed to clear notifications", {
+        description: err instanceof Error ? err.message : "Request failed",
+      });
+    }
+  };
+
+  const handleClearAuditLogs = async () => {
+    if (activity.length === 0) return;
+    if (!window.confirm("Are you sure you want to clear all audit logs?")) return;
+    try {
+      await api.auditLogs.clear();
+      setActivity([]);
+      toast.success("Audit logs cleared successfully");
+    } catch (err) {
+      toast.error("Failed to clear audit logs", {
         description: err instanceof Error ? err.message : "Request failed",
       });
     }
@@ -1760,19 +1851,13 @@ export default function Home({
                             <option value={100}>100</option>
                           </select>
                         </div>
-                        <Button
-                          onClick={openCreateSchool}
-                          className="h-8 rounded-xl bg-[#0f7f79] px-3 text-xs font-bold text-white hover:bg-[#096c67]"
-                        >
-                          <Building2 className="mr-1.5 h-3.5 w-3.5" /> Add school
-                        </Button>
                       </div>
                     </CardHeader>
                     <CardContent className="divide-y divide-[#edf0ed] p-0">
                       {displayedActiveSchools.length === 0 ? (
                         <div className="p-6 text-center text-xs text-[#98a4a1]">
                           {activeSchools.length === 0
-                            ? "No active schools found. All registered schools may be inactive, or click \"Add school\" to create one."
+                            ? "No active schools found."
                             : "No active schools to display."}
                         </div>
                       ) : (
@@ -1785,9 +1870,6 @@ export default function Home({
                               <div>
                                 <div className="text-sm font-extrabold text-[#304541] flex flex-wrap items-center gap-2">
                                   {school.name}
-                                  <StatusPill tone="teal">
-                                    Active
-                                  </StatusPill>
                                   {school.templateSelectionStatus === "Selected" ? (
                                     <span className="inline-flex items-center gap-1 rounded-full border border-teal-200 bg-teal-50 px-2 py-0.5 text-[10px] font-bold text-teal-800">
                                       <CheckCircle2 className="h-3 w-3 text-teal-600" />
@@ -1809,32 +1891,22 @@ export default function Home({
                               </div>
                             </div>
 
-                            <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
-                              <button
-                                type="button"
-                                onClick={() => handleToggleSchoolStatus(school)}
-                                className={`group flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-bold transition-all shadow-sm ${
-                                  school.isActive
-                                    ? "border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
-                                    : "border-neutral-300 bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
-                                }`}
-                                title={school.isActive ? "Click to deactivate school" : "Click to activate school"}
-                              >
-                                <span className="text-[11px] font-extrabold">
-                                  {school.isActive ? "Active" : "Inactive"}
-                                </span>
+                            <div className="flex items-center gap-2.5 self-end sm:self-center shrink-0">
+                              <div className="flex items-center gap-2 mr-1">
+                                <Switch
+                                  checked={school.isActive}
+                                  onCheckedChange={() => handleToggleSchoolStatus(school)}
+                                  className="data-[state=checked]:bg-[#0f7f79]"
+                                  aria-label={`Toggle active status for ${school.name}`}
+                                />
                                 <span
-                                  className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out ${
-                                    school.isActive ? "bg-emerald-600" : "bg-neutral-400"
+                                  className={`text-xs font-bold ${
+                                    school.isActive ? "text-[#0f7f79]" : "text-[#8d9995]"
                                   }`}
                                 >
-                                  <span
-                                    className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out mt-0.5 ml-0.5 ${
-                                      school.isActive ? "translate-x-3" : "translate-x-0"
-                                    }`}
-                                  />
+                                  {school.isActive ? "Active" : "Inactive"}
                                 </span>
-                              </button>
+                              </div>
                               <button
                                 onClick={() => handleGenerateCredentials(school)}
                                 className="flex items-center gap-1 rounded-lg border border-[#c3dfd9] bg-[#eef7f4] px-2.5 py-1.5 text-xs font-bold text-[#0f7f79] shadow-sm hover:bg-[#dff1ec]"
@@ -1890,13 +1962,30 @@ export default function Home({
               onSelectAllApproved={handleSelectAllApproved}
               onMarkNotificationRead={handleMarkNotificationRead}
               onClearNotifications={handleClearNotifications}
+              onClearAuditLogs={handleClearAuditLogs}
               onEditSchool={handleEditSchool}
               onDeleteSchool={handleDeleteSchool}
               onToggleSchoolStatus={handleToggleSchoolStatus}
               onDeleteTemplate={handleDeleteTemplate}
               activeSchool={currentActiveSchool}
               onGenerateCredentials={handleGenerateCredentials}
-              onApproveCardDirect={(id: number, num: string) => approve(id, num)}
+              selectedRequestCardIds={selectedRequestCardIds}
+              onToggleSelectRequest={handleToggleSelectRequest}
+              onSelectAllRequests={handleSelectAllRequests}
+              onBulkApproveRequests={handleBulkApproveRequests}
+              onBulkRejectRequests={() => setBulkRejectModalOpen(true)}
+              bulkActionLoading={bulkActionLoading}
+              onApproveCardDirect={async (id: number, num: string) => {
+                try {
+                  await api.approvals.approve(id);
+                  toast.success(`Card #${num} approved!`);
+                  reloadWorkspace();
+                } catch (e) {
+                  toast.error("Approval failed", {
+                    description: e instanceof Error ? e.message : "Request failed",
+                  });
+                }
+              }}
               onRejectCardDirect={(id: number) => handleOpenReview(id)}
             />
           )}
@@ -2181,13 +2270,38 @@ export default function Home({
           </DialogHeader>
 
           <div className="space-y-4 py-2">
-            <div className="rounded-xl border border-[#d8e8e3] bg-[#f7fbf9] p-3 text-xs text-[#304541]">
-              <p className="font-semibold text-[#0f7f79] flex items-center gap-1.5 mb-1">
-                <ShieldCheck className="h-4 w-4" /> School Portal Access
-              </p>
-              <p className="text-[#60716d]">
-                The school administrator can log in using this <strong>Login ID</strong> and <strong>ID Pass (Password)</strong> to preview templates, select a final template, and review & approve student ID cards.
-              </p>
+            {/* School Details */}
+            <div className="rounded-xl border border-[#d8e8e3] bg-[#f7fbf9] p-3.5 text-xs text-[#304541] space-y-2">
+              <div className="flex items-center justify-between border-b border-[#e5efe9] pb-2">
+                <span className="font-bold text-[#0f7f79] flex items-center gap-1.5">
+                  <Building2 className="h-4 w-4" /> {credentialsData?.schoolName || "School Details"}
+                </span>
+                {credentialsData?.shortCode && (
+                  <span className="font-mono text-[10px] font-bold bg-[#e1f3ed] text-[#0a716b] px-2 py-0.5 rounded-full">
+                    {credentialsData.shortCode}
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] pt-0.5">
+                <div>
+                  <span className="text-[#788784] font-medium block">Email:</span>
+                  <span className="font-semibold text-[#203734] break-all">
+                    {credentialsData?.email || "—"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[#788784] font-medium block">Phone:</span>
+                  <span className="font-semibold text-[#203734]">
+                    {credentialsData?.phone || "—"}
+                  </span>
+                </div>
+              </div>
+              <div className="text-[11px] pt-1 border-t border-[#edf4f0]">
+                <span className="text-[#788784] font-medium block">Address:</span>
+                <span className="font-semibold text-[#203734]">
+                  {credentialsData?.address || "—"}
+                </span>
+              </div>
             </div>
 
             {/* Login ID field */}
@@ -2247,9 +2361,18 @@ export default function Home({
               className="rounded-xl border-[#cfded8] text-xs font-bold text-[#0f7f79] hover:bg-[#eef6f3]"
               onClick={() => {
                 if (credentialsData) {
-                  const text = `School: ${credentialsData.schoolName}\nLogin ID: ${credentialsData.loginId}\nPassword: ${credentialsData.password || ""}\nPortal URL: ${window.location.origin}`;
-                  navigator.clipboard.writeText(text);
-                  toast.success("All credentials copied to clipboard");
+                  const lines = [
+                    `School: ${credentialsData.schoolName}`,
+                    credentialsData.shortCode ? `Code: ${credentialsData.shortCode}` : null,
+                    credentialsData.email ? `Email: ${credentialsData.email}` : null,
+                    credentialsData.phone ? `Phone: ${credentialsData.phone}` : null,
+                    credentialsData.address ? `Address: ${credentialsData.address}` : null,
+                    `Login ID: ${credentialsData.loginId}`,
+                    `Password: ${credentialsData.password || ""}`,
+                    `Portal URL: ${window.location.origin}`,
+                  ].filter(Boolean);
+                  navigator.clipboard.writeText(lines.join("\n"));
+                  toast.success("All credentials and school details copied to clipboard");
                 }
               }}
             >
@@ -2543,6 +2666,51 @@ export default function Home({
         </DialogContent>
       </Dialog>
 
+      {/* Bulk Reject Cards Dialog */}
+      <Dialog open={bulkRejectModalOpen} onOpenChange={setBulkRejectModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reject Selected ID Cards</DialogTitle>
+            <DialogDescription>
+              Provide a reason for rejecting the {selectedRequestCardIds.length} selected ID card(s). This will mark them as REJECTED.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <label className="text-xs font-bold text-[#304541]">
+              Rejection Reason <span className="text-red-500">*</span>
+            </label>
+            <Textarea
+              className="mt-1.5"
+              placeholder="e.g., Incomplete student information or photos do not meet criteria."
+              rows={4}
+              value={bulkRejectReason}
+              onChange={(e) => setBulkRejectReason(e.target.value)}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setBulkRejectModalOpen(false);
+                setBulkRejectReason("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleBulkRejectRequestsSubmit}
+              disabled={bulkActionLoading || !bulkRejectReason.trim()}
+            >
+              Reject {selectedRequestCardIds.length} Cards
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Dialog for Template Preview */}
       <Dialog open={!!previewModalTemplate} onOpenChange={(open) => !open && setPreviewModalTemplate(null)}>
         <DialogContent className="max-w-[700px]">
@@ -2674,8 +2842,15 @@ function ModuleView({
   selectedApprovedCardIds,
   onToggleSelectApproved,
   onSelectAllApproved,
+  selectedRequestCardIds = [],
+  onToggleSelectRequest,
+  onSelectAllRequests,
+  onBulkApproveRequests,
+  onBulkRejectRequests,
+  bulkActionLoading = false,
   onMarkNotificationRead,
   onClearNotifications,
+  onClearAuditLogs,
   onEditSchool,
   onDeleteSchool,
   onToggleSchoolStatus,
@@ -2710,8 +2885,15 @@ function ModuleView({
   selectedApprovedCardIds: number[];
   onToggleSelectApproved: (cardId: number) => void;
   onSelectAllApproved: (ids: number[]) => void;
+  selectedRequestCardIds?: number[];
+  onToggleSelectRequest?: (cardId: number) => void;
+  onSelectAllRequests?: (ids: number[]) => void;
+  onBulkApproveRequests?: () => void;
+  onBulkRejectRequests?: () => void;
+  bulkActionLoading?: boolean;
   onMarkNotificationRead: (id: number) => void;
   onClearNotifications?: () => void;
+  onClearAuditLogs?: () => void;
   onEditSchool?: (school: ApiSchool) => void;
   onDeleteSchool?: (schoolId: number, schoolName: string) => void;
   onToggleSchoolStatus?: (school: ApiSchool) => void;
@@ -2797,6 +2979,7 @@ function ModuleView({
   }, [idCards, searchTerm]);
 
   const allApprovedCardIds = useMemo(() => approvedCards.map((c) => c.id), [approvedCards]);
+  const allRequestCardIds = useMemo(() => requestCards.map((c) => c.id), [requestCards]);
 
   const filteredUsers = useMemo(() => {
     return users
@@ -2834,17 +3017,8 @@ function ModuleView({
 
   return (
     <section className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-      <button
-        onClick={onBack}
-        className="mb-6 text-[11px] font-extrabold text-[#0f7f79] hover:underline"
-      >
-        ← Back to overview
-      </button>
       <div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
-          <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[#82908e]">
-            Workspace module
-          </div>
           <h2 className="text-2xl font-extrabold tracking-[-0.05em] sm:text-3xl">
             {authenticatedUser.role !== "SUPER_ADMIN"
               ? label === "ID card templates"
@@ -2880,15 +3054,7 @@ function ModuleView({
               <FileText className="h-4 w-4" /> View Demo Templates
             </a>
           )}
-          {isNotifications && notifications.length > 0 && onClearNotifications && (
-            <Button
-              variant="outline"
-              onClick={onClearNotifications}
-              className="h-10 rounded-xl border-[#fca5a5] text-xs font-bold text-[#dc2626] hover:bg-[#fef2f2] hover:text-[#b91c1c] shadow-sm"
-            >
-              <Trash2 className="mr-2 h-4 w-4" /> Clear All Notifications
-            </Button>
-          )}
+
           {((isRequests && authenticatedUser.role === "SUPER_ADMIN") ||
             (isSchools && authenticatedUser.role === "SUPER_ADMIN") ||
             (isTemplates && authenticatedUser.role === "SUPER_ADMIN") ||
@@ -3016,29 +3182,55 @@ function ModuleView({
       {isRequests && (
         <Card className="rounded-2xl border-[#e2e8e3] bg-[#fffefa] shadow-[0_12px_35px_rgba(38,71,65,0.05)]">
           <div className="flex flex-col gap-3 border-b border-[#edf0ed] p-5 sm:flex-row sm:items-center sm:justify-between">
-            <div className="relative w-full max-w-sm">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#98a4a1]" />
-              <Input
-                placeholder="Search card #, student, or school..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="h-10 rounded-xl border-[#e2e8e3] pl-9 text-xs shadow-none"
-              />
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#98a4a1]" />
+                <Input
+                  placeholder="Search card #, student, or school..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="h-10 rounded-xl border-[#e2e8e3] pl-9 text-xs shadow-none"
+                />
+              </div>
+              {/* Status filter chips */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                {["All", "DRAFT", "SUBMITTED", "UNDER_REVIEW", "CHANGES_REQUIRED", "REJECTED"].map((status) => (
+                  <button
+                    key={status}
+                    onClick={() => setCardStatusFilter(status)}
+                    className={`rounded-lg px-2.5 py-1.5 text-[11px] font-bold transition-all ${cardStatusFilter === status
+                        ? "bg-[#0f7f79] text-white shadow-sm"
+                        : "bg-[#f0efec] text-[#55605d] hover:bg-[#e4e2de]"
+                      }`}
+                  >
+                    {status.replace(/_/g, " ")}
+                  </button>
+                ))}
+              </div>
             </div>
-            {/* Status filter chips */}
-            <div className="flex flex-wrap items-center gap-1.5">
-              {["All", "DRAFT", "SUBMITTED", "UNDER_REVIEW", "CHANGES_REQUIRED", "REJECTED"].map((status) => (
-                <button
-                  key={status}
-                  onClick={() => setCardStatusFilter(status)}
-                  className={`rounded-lg px-2.5 py-1.5 text-[11px] font-bold transition-all ${cardStatusFilter === status
-                      ? "bg-[#0f7f79] text-white shadow-sm"
-                      : "bg-[#f0efec] text-[#55605d] hover:bg-[#e4e2de]"
-                    }`}
-                >
-                  {status.replace(/_/g, " ")}
-                </button>
-              ))}
+
+            {/* Bulk Approval & Rejection Toolbar for both Admin and School */}
+            <div className="flex items-center gap-2 self-end sm:self-center">
+              {selectedRequestCardIds.length > 0 && (
+                <span className="text-xs font-semibold text-[#84918e] mr-1">
+                  {selectedRequestCardIds.length} of {requestCards.length} selected
+                </span>
+              )}
+              <Button
+                onClick={onBulkApproveRequests}
+                disabled={selectedRequestCardIds.length === 0 || bulkActionLoading}
+                className="h-10 rounded-xl bg-[#0f7f79] hover:bg-[#096c67] text-xs font-bold text-white shadow-sm"
+              >
+                <CheckCircle2 className="w-4 h-4 mr-1.5" /> Approve all
+              </Button>
+              <Button
+                variant="outline"
+                onClick={onBulkRejectRequests}
+                disabled={selectedRequestCardIds.length === 0 || bulkActionLoading}
+                className="h-10 rounded-xl border-[#fecaca] text-[#dc2626] hover:bg-[#fef2f2] hover:text-[#b91c1c] text-xs font-bold shadow-sm"
+              >
+                <XCircle className="w-4 h-4 mr-1.5" /> Reject all
+              </Button>
             </div>
           </div>
 
@@ -3046,6 +3238,16 @@ function ModuleView({
             <table className="w-full text-left text-xs">
               <thead className="bg-[#f8faf8] border-b border-[#edf0ed] text-[#84918e] uppercase tracking-wider font-semibold">
                 <tr>
+                  <th className="px-5 py-3.5 w-12 text-center">
+                    <Checkbox
+                      checked={
+                        allRequestCardIds.length > 0 &&
+                        selectedRequestCardIds.length === allRequestCardIds.length
+                      }
+                      onCheckedChange={() => onSelectAllRequests?.(allRequestCardIds)}
+                      aria-label="Select all request cards"
+                    />
+                  </th>
                   <th className="px-5 py-3.5">Card Number</th>
                   <th className="px-5 py-3.5">School</th>
                   <th className="px-5 py-3.5">Template</th>
@@ -3057,13 +3259,20 @@ function ModuleView({
               <tbody className="divide-y divide-[#edf0ed]">
                 {requestCards.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-5 py-10 text-center text-[#98a4a1]">
+                    <td colSpan={7} className="px-5 py-10 text-center text-[#98a4a1]">
                       No ID card requests found matching the current filters.
                     </td>
                   </tr>
                 ) : (
                   requestCards.map((card) => (
                     <tr key={card.id} className="hover:bg-[#fbfdfb] transition-colors">
+                      <td className="px-5 py-4 text-center">
+                        <Checkbox
+                          checked={selectedRequestCardIds.includes(card.id)}
+                          onCheckedChange={() => onToggleSelectRequest?.(card.id)}
+                          aria-label={`Select card ${card.cardNumber}`}
+                        />
+                      </td>
                       <td className="px-5 py-4 font-mono font-bold text-[#203734]">
                         {card.cardNumber}
                       </td>
@@ -3336,8 +3545,16 @@ function ModuleView({
       {/* 5. Audit Logs Tab */}
       {isAudit && (
         <Card className="rounded-2xl border-[#e2e8e3] bg-[#fffefa] shadow-[0_12px_35px_rgba(38,71,65,0.05)]">
-          <div className="p-5 border-b border-[#edf0ed]">
+          <div className="p-5 border-b border-[#edf0ed] flex items-center justify-between">
             <h3 className="text-sm font-bold text-[#304541]">System Audit Log & Traceability</h3>
+            {activity.length > 0 && onClearAuditLogs && (
+              <button
+                onClick={onClearAuditLogs}
+                className="text-[11px] font-extrabold text-[#dc2626] hover:underline cursor-pointer flex items-center gap-1"
+              >
+                <Trash2 className="h-3 w-3" /> Clear all
+              </button>
+            )}
           </div>
           <div className="divide-y divide-[#edf0ed]">
             {activity.length === 0 ? (
@@ -3485,39 +3702,32 @@ function ModuleView({
                         )}
                       </td>
                       <td className="px-5 py-4 whitespace-nowrap">
-                        <StatusPill tone={school.isActive ? "teal" : "coral"}>
-                          {school.isActive ? "Active" : "Inactive"}
-                        </StatusPill>
+                        {authenticatedUser.role === "SUPER_ADMIN" ? (
+                          <div className="flex items-center gap-2">
+                            <Switch
+                              checked={school.isActive}
+                              onCheckedChange={() => onToggleSchoolStatus?.(school)}
+                              className="data-[state=checked]:bg-[#0f7f79]"
+                              aria-label={`Toggle active status for ${school.name}`}
+                            />
+                            <span
+                              className={`text-xs font-bold ${
+                                school.isActive ? "text-[#0f7f79]" : "text-[#8d9995]"
+                              }`}
+                            >
+                              {school.isActive ? "Active" : "Inactive"}
+                            </span>
+                          </div>
+                        ) : (
+                          <StatusPill tone={school.isActive ? "teal" : "coral"}>
+                            {school.isActive ? "Active" : "Inactive"}
+                          </StatusPill>
+                        )}
                       </td>
                       <td className="px-5 py-4 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1.5">
                           {authenticatedUser.role === "SUPER_ADMIN" && (
                             <>
-                              <button
-                                type="button"
-                                onClick={() => onToggleSchoolStatus?.(school)}
-                                className={`group flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-bold transition-all shadow-sm ${
-                                  school.isActive
-                                    ? "border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
-                                    : "border-neutral-300 bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
-                                }`}
-                                title={school.isActive ? "Click to deactivate school" : "Click to activate school"}
-                              >
-                                <span className="text-[11px] font-extrabold">
-                                  {school.isActive ? "Active" : "Inactive"}
-                                </span>
-                                <span
-                                  className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out ${
-                                    school.isActive ? "bg-emerald-600" : "bg-neutral-400"
-                                  }`}
-                                >
-                                  <span
-                                    className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out mt-0.5 ml-0.5 ${
-                                      school.isActive ? "translate-x-3" : "translate-x-0"
-                                    }`}
-                                  />
-                                </span>
-                              </button>
                               <button
                                 onClick={() => onGenerateCredentials?.(school)}
                                 className="flex items-center gap-1 rounded-lg border border-[#c3dfd9] bg-[#eef7f4] px-2.5 py-1.5 text-xs font-bold text-[#0f7f79] shadow-sm hover:bg-[#dff1ec]"
