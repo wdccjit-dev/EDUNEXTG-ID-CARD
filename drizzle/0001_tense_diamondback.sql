@@ -6,7 +6,7 @@ CREATE TABLE `idCardRequests` (
 	`status` enum('pending','approved','changes_requested') NOT NULL DEFAULT 'pending',
 	`reviewNote` text,
 	`submittedAt` timestamp NOT NULL DEFAULT (now()),
-	`reviewedAt` timestamp,
+	`reviewedAt` timestamp NULL,
 	CONSTRAINT `idCardRequests_id` PRIMARY KEY(`id`)
 );
 --> statement-breakpoint

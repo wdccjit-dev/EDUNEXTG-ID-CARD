@@ -58,7 +58,7 @@ CREATE TABLE `id_cards` (
 	`status` enum('DRAFT','SUBMITTED','UNDER_REVIEW','CHANGES_REQUIRED','RESUBMITTED','APPROVED','REJECTED','PRINTED') NOT NULL DEFAULT 'DRAFT',
 	`submitted_by_user_id` int,
 	`approved_by_user_id` int,
-	`printed_at` timestamp,
+	`printed_at` timestamp NULL,
 	`created_at` timestamp NOT NULL DEFAULT (now()),
 	`updated_at` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
 	CONSTRAINT `id_cards_id` PRIMARY KEY(`id`),
@@ -75,7 +75,7 @@ CREATE TABLE `notifications` (
 	`entity_type` varchar(64),
 	`entity_id` int,
 	`is_read` boolean NOT NULL DEFAULT false,
-	`read_at` timestamp,
+	`read_at` timestamp NULL,
 	`created_at` timestamp NOT NULL DEFAULT (now()),
 	`updated_at` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
 	CONSTRAINT `notifications_id` PRIMARY KEY(`id`)
@@ -86,7 +86,7 @@ CREATE TABLE `password_resets` (
 	`user_id` int NOT NULL,
 	`token_hash` varchar(255) NOT NULL,
 	`expires_at` timestamp NOT NULL,
-	`used_at` timestamp,
+	`used_at` timestamp NULL,
 	`created_at` timestamp NOT NULL DEFAULT (now()),
 	`updated_at` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
 	CONSTRAINT `password_resets_id` PRIMARY KEY(`id`),
@@ -154,7 +154,7 @@ UPDATE `idCardRequests` SET `status` = 'SUBMITTED' WHERE `status` = 'pending';
 ALTER TABLE `idCardRequests` DROP FOREIGN KEY `idCardRequests_schoolId_schools_id_fk`;
 --> statement-breakpoint
 ALTER TABLE `idCardRequests` MODIFY COLUMN `status` enum('DRAFT','SUBMITTED','UNDER_REVIEW','CHANGES_REQUIRED','RESUBMITTED','APPROVED','REJECTED','PRINTED') NOT NULL DEFAULT 'DRAFT';--> statement-breakpoint
-ALTER TABLE `idCardRequests` MODIFY COLUMN `submittedAt` timestamp;--> statement-breakpoint
+ALTER TABLE `idCardRequests` MODIFY COLUMN `submittedAt` timestamp NULL;--> statement-breakpoint
 ALTER TABLE `idCardTemplates` MODIFY COLUMN `status` enum('DRAFT','ACTIVE','INACTIVE','ARCHIVED') NOT NULL DEFAULT 'DRAFT';--> statement-breakpoint
 ALTER TABLE `users` MODIFY COLUMN `role` enum('SUPER_ADMIN','SCHOOL_ADMIN','SCHOOL_OPERATOR','VIEWER') NOT NULL DEFAULT 'VIEWER';--> statement-breakpoint
 ALTER TABLE `idCardRequests` ADD `requestedByUserId` int;--> statement-breakpoint

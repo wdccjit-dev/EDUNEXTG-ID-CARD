@@ -1,8 +1,14 @@
+import "dotenv/config";
 import mysql from "mysql2/promise";
 
 async function purgeTestArtifacts() {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    throw new Error("DATABASE_URL is required to clean up database test artifacts");
+  }
+
   try {
-    const conn = await mysql.createConnection("mysql://root:asHik@8967@127.0.0.1:3306/school_id_card_management");
+    const conn = await mysql.createConnection(databaseUrl);
 
     await conn.execute(`
       DELETE FROM password_resets 
@@ -59,7 +65,7 @@ async function purgeTestArtifacts() {
 
     await conn.end();
   } catch (err) {
-    // Ignore cleanup error
+    console.warn("[Test cleanup] Could not purge test artifacts:", err);
   }
 }
 
