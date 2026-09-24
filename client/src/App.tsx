@@ -1,14 +1,20 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Route, Switch, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import Home from "./pages/Home";
-import Login from "./pages/Login";
-import TemplateDesigner from "./pages/TemplateDesigner";
-import { ForgotPassword, ResetPassword } from "./pages/PasswordReset";
 import { api, type ApiAuthUser } from "./lib/api";
+
+const Home = lazy(() => import("./pages/Home"));
+const Login = lazy(() => import("./pages/Login"));
+const TemplateDesigner = lazy(() => import("./pages/TemplateDesigner"));
+const ForgotPassword = lazy(() =>
+  import("./pages/PasswordReset").then((module) => ({ default: module.ForgotPassword })),
+);
+const ResetPassword = lazy(() =>
+  import("./pages/PasswordReset").then((module) => ({ default: module.ResetPassword })),
+);
 
 function ProtectedPortal({ portal, initialNav }: { portal: "admin" | "school"; initialNav?: string }) {
   const [, navigate] = useLocation();
@@ -66,5 +72,5 @@ function PortalRedirect() {
 }
 
 export default function App() {
-  return <ErrorBoundary><ThemeProvider defaultTheme="light"><TooltipProvider><Toaster /><Router /></TooltipProvider></ThemeProvider></ErrorBoundary>;
+  return <ErrorBoundary><ThemeProvider defaultTheme="light"><TooltipProvider><Toaster /><Suspense fallback={<main className="flex min-h-screen items-center justify-center bg-[#f7f6f2] text-sm text-[#778381]">Loading…</main>}><Router /></Suspense></TooltipProvider></ThemeProvider></ErrorBoundary>;
 }

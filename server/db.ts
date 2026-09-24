@@ -1,5 +1,6 @@
 import { desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
+import mysql, { type Pool, type RowDataPacket } from "mysql2/promise";
 import {
   idCardRequests,
   idCardTemplates,
@@ -10,18 +11,80 @@ import {
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
+let _pool: Pool | null = null;
+
+const REQUIRED_TABLES = [
+  "users",
+  "schools",
+  "idCardTemplates",
+  "idCardRequests",
+  "school_permissions",
+  "template_elements",
+  "school_templates",
+  "id_cards",
+  "id_card_data",
+  "id_card_files",
+  "approval_history",
+  "notifications",
+  "audit_logs",
+  "password_resets",
+] as const;
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      _pool = mysql.createPool(process.env.DATABASE_URL);
+      // mysql2 exposes equivalent callback and promise Pool interfaces, while
+      // Drizzle's overload return type retains the callback-flavoured client.
+      _db = drizzle(_pool) as unknown as ReturnType<typeof drizzle>;
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
     }
   }
   return _db;
+}
+
+export async function assertDatabaseReady() {
+  await getDb();
+  if (!_pool) throw new Error("DATABASE_URL is not configured");
+
+  await _pool.query("SELECT 1");
+  const [settings] = await _pool.query<RowDataPacket[]>(
+    "SELECT @@lower_case_table_names AS lowerCaseTableNames",
+  );
+  const [rows] = await _pool.query<RowDataPacket[]>(
+    "SELECT table_name AS tableName FROM information_schema.tables WHERE table_schema = DATABASE()",
+  );
+  const caseInsensitive = Number(settings[0]?.lowerCaseTableNames) !== 0;
+  const normalize = (name: string) => (caseInsensitive ? name.toLowerCase() : name);
+  const existing = new Set(rows.map((row) => normalize(String(row.tableName))));
+  const missing = REQUIRED_TABLES.filter((table) => !existing.has(normalize(table)));
+
+  if (missing.length > 0) {
+    throw new Error(
+      `Database schema is incomplete. Missing tables: ${missing.join(", ")}. Run \"pnpm db:migrate\" before starting the server.`,
+    );
+  }
+}
+
+export async function checkDatabaseConnection() {
+  if (!_pool) await getDb();
+  if (!_pool) return false;
+  try {
+    await _pool.query("SELECT 1");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function closeDb() {
+  const pool = _pool;
+  _db = null;
+  _pool = null;
+  if (pool) await pool.end();
 }
 
 export async function upsertUser(user: InsertUser): Promise<void> {

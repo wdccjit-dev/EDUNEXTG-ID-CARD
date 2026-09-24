@@ -64,6 +64,13 @@
       "when": 1790158997524,
       "tag": "0008_add_token_prefix",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1790239303658,
+      "tag": "0009_fix_case_sensitive_table_names",
+      "breakpoints": true
     }
   ]
 }

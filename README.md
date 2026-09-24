@@ -122,7 +122,7 @@ pnpm install
 ### 3. Database Migration
 Apply the database schema to your MySQL instance:
 ```bash
-pnpm db:push
+pnpm db:migrate
 ```
 
 ### 4. Seed Development Accounts
@@ -157,6 +157,8 @@ The application will be accessible at `http://localhost:3000`.
 | `pnpm test` | `vitest run --fileParallelism=false` | Execute full Vitest test suite |
 | `pnpm format` | `prettier --write .` | Format codebase using Prettier |
 | `pnpm db:push` | `drizzle-kit generate && drizzle-kit migrate` | Generate and apply database migrations |
+| `pnpm db:migrate` | `node scripts/migrate-database.mjs` | Apply committed migrations without generating new files |
+| `pnpm db:setup` | `tsx scripts/setup-database.ts` | Apply migrations and create/update the initial Super Admin |
 | `pnpm db:seed-auth` | `tsx scripts/seed-auth.ts` | Seed dev accounts (Super Admin & School Admin) |
 
 ---
@@ -176,19 +178,28 @@ The application will be accessible at `http://localhost:3000`.
 
 ## Production Deployment
 
-1. Set `NODE_ENV=production` and configure your production `DATABASE_URL` and `JWT_SECRET`.
-2. Build the production package:
+1. Copy `.env.example` to `.env` and configure `NODE_ENV=production`, `DATABASE_URL`, a unique `JWT_SECRET` of at least 32 characters, and `PORT`.
+2. Install from the lockfile, verify, and build:
    ```bash
+   pnpm install --frozen-lockfile
+   pnpm check
+   pnpm test
    pnpm build
    ```
-3. Run database migrations:
+3. Back up the database, then apply committed migrations:
    ```bash
-   pnpm db:push
+   pnpm db:migrate
    ```
-4. Launch the production server:
+4. Launch or restart the production server:
    ```bash
    pnpm start
    ```
+
+   With PM2, use `pm2 restart id-card-management --update-env` after the build and migration complete.
+
+5. Configure the reverse proxy to use `/healthz` for liveness and `/readyz` for readiness. Production defaults to trusting one proxy hop; set `TRUST_PROXY` if your topology differs.
+
+The server validates its environment and required database tables during startup. If a migration is missing, startup fails with an actionable error instead of serving a partially working dashboard.
 
 ---
 

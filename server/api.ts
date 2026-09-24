@@ -81,6 +81,19 @@ function safeUser(user: User) {
   return publicUser;
 }
 
+function parseJsonColumn(value: unknown): unknown {
+  if (typeof value !== "string") return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
+function normalizeTemplateElement<T extends { config: unknown }>(element: T) {
+  return { ...element, config: parseJsonColumn(element.config) };
+}
+
 function canManageSchool(user: User, schoolId?: number) {
   return adminRoles.has(user.role) || (schoolManagerRoles.has(user.role) && user.schoolId === schoolId);
 }
@@ -811,7 +824,7 @@ router.get("/templates", async (_req, res) => {
       ? await db.select().from(idCardTemplates).orderBy(desc(idCardTemplates.createdAt))
       : await db.select().from(idCardTemplates).where(eq(idCardTemplates.status, "ACTIVE")).orderBy(desc(idCardTemplates.createdAt));
 
-    const allElements = await db.select().from(templateElements);
+    const allElements = (await db.select().from(templateElements)).map(normalizeTemplateElement);
     const elementsByTemplate = new Map<number, typeof allElements>();
     for (const el of allElements) {
       const list = elementsByTemplate.get(el.templateId) ?? [];
@@ -863,7 +876,7 @@ router.get("/templates/:id", async (req, res) => {
     if (!adminRoles.has(user.role) && template.status !== "ACTIVE") {
       return res.status(404).json({ error: "Template not found" });
     }
-    const elements = await db.select().from(templateElements).where(eq(templateElements.templateId, id));
+    const elements = (await db.select().from(templateElements).where(eq(templateElements.templateId, id))).map(normalizeTemplateElement);
     res.json({ ...template, elements });
   } catch (e) {
     fail(res, e);
@@ -932,7 +945,7 @@ router.put("/templates/:id", requireRole(adminRoles), async (req, res) => {
             .set({
               elementType: element.elementType,
               label: element.label ?? null,
-              config: element.config as never,
+              config: parseJsonColumn(element.config) as never,
               sortOrder: element.sortOrder ?? i,
             })
             .where(eq(templateElements.id, existing.id));
@@ -942,7 +955,7 @@ router.put("/templates/:id", requireRole(adminRoles), async (req, res) => {
             elementKey: element.elementKey,
             elementType: element.elementType,
             label: element.label ?? null,
-            config: element.config as never,
+            config: parseJsonColumn(element.config) as never,
             sortOrder: element.sortOrder ?? i,
           });
         }
@@ -1409,7 +1422,9 @@ router.get("/id-cards/:id", async (req, res) => {
 
     const files = await db.select().from(idCardFiles).where(eq(idCardFiles.idCardId, id));
     const template = (await db.select().from(idCardTemplates).where(eq(idCardTemplates.id, card.templateId)))[0];
-    const elements = template ? await db.select().from(templateElements).where(eq(templateElements.templateId, template.id)) : [];
+    const elements = template
+      ? (await db.select().from(templateElements).where(eq(templateElements.templateId, template.id))).map(normalizeTemplateElement)
+      : [];
 
     const history = await db
       .select({
@@ -1546,7 +1561,7 @@ router.post("/id-cards/:id/submit", requireRole(adminRoles), async (req, res) =>
     const template = (await db.select().from(idCardTemplates).where(eq(idCardTemplates.id, card.templateId)))[0];
     if (!template) return res.status(400).json({ error: "Template no longer exists" });
 
-    const elements = await db.select().from(templateElements).where(eq(templateElements.templateId, template.id));
+    const elements = (await db.select().from(templateElements).where(eq(templateElements.templateId, template.id))).map(normalizeTemplateElement);
     const dataRows = await db.select().from(idCardData).where(eq(idCardData.idCardId, cardId));
     const dataMap: Record<string, string> = {};
     for (const d of dataRows) dataMap[d.fieldKey] = d.fieldValue || "";
@@ -2044,7 +2059,7 @@ async function fetchCardPdfData(db: any, cardId: number): Promise<CardPdfData | 
   if (!card) return null;
   const template = (await db.select().from(idCardTemplates).where(eq(idCardTemplates.id, card.templateId)))[0];
   if (!template) return null;
-  const elements = await db.select().from(templateElements).where(eq(templateElements.templateId, template.id));
+  const elements = (await db.select().from(templateElements).where(eq(templateElements.templateId, template.id))).map(normalizeTemplateElement);
   const dataRows = await db.select().from(idCardData).where(eq(idCardData.idCardId, card.id));
   const cardData: Record<string, string> = { cardNumber: card.cardNumber };
   for (const d of dataRows) cardData[d.fieldKey] = d.fieldValue || "";
@@ -2323,4 +2338,3 @@ router.get("/approvals", async (_req, res) => {
 });
 
 export const apiRouter = router;
-
