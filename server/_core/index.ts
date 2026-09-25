@@ -41,9 +41,13 @@ async function startServer() {
     app.set("trust proxy", /^\d+$/.test(trustProxyValue) ? Number(trustProxyValue) : trustProxyValue);
   }
   app.disable("x-powered-by");
-  app.use((_req, res, next) => {
+  app.use((req, res, next) => {
     res.setHeader("X-Content-Type-Options", "nosniff");
-    res.setHeader("X-Frame-Options", "DENY");
+    if (req.path.endsWith(".pdf")) {
+      res.setHeader("X-Frame-Options", "SAMEORIGIN");
+    } else {
+      res.setHeader("X-Frame-Options", "DENY");
+    }
     res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
     res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
     next();
@@ -63,6 +67,17 @@ async function startServer() {
   registerOAuthRoutes(app);
   app.use("/api", apiRouter);
   app.use("/api/trpc", createExpressMiddleware({ router: appRouter, createContext }));
+  // Handle demo template aliases / redirects
+  app.get(["/demo-templates", "/demo-templates/"], (_req, res) => {
+    res.redirect(301, "/demo-templates/Update-Catalog-ID-Card-and-Ribbon.pdf");
+  });
+  app.get("/demo-templates/*", (req, res, next) => {
+    const rawPath = decodeURIComponent(req.path);
+    if (rawPath.toLowerCase().includes("catalog") && req.path !== "/demo-templates/Update-Catalog-ID-Card-and-Ribbon.pdf") {
+      return res.redirect(301, "/demo-templates/Update-Catalog-ID-Card-and-Ribbon.pdf");
+    }
+    next();
+  });
   if (process.env.NODE_ENV === "development") await setupVite(app, server);
   else serveStatic(app);
 

@@ -1,6 +1,6 @@
 import path from "node:path";
 import { Router, type NextFunction, type Request, type Response } from "express";
-import { and, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import {
   approvalHistory,
   auditLogs,
@@ -1424,46 +1424,123 @@ router.get("/id-cards/:id", async (req, res) => {
     if (!db) return res.status(503).json({ error: "Database not available" });
     const id = Number(req.params.id);
     if (!id || isNaN(id)) return res.status(400).json({ error: "Invalid card ID" });
-    const card = (await db.select().from(idCards).where(eq(idCards.id, id)))[0];
-    if (!card) return res.status(404).json({ error: "ID card not found" });
-    if (!canReadSchool(user, card.schoolId)) return res.status(403).json({ error: "ID card access denied" });
 
-    const dataRows = await db.select().from(idCardData).where(eq(idCardData.idCardId, id));
+    // Look up by idCards.id first
+    let card = (await db.select().from(idCards).where(eq(idCards.id, id)))[0];
+
+    // If not found by card ID, check if id is a requestId
+    let requestRow = null;
+    if (!card) {
+      card = (await db.select().from(idCards).where(eq(idCards.requestId, id)))[0];
+      if (!card) {
+        requestRow = (await db.select().from(idCardRequests).where(eq(idCardRequests.id, id)))[0];
+        if (requestRow) {
+          card = (
+            await db
+              .select()
+              .from(idCards)
+              .where(
+                and(
+                  eq(idCards.schoolId, requestRow.schoolId),
+                  eq(idCards.cardNumber, requestRow.admissionCode),
+                ),
+              )
+          )[0];
+        }
+      }
+    }
+
+    if (!card && !requestRow) return res.status(404).json({ error: "ID card not found" });
+
+    const schoolId = card ? card.schoolId : requestRow!.schoolId;
+    if (!canReadSchool(user, schoolId)) return res.status(403).json({ error: "ID card access denied" });
+
+    const school = (await db.select().from(schools).where(eq(schools.id, schoolId)))[0];
+
+    const templateId = card ? card.templateId : (requestRow?.templateId || null);
+    const template = templateId
+      ? (await db.select().from(idCardTemplates).where(eq(idCardTemplates.id, templateId)))[0]
+      : null;
+    const elements = template
+      ? (await db.select().from(templateElements).where(eq(templateElements.templateId, template.id))).map(normalizeTemplateElement)
+      : [];
+
+    let dataRows: any[] = [];
+    let files: any[] = [];
+    let history: any[] = [];
+
+    if (card) {
+      dataRows = await db.select().from(idCardData).where(eq(idCardData.idCardId, card.id));
+      files = await db.select().from(idCardFiles).where(eq(idCardFiles.idCardId, card.id));
+      history = await db
+        .select({
+          id: approvalHistory.id,
+          idCardId: approvalHistory.idCardId,
+          fromStatus: approvalHistory.fromStatus,
+          toStatus: approvalHistory.toStatus,
+          action: approvalHistory.action,
+          comments: approvalHistory.comments,
+          actedByUserId: approvalHistory.actedByUserId,
+          createdAt: approvalHistory.createdAt,
+          actorName: users.name,
+          actorRole: users.role,
+        })
+        .from(approvalHistory)
+        .leftJoin(users, eq(approvalHistory.actedByUserId, users.id))
+        .where(eq(approvalHistory.idCardId, card.id))
+        .orderBy(desc(approvalHistory.createdAt));
+    }
+
     const dataMap: Record<string, string> = {};
     for (const d of dataRows) {
       dataMap[d.fieldKey] = d.fieldValue || "";
     }
 
-    const files = await db.select().from(idCardFiles).where(eq(idCardFiles.idCardId, id));
-    const template = (await db.select().from(idCardTemplates).where(eq(idCardTemplates.id, card.templateId)))[0];
-    const elements = template
-      ? (await db.select().from(templateElements).where(eq(templateElements.templateId, template.id))).map(normalizeTemplateElement)
-      : [];
+    const request = requestRow
+      ? requestRow
+      : card?.requestId
+        ? (await db.select().from(idCardRequests).where(eq(idCardRequests.id, card.requestId)))[0]
+        : (
+            await db
+              .select()
+              .from(idCardRequests)
+              .where(
+                and(
+                  eq(idCardRequests.schoolId, schoolId),
+                  eq(idCardRequests.admissionCode, card?.cardNumber || ""),
+                ),
+              )
+          )[0] || null;
 
-    const history = await db
-      .select({
-        id: approvalHistory.id,
-        idCardId: approvalHistory.idCardId,
-        fromStatus: approvalHistory.fromStatus,
-        toStatus: approvalHistory.toStatus,
-        action: approvalHistory.action,
-        comments: approvalHistory.comments,
-        actedByUserId: approvalHistory.actedByUserId,
-        createdAt: approvalHistory.createdAt,
-        actorName: users.name,
-        actorRole: users.role,
-      })
-      .from(approvalHistory)
-      .leftJoin(users, eq(approvalHistory.actedByUserId, users.id))
-      .where(eq(approvalHistory.idCardId, id))
-      .orderBy(desc(approvalHistory.createdAt));
+    if (!dataMap["student_name"] && request?.studentName) {
+      dataMap["student_name"] = request.studentName;
+    }
+    if (!dataMap["admission_number"]) {
+      dataMap["admission_number"] = request?.admissionCode || card?.cardNumber || "";
+    }
+    if (!dataMap["school_name"] && school) {
+      dataMap["school_name"] = school.name;
+    }
+    if (!dataMap["school_code"] && school) {
+      dataMap["school_code"] = school.shortCode;
+    }
 
-    const request = card.requestId
-      ? (await db.select().from(idCardRequests).where(eq(idCardRequests.id, card.requestId)))[0]
-      : null;
+    const studentName = dataMap["student_name"] || request?.studentName || "Student";
+    const cardNumber = card?.cardNumber || request?.admissionCode || `REQ-${request?.id}`;
+    const status = card?.status || request?.status || "SUBMITTED";
 
     res.json({
-      ...card,
+      ...(card || {}),
+      id: card ? card.id : request!.id,
+      cardId: card ? card.id : null,
+      requestId: request ? request.id : null,
+      schoolId,
+      templateId: template?.id ?? templateId,
+      cardNumber,
+      studentName,
+      schoolName: school?.name || "",
+      templateName: template?.name || "",
+      status,
       data: dataRows,
       dataMap,
       files,
@@ -2484,7 +2561,16 @@ router.get("/approvals", async (_req, res) => {
       })
       .from(idCardRequests)
       .innerJoin(schools, eq(idCardRequests.schoolId, schools.id))
-      .leftJoin(idCards, eq(idCards.requestId, idCardRequests.id));
+      .leftJoin(
+        idCards,
+        or(
+          eq(idCards.requestId, idCardRequests.id),
+          and(
+            eq(idCards.schoolId, idCardRequests.schoolId),
+            eq(idCards.cardNumber, idCardRequests.admissionCode),
+          ),
+        ),
+      );
 
     if (adminRoles.has(user.role)) {
       const rows = await baseQuery.orderBy(desc(idCardRequests.createdAt));

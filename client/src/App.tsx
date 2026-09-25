@@ -49,7 +49,7 @@ function Router() {
     <Route path="/admin/requests"><ProtectedPortal portal="admin" initialNav="ID card requests" /></Route>
     <Route path="/admin/approved-cards"><ProtectedPortal portal="admin" initialNav="Approved cards" /></Route>
     <Route path="/admin/reports"><ProtectedPortal portal="admin" initialNav="Reports" /></Route>
-    <Route path="/admin/notifications"><ProtectedPortal portal="admin" initialNav="Notifications" /></Route>
+    <Route path="/admin/notifications"><ProtectedPortal portal="admin" initialNav="Overview" /></Route>
     <Route path="/admin/audit-logs"><ProtectedPortal portal="admin" initialNav="Audit logs" /></Route>
     <Route path="/admin/about"><ProtectedPortal portal="admin" initialNav="About Us" /></Route>
     <Route path="/school"><ProtectedPortal portal="school" /></Route>
@@ -57,7 +57,7 @@ function Router() {
     <Route path="/school/id-cards"><ProtectedPortal portal="school" initialNav="ID card requests" /></Route>
     <Route path="/school/requests"><ProtectedPortal portal="school" initialNav="ID card requests" /></Route>
     <Route path="/school/approved-cards"><ProtectedPortal portal="school" initialNav="Approved cards" /></Route>
-    <Route path="/school/notifications"><ProtectedPortal portal="school" initialNav="Notifications" /></Route>
+    <Route path="/school/notifications"><ProtectedPortal portal="school" initialNav="Overview" /></Route>
     <Route path="/school/about"><ProtectedPortal portal="school" initialNav="About Us" /></Route>
     <Route path="/about"><ProtectedPortal portal="school" initialNav="About Us" /></Route>
     <Route path="/"><PortalRedirect /></Route>

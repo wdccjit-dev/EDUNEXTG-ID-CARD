@@ -78,7 +78,13 @@ export type ApiIdCardDetail = ApiIdCard & {
   files: ApiIdCardFile[];
   template: ApiTemplate | null;
   approvalHistory: ApiApprovalHistoryItem[];
-  request?: { id: number; reviewNote?: string | null; status: string } | null;
+  request?: {
+    id: number;
+    studentName?: string | null;
+    admissionCode?: string | null;
+    reviewNote?: string | null;
+    status: string;
+  } | null;
 };
 
 export type ApiApproval = {

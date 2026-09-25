@@ -4,12 +4,12 @@ import CardRenderer from "@/components/CardRenderer";
 import IdCardFormModal from "./IdCardFormModal";
 import PrintModal from "@/components/PrintModal";
 import ApprovalTimeline from "@/components/ApprovalTimeline";
-import { SAMPLE_CARD_DATA, type DesignerElement } from "@shared/templateDesigner";
+import { DYNAMIC_FIELDS, SAMPLE_CARD_DATA, type DesignerElement } from "@shared/templateDesigner";
 import {
+  type LucideIcon,
   AlertCircle,
   AlertTriangle,
   ArrowUpRight,
-  Bell,
   BookOpenCheck,
   Building2,
   CheckCircle2,
@@ -86,7 +86,6 @@ import {
   type ApiUser,
   type ApiIdCard,
   type ApiIdCardDetail,
-  type ApiNotification,
   type ApiApproval,
   type ApiAuthUser,
 } from "@/lib/api";
@@ -106,7 +105,6 @@ const navItems = [
   { label: "Approved cards", icon: FileCheck2 },
   { label: "Reports", icon: Grid2X2 },
   { label: "Users", icon: Users },
-  { label: "Notifications", icon: Bell },
   { label: "Audit logs", icon: BookOpenCheck },
 ];
 
@@ -131,7 +129,6 @@ type NavLabel =
   | "Approved cards"
   | "Reports"
   | "Users"
-  | "Notifications"
   | "Audit logs"
   | "About Us";
 
@@ -149,7 +146,7 @@ function ToneIcon({
   tone,
   size = "h-4 w-4",
 }: {
-  icon: typeof Bell;
+  icon: LucideIcon;
   tone: Tone;
   size?: string;
 }) {
@@ -288,12 +285,11 @@ export default function Home({
           "ID card templates",
           "ID card requests",
           "Approved cards",
-          "Notifications",
         ].includes(label),
       );
   const [query, setQuery] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [filter, setFilter] = useState<"All" | "Pending" | "Changes required">(
+  const [filter, setFilter] = useState<"All" | "Pending" | "Changes required" | "Rejected">(
     "All",
   );
   const [schools, setSchools] = useState<ApiSchool[]>([]);
@@ -302,7 +298,6 @@ export default function Home({
   const [apiError, setApiError] = useState<string | null>(null);
   const [users, setUsers] = useState<ApiUser[]>([]);
   const [idCards, setIdCards] = useState<ApiIdCard[]>([]);
-  const [notifications, setNotifications] = useState<ApiNotification[]>([]);
   const [approvals, setApprovals] = useState<ApiApproval[]>([]);
   const [approvalsLoading, setApprovalsLoading] = useState(true);
   const [approveLoading, setApproveLoading] = useState(false);
@@ -385,15 +380,13 @@ export default function Home({
 
   const reloadWorkspace = async () => {
     try {
-      const [nextCards, nextApprovals, nextNotifications, nextActivity] = await Promise.all([
+      const [nextCards, nextApprovals, nextActivity] = await Promise.all([
         api.idCards.list(),
         api.approvals.list().catch(() => []),
-        api.notifications.list().catch(() => []),
         api.auditLogs.list().catch(() => []),
       ]);
       setIdCards(nextCards);
       setApprovals(nextApprovals);
-      setNotifications(nextNotifications);
       setActivity(nextActivity);
     } catch (err) {
       console.error("Failed to reload workspace", err);
@@ -409,7 +402,6 @@ export default function Home({
           nextActivity,
           nextUsers,
           nextCards,
-          nextNotifications,
           nextApprovals,
         ] = await Promise.all([
           api.schools.list(),
@@ -417,7 +409,6 @@ export default function Home({
           api.auditLogs.list().catch(() => []),
           api.users.list().catch(() => []),
           api.idCards.list().catch(() => []),
-          api.notifications.list().catch(() => []),
           api.approvals.list().catch(() => []),
         ]);
         setSchools(nextSchools);
@@ -425,7 +416,6 @@ export default function Home({
         setActivity(nextActivity);
         setUsers(nextUsers);
         setIdCards(nextCards);
-        setNotifications(nextNotifications);
         setApprovals(nextApprovals);
 
         if (authenticatedUser.role === "SUPER_ADMIN") {
@@ -454,25 +444,46 @@ export default function Home({
 
   const currentActiveSchool = schools.find((s) => s.id === activeSchoolId);
 
+  const schoolApprovals = useMemo(() => {
+    if (!activeSchoolId) return approvals;
+    return approvals.filter((item) => item.schoolId === activeSchoolId);
+  }, [approvals, activeSchoolId]);
+
+  const schoolIdCards = useMemo(() => {
+    if (!activeSchoolId) return idCards;
+    return idCards.filter((card) => card.schoolId === activeSchoolId);
+  }, [idCards, activeSchoolId]);
+
   const pendingRequests = useMemo(
-    () => approvals.filter((item) => item.status !== "APPROVED"),
-    [approvals],
+    () => schoolApprovals.filter((item) => item.status !== "APPROVED"),
+    [schoolApprovals],
   );
 
   const filteredApprovals = useMemo(
     () =>
       pendingRequests
-        .filter(
-          (item) =>
-            filter === "All" ||
-            (filter === "Pending"
-              ? item.status === "SUBMITTED"
-              : item.status === "CHANGES_REQUIRED"),
-        )
+        .filter((item) => {
+          if (filter === "All") return true;
+          if (filter === "Pending") {
+            return (
+              item.status === "SUBMITTED" ||
+              item.status === "UNDER_REVIEW" ||
+              item.status === "RESUBMITTED"
+            );
+          }
+          if (filter === "Changes required") {
+            return item.status === "CHANGES_REQUIRED";
+          }
+          if (filter === "Rejected") {
+            return item.status === "REJECTED";
+          }
+          return true;
+        })
         .filter(
           (item) =>
             item.studentName.toLowerCase().includes(query.toLowerCase()) ||
-            item.schoolName.toLowerCase().includes(query.toLowerCase()),
+            item.schoolName.toLowerCase().includes(query.toLowerCase()) ||
+            (item.admissionCode && item.admissionCode.toLowerCase().includes(query.toLowerCase())),
         )
         .map((item, index) => ({
           ...item,
@@ -1016,28 +1027,6 @@ export default function Home({
     }
   };
 
-  const handleMarkNotificationRead = async (notifId: number) => {
-    try {
-      await api.notifications.markRead(notifId);
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === notifId ? { ...n, isRead: true } : n)),
-      );
-    } catch { }
-  };
-
-  const handleClearNotifications = async () => {
-    if (notifications.length === 0) return;
-    try {
-      await api.notifications.clear();
-      setNotifications([]);
-      toast.success("Notifications cleared");
-    } catch (err) {
-      toast.error("Failed to clear notifications", {
-        description: err instanceof Error ? err.message : "Request failed",
-      });
-    }
-  };
-
   const handleClearAuditLogs = async () => {
     if (activity.length === 0) return;
     if (!window.confirm("Are you sure you want to clear all audit logs?")) return;
@@ -1231,11 +1220,6 @@ export default function Home({
                     strokeWidth={active ? 2.3 : 1.8}
                   />
                   <span className="flex-1">{displayLabel}</span>
-                  {label === "Notifications" && notifications.filter((n) => !n.isRead).length > 0 && (
-                    <span className="rounded-full bg-[#0f7f79] px-2 py-0.5 text-[10px] font-extrabold text-white">
-                      {notifications.filter((n) => !n.isRead).length}
-                    </span>
-                  )}
                 </button>
               );
             })}
@@ -1299,11 +1283,11 @@ export default function Home({
               <Menu className="h-5 w-5" />
             </button>
             <div>
-              <h1 className="text-[22px] font-extrabold tracking-[-0.05em]">
-                {activeNav === "Overview"
-                  ? `${getGreeting()}, ${authenticatedUser.name?.split(" ")[0] ?? "there"}`
-                  : activeNav}
-              </h1>
+              {activeNav === "Overview" && (
+                <h1 className="text-[22px] font-extrabold tracking-[-0.05em]">
+                  {`${getGreeting()}, ${authenticatedUser.name?.split(" ")[0] ?? "there"}`}
+                </h1>
+              )}
             </div>
           </div>
 
@@ -1514,7 +1498,7 @@ export default function Home({
                 <MetricCard
                   label="Approved cards"
                   value={String(
-                    approvals.filter((request) => request.status === "APPROVED").length,
+                    schoolApprovals.filter((request) => request.status === "APPROVED").length,
                   )}
                   change="Click to view"
                   icon={FileCheck2}
@@ -1524,7 +1508,7 @@ export default function Home({
                 <MetricCard
                   label="Print-ready cards"
                   value={String(
-                    idCards.filter((card) => card.status === "PRINTED").length,
+                    schoolIdCards.filter((card) => card.status === "PRINTED").length,
                   )}
                   change="Click to view"
                   icon={Printer}
@@ -1546,14 +1530,14 @@ export default function Home({
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="hidden rounded-lg border border-[#e4e9e5] bg-[#f8faf8] p-0.5 sm:flex">
-                        {(["All", "Pending", "Changes required"] as const).map(
+                        {(["All", "Pending", "Changes required", "Rejected"] as const).map(
                           (item) => (
                             <button
                               key={item}
                               onClick={() => setFilter(item)}
                               className={`rounded-md px-2.5 py-1.5 text-[10px] font-bold ${filter === item
                                 ? "bg-white text-[#0f7f79] shadow-sm"
-                                : "text-[#8a9793]"
+                                : "text-[#8a9793] hover:text-[#55605d]"
                                 }`}
                             >
                               {item}
@@ -1623,13 +1607,40 @@ export default function Home({
                                   <td className="px-4 py-4">
                                     {item.status === "SUBMITTED" ? (
                                       <StatusPill tone="yellow">Pending review</StatusPill>
+                                    ) : item.status === "UNDER_REVIEW" ? (
+                                      <StatusPill tone="yellow">Under review</StatusPill>
+                                    ) : item.status === "RESUBMITTED" ? (
+                                      <StatusPill tone="yellow">Resubmitted</StatusPill>
+                                    ) : item.status === "CHANGES_REQUIRED" ? (
+                                      <div>
+                                        <StatusPill tone="coral">Changes requested</StatusPill>
+                                        {item.reviewNote && (
+                                          <p className="mt-1 text-[10px] text-[#b35338] max-w-[160px] truncate" title={item.reviewNote}>
+                                            {item.reviewNote}
+                                          </p>
+                                        )}
+                                      </div>
+                                    ) : item.status === "REJECTED" ? (
+                                      <div>
+                                        <StatusPill tone="coral">Rejected</StatusPill>
+                                        {item.reviewNote && (
+                                          <p className="mt-1 text-[10px] text-[#c65c3d] max-w-[160px] truncate" title={item.reviewNote}>
+                                            {item.reviewNote}
+                                          </p>
+                                        )}
+                                      </div>
+                                    ) : item.status === "APPROVED" ? (
+                                      <StatusPill tone="teal">Approved</StatusPill>
                                     ) : (
-                                      <StatusPill tone="coral">Changes requested</StatusPill>
+                                      <StatusPill tone="indigo">{item.status.replace(/_/g, " ")}</StatusPill>
                                     )}
                                   </td>
                                   <td className="px-6 py-4 text-right">
                                     {(authenticatedUser.role === "SUPER_ADMIN" ||
-                                      authenticatedUser.schoolId === item.schoolId) && (
+                                      authenticatedUser.schoolId === item.schoolId) &&
+                                      (item.status === "SUBMITTED" ||
+                                        item.status === "UNDER_REVIEW" ||
+                                        item.status === "RESUBMITTED") && (
                                         <button
                                           disabled={approveLoading}
                                           onClick={() => approve(item.id, item.studentName)}
@@ -1658,7 +1669,7 @@ export default function Home({
                         )}
                         <div className="flex items-center justify-between border-t border-[#edf0ed] px-6 py-4">
                           <span className="font-mono text-[10px] text-[#a1aaa7]">
-                            Showing {filteredApprovals.length} of {pendingRequests.length} pending cards
+                            Showing {filteredApprovals.length} of {pendingRequests.length} requests
                           </span>
                           <button
                             onClick={() => goTo("ID card requests")}
@@ -1962,7 +1973,6 @@ export default function Home({
               users={users}
               idCards={idCards}
               approvals={approvals}
-              notifications={notifications}
               activity={activity}
               onSelectTemplate={handleSelectTemplate}
               onLockTemplate={handleLockTemplate}
@@ -1978,8 +1988,6 @@ export default function Home({
               selectedApprovedCardIds={selectedApprovedCardIds}
               onToggleSelectApproved={handleToggleSelectApproved}
               onSelectAllApproved={handleSelectAllApproved}
-              onMarkNotificationRead={handleMarkNotificationRead}
-              onClearNotifications={handleClearNotifications}
               onClearAuditLogs={handleClearAuditLogs}
               onEditSchool={handleEditSchool}
               onDeleteSchool={handleDeleteSchool}
@@ -2451,7 +2459,7 @@ export default function Home({
                       </span>
                     </DialogTitle>
                     <DialogDescription>
-                      School: {reviewingCard.schoolName} · Template: {reviewingCard.templateName}
+                      School: {reviewingCard.schoolName || currentActiveSchool?.name || "School"} · Template: {reviewingCard.templateName || reviewingCard.template?.name || "Standard Template"}
                     </DialogDescription>
                   </div>
                   {/* Side switcher */}
@@ -2502,16 +2510,72 @@ export default function Home({
                       Card Fields & Data
                     </h4>
                     <div className="rounded-xl border border-[#e2e8e3] bg-white divide-y divide-[#edf0ed] overflow-hidden">
-                      {Object.entries(reviewingCard.dataMap || {}).map(([key, val]) => (
-                        <div key={key} className="flex justify-between items-center px-3 py-2 text-xs">
-                          <span className="font-semibold text-[#55605d] capitalize">
-                            {key.replace(/_/g, " ")}
-                          </span>
-                          <span className="font-mono text-[#203734] truncate max-w-[200px]">
-                            {String(val)}
-                          </span>
-                        </div>
-                      ))}
+                      {[
+                        {
+                          label: "Student Name",
+                          value:
+                            reviewingCard.studentName ||
+                            reviewingCard.dataMap?.student_name ||
+                            reviewingCard.request?.studentName ||
+                            "",
+                        },
+                        {
+                          label: "Admission / Roll No",
+                          value:
+                            reviewingCard.dataMap?.admission_number ||
+                            reviewingCard.request?.admissionCode ||
+                            reviewingCard.cardNumber ||
+                            "",
+                        },
+                        {
+                          label: "Card Number",
+                          value: reviewingCard.cardNumber || "",
+                        },
+                        {
+                          label: "School",
+                          value:
+                            reviewingCard.schoolName ||
+                            reviewingCard.dataMap?.school_name ||
+                            currentActiveSchool?.name ||
+                            "",
+                        },
+                        // Additional custom dynamic fields from dataMap
+                        ...Object.entries(reviewingCard.dataMap || {})
+                          .filter(([key, val]) => {
+                            if (!val || typeof val !== "string") return false;
+                            const isImage =
+                              key === "photo" ||
+                              key === "student_photo" ||
+                              key === "signature" ||
+                              key === "logo" ||
+                              val.startsWith("data:image/") ||
+                              val.length > 500;
+                            const isCore =
+                              key === "student_name" ||
+                              key === "studentName" ||
+                              key === "admission_number" ||
+                              key === "admissionCode" ||
+                              key === "school_name";
+                            return !isImage && !isCore;
+                          })
+                          .map(([key, val]) => ({
+                            label:
+                              DYNAMIC_FIELDS.find((f) => f.key === key)?.label ||
+                              key.replace(/_/g, " "),
+                            value: String(val),
+                          })),
+                      ]
+                        .filter((field): field is { label: string; value: string } => Boolean(field.value && field.value.trim()))
+                        .map(({ label, value }) => (
+                          <div key={label} className="flex justify-between items-center px-3 py-2 text-xs">
+                            <span className="font-semibold text-[#55605d]">
+                              {label}
+                            </span>
+                            <span className="font-mono text-[#203734] truncate max-w-[220px]" title={value}>
+                              {value}
+                            </span>
+                          </div>
+                        ))}
                     </div>
                   </div>
 
@@ -2779,7 +2843,11 @@ export default function Home({
                 }))}
                 side={previewModalSide}
                 cardData={SAMPLE_CARD_DATA}
-                scale={Math.min(2, 560 / (previewModalTemplate.cardWidth ?? 324))}
+                scale={Math.min(
+                  1.75,
+                  520 / (previewModalTemplate.cardWidth ?? 324),
+                  420 / (previewModalTemplate.cardHeight ?? 204),
+                )}
               />
               <div className="text-center text-xs text-[#98a4a1]">
                 {previewModalTemplate.elements && previewModalTemplate.elements.length > 0
@@ -2794,47 +2862,133 @@ export default function Home({
   );
 }
 
+const metricGradientStyles: Record<
+  Tone,
+  {
+    bg: string;
+    border: string;
+    shadow: string;
+    shadowHover: string;
+    glow: string;
+    iconBg: string;
+    badgeBg: string;
+  }
+> = {
+  teal: {
+    bg: "bg-gradient-to-br from-[#0a5853] via-[#0f7f79] to-[#1eb5ab]",
+    border: "border-teal-300/30",
+    shadow: "shadow-[0_14px_34px_rgba(15,127,121,0.22)]",
+    shadowHover: "hover:shadow-[0_20px_45px_rgba(15,127,121,0.36)]",
+    glow: "bg-teal-300/25",
+    iconBg: "bg-white/20 border-white/30 text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.4)]",
+    badgeBg: "bg-white/15 border-white/25 text-white hover:bg-white/25",
+  },
+  coral: {
+    bg: "bg-gradient-to-br from-[#b33318] via-[#d95232] to-[#f47352]",
+    border: "border-orange-300/30",
+    shadow: "shadow-[0_14px_34px_rgba(217,82,50,0.22)]",
+    shadowHover: "hover:shadow-[0_20px_45px_rgba(217,82,50,0.36)]",
+    glow: "bg-orange-300/25",
+    iconBg: "bg-white/20 border-white/30 text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.4)]",
+    badgeBg: "bg-white/15 border-white/25 text-white hover:bg-white/25",
+  },
+  indigo: {
+    bg: "bg-gradient-to-br from-[#3730a3] via-[#4f46e5] to-[#7c75f5]",
+    border: "border-indigo-300/30",
+    shadow: "shadow-[0_14px_34px_rgba(79,70,229,0.24)]",
+    shadowHover: "hover:shadow-[0_20px_45px_rgba(79,70,229,0.40)]",
+    glow: "bg-indigo-300/25",
+    iconBg: "bg-white/20 border-white/30 text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.4)]",
+    badgeBg: "bg-white/15 border-white/25 text-white hover:bg-white/25",
+  },
+  yellow: {
+    bg: "bg-gradient-to-br from-[#92400e] via-[#d97706] to-[#f59e0b]",
+    border: "border-amber-300/30",
+    shadow: "shadow-[0_14px_34px_rgba(217,119,6,0.24)]",
+    shadowHover: "hover:shadow-[0_20px_45px_rgba(217,119,6,0.40)]",
+    glow: "bg-amber-300/25",
+    iconBg: "bg-white/20 border-white/30 text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.4)]",
+    badgeBg: "bg-white/15 border-white/25 text-white hover:bg-white/25",
+  },
+};
+
 function MetricCard({
   label,
   value,
   change,
-  icon,
+  icon: Icon,
   tone,
   onClick,
 }: {
   label: string;
   value: string;
   change: string;
-  icon: typeof Bell;
+  icon: LucideIcon;
   tone: Tone;
   onClick?: () => void;
 }) {
+  const g = metricGradientStyles[tone];
+
   return (
-    <Card
+    <div
       onClick={onClick}
-      className={`rounded-2xl border-[#e2e8e3] bg-[#fffefa] shadow-[0_12px_35px_rgba(38,71,65,0.045)] ${onClick
-          ? "cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_40px_rgba(38,71,65,0.09)] hover:border-[#0f7f79]/40"
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={
+        onClick
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onClick();
+              }
+            }
+          : undefined
+      }
+      className={`group relative overflow-hidden rounded-2xl border ${g.border} ${g.bg} p-5 ${g.shadow} transition-all duration-300 ${
+        onClick
+          ? `cursor-pointer hover:-translate-y-1 ${g.shadowHover}`
           : ""
-        }`}
+      }`}
     >
-      <CardContent className="p-5">
-        <div className="flex items-start justify-between">
-          <div>
-            <div className="text-[11px] font-semibold text-[#84918e]">{label}</div>
-            <div className="mt-2 text-3xl font-extrabold tracking-[-0.07em] text-[#203734]">
-              {value}
-            </div>
+      {/* Decorative ambient glow circle in background */}
+      <div
+        className={`pointer-events-none absolute -right-6 -bottom-6 h-32 w-32 rounded-full ${g.glow} blur-2xl transition-all duration-500 group-hover:scale-125 group-hover:opacity-90`}
+      />
+
+      {/* Subtle watermark icon in background */}
+      <Icon
+        className="pointer-events-none absolute -right-2 -bottom-2 h-24 w-24 text-white/[0.08] transition-all duration-500 group-hover:scale-110 group-hover:text-white/[0.14]"
+        strokeWidth={1.5}
+      />
+
+      {/* Top row: Label & Glassmorphic Icon */}
+      <div className="relative z-10 flex items-start justify-between gap-2">
+        <div className="space-y-1">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-white/85">
+            {label}
+          </span>
+          <div className="text-3xl sm:text-[34px] font-extrabold tracking-[-0.05em] text-white drop-shadow-sm">
+            {value}
           </div>
-          <ToneIcon icon={icon} tone={tone} />
         </div>
+
         <div
-          className={`mt-4 flex items-center gap-1.5 text-xs font-bold ${toneStyles[tone].fg}`}
+          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border backdrop-blur-md transition-transform duration-300 group-hover:scale-105 ${g.iconBg}`}
         >
-          <ArrowUpRight className="h-3.5 w-3.5" />
-          <span className={onClick ? "hover:underline" : ""}>{change}</span>
+          <Icon className="h-5 w-5" strokeWidth={2.2} />
         </div>
-      </CardContent>
-    </Card>
+      </div>
+
+      {/* Bottom row: Clickable Action Badge / Pill */}
+      <div className="relative z-10 mt-4 flex items-center">
+        <span
+          className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold backdrop-blur-sm transition-all duration-200 ${g.badgeBg}`}
+        >
+          <ArrowUpRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+          <span>{change}</span>
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -2848,7 +3002,6 @@ function ModuleView({
   users,
   idCards,
   approvals,
-  notifications,
   activity,
   onSelectTemplate,
   onLockTemplate,
@@ -2870,8 +3023,6 @@ function ModuleView({
   onBulkApproveRequests,
   onBulkRejectRequests,
   bulkActionLoading = false,
-  onMarkNotificationRead,
-  onClearNotifications,
   onClearAuditLogs,
   onEditSchool,
   onDeleteSchool,
@@ -2891,7 +3042,6 @@ function ModuleView({
   users: ApiUser[];
   idCards: ApiIdCard[];
   approvals: ApiApproval[];
-  notifications: ApiNotification[];
   activity: ApiActivity[];
   onSelectTemplate: (template: ApiTemplate) => void;
   onLockTemplate: (template: ApiTemplate) => void;
@@ -2913,8 +3063,6 @@ function ModuleView({
   onBulkApproveRequests?: () => void;
   onBulkRejectRequests?: () => void;
   bulkActionLoading?: boolean;
-  onMarkNotificationRead: (id: number) => void;
-  onClearNotifications?: () => void;
   onClearAuditLogs?: () => void;
   onEditSchool?: (school: ApiSchool) => void;
   onDeleteSchool?: (schoolId: number, schoolName: string) => void;
@@ -2934,7 +3082,6 @@ function ModuleView({
   const isUsers = label === "Users";
   const isRequests = label === "ID card requests";
   const isApproved = label === "Approved cards";
-  const isNotifications = label === "Notifications";
   const isAudit = label === "Audit logs";
 
   const [userRoleFilter, setUserRoleFilter] = useState<string>("All");
@@ -2974,9 +3121,14 @@ function ModuleView({
     return filteredSchools.slice(start, start + SCHOOLS_PAGE_SIZE);
   }, [filteredSchools, schoolsPage]);
 
-  // Filtered lists for ID cards
+  // Filtered lists for ID cards (filtered by active school if selected)
+  const schoolFilteredCards = useMemo(() => {
+    if (!activeSchool?.id) return idCards;
+    return idCards.filter((c) => c.schoolId === activeSchool.id);
+  }, [idCards, activeSchool?.id]);
+
   const requestCards = useMemo(() => {
-    return idCards
+    return schoolFilteredCards
       .filter((c) => c.status !== "APPROVED" && c.status !== "PRINTED")
       .filter((c) => cardStatusFilter === "All" || c.status === cardStatusFilter)
       .filter(
@@ -2986,10 +3138,10 @@ function ModuleView({
           (c.schoolName?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
           (c.templateName?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false),
       );
-  }, [idCards, cardStatusFilter, searchTerm]);
+  }, [schoolFilteredCards, cardStatusFilter, searchTerm]);
 
   const approvedCards = useMemo(() => {
-    return idCards
+    return schoolFilteredCards
       .filter((c) => c.status === "APPROVED" || c.status === "PRINTED")
       .filter(
         (c) =>
@@ -2998,7 +3150,7 @@ function ModuleView({
           (c.schoolName?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
           (c.templateName?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false),
       );
-  }, [idCards, searchTerm]);
+  }, [schoolFilteredCards, searchTerm]);
 
   const allApprovedCardIds = useMemo(() => approvedCards.map((c) => c.id), [approvedCards]);
   const allRequestCardIds = useMemo(() => requestCards.map((c) => c.id), [requestCards]);
@@ -3053,10 +3205,14 @@ function ModuleView({
           <p className="mt-2 text-sm text-[#778381]">
             {isRequests
               ? authenticatedUser.role === "SUPER_ADMIN"
-                ? "Create, edit, submit, and manage student ID cards for all schools."
+                ? activeSchool
+                  ? `Showing ID cards for ${activeSchool.name} (${activeSchool.shortCode}).`
+                  : "Create, edit, submit, and manage student ID cards for all schools."
                 : "View and approve or reject student ID cards created for your school."
               : isApproved
-                ? "Print and export batch production-ready verified ID cards."
+                ? activeSchool
+                  ? `Showing verified, production-ready ID cards for ${activeSchool.name} (${activeSchool.shortCode}).`
+                  : "Print and export batch production-ready verified ID cards."
                 : isTemplates
                   ? authenticatedUser.role === "SUPER_ADMIN"
                     ? "Manage customizable front and back ID card templates."
@@ -3106,58 +3262,58 @@ function ModuleView({
                   <CardPreview accent={template.accent as Tone} />
                 </div>
                 <CardContent className="p-5">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-extrabold text-[#304541]">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="font-extrabold text-[#304541] truncate">
                       {template.name}
                     </h3>
-                    {template.status === "ACTIVE" ? (
+                    {authenticatedUser.role === "SUPER_ADMIN" ? (
+                      <button
+                        onClick={() => onToggleTemplateStatus(template)}
+                        className={`rounded-lg px-2.5 py-1 text-[10px] font-extrabold transition-colors shrink-0 ${template.status === "ACTIVE"
+                          ? "bg-[#fff0e8] text-[#c65c3d] hover:bg-[#fde2d6]"
+                          : "bg-[#e1f3ed] text-[#0a716b] hover:bg-[#cbf0e4]"
+                          }`}
+                      >
+                        {template.status === "ACTIVE" ? "Deactivate" : "Activate"}
+                      </button>
+                    ) : template.status === "ACTIVE" ? (
                       <StatusPill tone="teal">Active</StatusPill>
-                    ) : template.status === "INACTIVE" ? (
-                      <StatusPill tone="yellow">Inactive</StatusPill>
-                    ) : template.status === "ARCHIVED" ? (
-                      <StatusPill tone="coral">Archived</StatusPill>
                     ) : (
-                      <StatusPill tone="indigo">Draft</StatusPill>
+                      <StatusPill tone="yellow">Inactive</StatusPill>
                     )}
                   </div>
-                  <p className="mt-1 text-xs text-[#84918e]">{template.description || template.meta || `${template.orientation ?? 'landscape'} · ${template.cardWidth ?? 324}×${template.cardHeight ?? 204}px`}</p>
-                  <div className="mt-5 flex items-center justify-between">
+                  {Boolean(template.description || template.meta) && (
+                    <p className="mt-1 text-xs text-[#84918e]">
+                      {template.description || template.meta}
+                    </p>
+                  )}
+                  <div className="mt-5 flex items-center justify-between gap-2">
                     <span className="font-mono text-[10px] text-[#9aa6a2]">
                       {template.status}
                     </span>
-                    <div className="flex flex-wrap items-center gap-1.5">
+                    <div className="flex flex-1 items-center justify-end gap-2">
                       <button
                         onClick={() => onPreviewTemplate(template)}
-                        className="rounded-lg bg-[#f0efec] px-2.5 py-1.5 text-[10px] font-extrabold text-[#55605d] hover:bg-[#e4e2de]"
+                        className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#f0efec] px-3.5 py-2 text-xs font-bold text-[#3d4946] shadow-2xs hover:bg-[#e2e0dc] transition-all"
                       >
-                        Preview
+                        <Eye className="w-3.5 h-3.5 text-[#55605d]" />
+                        <span>Preview</span>
                       </button>
 
                       {authenticatedUser.role === "SUPER_ADMIN" && (
                         <button
                           onClick={() => navigate(`/admin/templates/${template.id}/design`)}
-                          className="rounded-lg bg-[#e9ebfa] px-2.5 py-1.5 text-[10px] font-extrabold text-[#5c64b7] hover:bg-[#d8dbf3]"
+                          className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#e9ebfa] px-3.5 py-2 text-xs font-bold text-[#5c64b7] shadow-2xs hover:bg-[#d8dbf3] transition-all"
                         >
-                          Design
-                        </button>
-                      )}
-
-                      {authenticatedUser.role === "SUPER_ADMIN" && (
-                        <button
-                          onClick={() => onToggleTemplateStatus(template)}
-                          className={`rounded-lg px-2.5 py-1.5 text-[10px] font-extrabold ${template.status === "ACTIVE"
-                            ? "bg-[#fff0e8] text-[#c65c3d] hover:bg-[#fde2d6]"
-                            : "bg-[#e1f3ed] text-[#0a716b] hover:bg-[#cbf0e4]"
-                            }`}
-                        >
-                          {template.status === "ACTIVE" ? "Deactivate" : "Activate"}
+                          <Palette className="w-3.5 h-3.5 text-[#5c64b7]" />
+                          <span>Design</span>
                         </button>
                       )}
 
                       {/* Final template badge if this is school's selected template */}
                       {activeSchool?.selectedTemplateId === template.id && (
-                        <span className="inline-flex items-center gap-1 rounded-lg bg-[#0f7f79] px-2.5 py-1.5 text-[10px] font-bold text-white shadow-xs">
-                          <CheckCircle2 className="w-3 h-3" /> Final Selected Template
+                        <span className="inline-flex items-center gap-1 rounded-xl bg-[#0f7f79] px-3 py-2 text-xs font-bold text-white shadow-xs">
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Final Selected
                         </span>
                       )}
 
@@ -3167,29 +3323,21 @@ function ModuleView({
                         activeSchool?.selectedTemplateId !== template.id && (
                           <button
                             onClick={() => onSelectTemplate(template)}
-                            className="rounded-lg bg-[#e1f3ed] px-2.5 py-1.5 text-[10px] font-extrabold text-[#0a716b] hover:bg-[#cbf0e4]"
+                            className="inline-flex items-center justify-center gap-1 rounded-xl bg-[#e1f3ed] px-3 py-2 text-xs font-bold text-[#0a716b] hover:bg-[#cbf0e4] transition-all"
                           >
                             Select as Final Template
                           </button>
                         )}
 
-                      {/* Lock button only for Super Admin */}
-                      {authenticatedUser.role === "SUPER_ADMIN" && (
-                        <button
-                          onClick={() => onLockTemplate(template)}
-                          className="rounded-lg bg-[#fff0e8] px-2.5 py-1.5 text-[10px] font-extrabold text-[#c65c3d] hover:bg-[#fde2d6]"
-                        >
-                          Lock
-                        </button>
-                      )}
-
-                      {/* Delete button for Super Admin */}
+                      {/* Delete button for Super Admin - smaller and compact */}
                       {authenticatedUser.role === "SUPER_ADMIN" && (
                         <button
                           onClick={() => onDeleteTemplate?.(template.id, template.name)}
-                          className="rounded-lg bg-[#fef2f2] border border-[#fecaca] px-2.5 py-1.5 text-[10px] font-extrabold text-[#dc2626] hover:bg-[#fee2e2]"
+                          className="rounded-lg border border-[#fecaca] bg-[#fff5f5] p-2 text-[#dc2626] hover:bg-[#fee2e2] transition-colors"
+                          title={`Delete ${template.name}`}
+                          aria-label={`Delete ${template.name}`}
                         >
-                          <Trash2 className="inline w-3 h-3 mr-0.5" /> Delete
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       )}
                     </div>
@@ -3501,68 +3649,6 @@ function ModuleView({
         </Card>
       )}
 
-      {/* 4. Notifications Tab */}
-      {isNotifications && (
-        <Card className="rounded-2xl border-[#e2e8e3] bg-[#fffefa] shadow-[0_12px_35px_rgba(38,71,65,0.05)]">
-          <div className="p-5 border-b border-[#edf0ed] flex items-center justify-between">
-            <h3 className="text-sm font-bold text-[#304541]">Notifications Inbox</h3>
-            {notifications.length > 0 && onClearNotifications && (
-              <button
-                onClick={onClearNotifications}
-                className="text-[11px] font-extrabold text-[#dc2626] hover:underline cursor-pointer flex items-center gap-1"
-              >
-                <Trash2 className="h-3 w-3" /> Clear all
-              </button>
-            )}
-          </div>
-          <div className="divide-y divide-[#edf0ed]">
-            {notifications.length === 0 ? (
-              <div className="px-5 py-10 text-center text-[#98a4a1] text-xs">
-                No notifications recorded yet.
-              </div>
-            ) : (
-              notifications.map((n) => (
-                <div
-                  key={n.id}
-                  className={`flex items-start justify-between gap-4 p-5 transition-colors ${!n.isRead ? "bg-[#f4faf7]" : "hover:bg-[#fbfdfb]"
-                    }`}
-                >
-                  <div className="flex items-start gap-3">
-                    <div
-                      className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-xs font-bold ${!n.isRead ? "bg-[#dff3ee] text-[#0b716b]" : "bg-[#f0efec] text-[#84918e]"
-                        }`}
-                    >
-                      <Bell className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-extrabold text-[#304541]">{n.title}</span>
-                        {!n.isRead && (
-                          <span className="rounded-full bg-[#0f7f79] px-2 py-0.5 text-[9px] font-bold text-white">
-                            New
-                          </span>
-                        )}
-                      </div>
-                      <p className="mt-1 text-xs text-[#778381]">{n.message}</p>
-                      <div className="mt-2 text-[10px] text-[#98a4a1]">
-                        {formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })}
-                      </div>
-                    </div>
-                  </div>
-                  {!n.isRead && (
-                    <button
-                      onClick={() => onMarkNotificationRead(n.id)}
-                      className="shrink-0 rounded-lg bg-white px-2.5 py-1 text-[10px] font-bold text-[#0f7f79] border border-[#e2e8e3] hover:bg-[#e1f3ed]"
-                    >
-                      Mark read
-                    </button>
-                  )}
-                </div>
-              ))
-            )}
-          </div>
-        </Card>
-      )}
 
       {/* 5. Audit Logs Tab */}
       {isAudit && (

@@ -237,7 +237,11 @@ export default function TemplateDesigner() {
               elements={state.elements}
               side={previewSide}
               cardData={SAMPLE_CARD_DATA}
-              scale={Math.min(2, 600 / state.template.cardWidth)}
+              scale={Math.min(
+                1.75,
+                520 / (state.template.cardWidth || 324),
+                420 / (state.template.cardHeight || 204),
+              )}
             />
             <div className="max-w-md text-center text-xs text-[#98a4a1]">
               Preview with sample data. Actual card data will replace dynamic fields during ID card generation.
