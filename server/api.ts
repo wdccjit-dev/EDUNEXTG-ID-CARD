@@ -21,6 +21,7 @@ import { getDb } from "./db";
 import { ENV } from "./_core/env";
 import { authenticateApplicationRequest, clearApplicationSession, createPasswordReset, hashPassword, loginUser, resetPassword, setApplicationSession, signApplicationSession, verifyPassword } from "./appAuth";
 import { generateSingleCardPdf, generateBulkCardPdf, type CardPdfData } from "./pdf";
+import { isValidIndianMobileNumber, INDIAN_MOBILE_ERROR_MESSAGE } from "../shared/types";
 
 const router = Router();
 const adminRoles = new Set(["SUPER_ADMIN"]);
@@ -252,6 +253,10 @@ router.put("/profile", requireRole(adminRoles), async (req, res) => {
       return res.status(400).json({ error: "Name cannot be empty." });
     }
 
+    if (phone !== undefined && !isValidIndianMobileNumber(phone, true)) {
+      return res.status(400).json({ error: INDIAN_MOBILE_ERROR_MESSAGE });
+    }
+
     if (email !== undefined) {
       if (!email || !email.includes("@")) {
         return res.status(400).json({ error: "A valid email address is required." });
@@ -451,6 +456,11 @@ router.post("/schools", requireRole(adminRoles), async (req, res) => {
     const shortCode = String(req.body.shortCode).trim();
     if (!shortCode) return res.status(400).json({ error: "shortCode is required" });
 
+    const rawPhone = req.body.phone !== undefined && req.body.phone !== null ? String(req.body.phone).trim() : null;
+    if (rawPhone && !isValidIndianMobileNumber(rawPhone, false)) {
+      return res.status(400).json({ error: INDIAN_MOBILE_ERROR_MESSAGE });
+    }
+
     let createdSchool: any;
     let credentials: any;
 
@@ -459,7 +469,7 @@ router.post("/schools", requireRole(adminRoles), async (req, res) => {
         name: String(req.body.name).trim(),
         shortCode,
         email: req.body.email ?? null,
-        phone: req.body.phone ?? null,
+        phone: rawPhone || null,
         address: req.body.address ?? null,
       });
       const id = Number(result[0].insertId);
@@ -616,6 +626,10 @@ const handleUpdateSchool = async (req: Request, res: Response) => {
     const nextEmail = req.body.email && String(req.body.email).trim() ? String(req.body.email).trim() : null;
     const nextPhone = req.body.phone && String(req.body.phone).trim() ? String(req.body.phone).trim() : null;
     const nextAddress = req.body.address && String(req.body.address).trim() ? String(req.body.address).trim() : null;
+
+    if (req.body.phone !== undefined && !isValidIndianMobileNumber(nextPhone, true)) {
+      return res.status(400).json({ error: INDIAN_MOBILE_ERROR_MESSAGE });
+    }
 
     if (nextCode !== existing.shortCode) {
       const [conflict] = await db.select().from(schools).where(eq(schools.shortCode, nextCode)).limit(1);

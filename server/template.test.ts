@@ -17,6 +17,7 @@ describe("Visual ID Card Template Designer — Full Lifecycle & Isolation", () =
   let schoolEmail: string;
   let schoolId: number;
   let createdTemplateId: number;
+  let isCreatedSchool = false;
   let originalElementIds: number[] = [];
 
   beforeAll(async () => {
@@ -49,6 +50,7 @@ describe("Visual ID Card Template Designer — Full Lifecycle & Isolation", () =
         isActive: true,
       });
       schoolId = Number(res.insertId);
+      isCreatedSchool = true;
     }
 
     // Create dedicated test users for this suite to isolate from concurrent tests
@@ -520,7 +522,7 @@ describe("Visual ID Card Template Designer — Full Lifecycle & Isolation", () =
       }
       if (adminEmail) await db.delete(users).where(eq(users.email, adminEmail));
       if (schoolEmail) await db.delete(users).where(eq(users.email, schoolEmail));
-      if (schoolId) {
+      if (schoolId && isCreatedSchool) {
         await db.delete(users).where(eq(users.schoolId, schoolId));
         await db.delete(schools).where(eq(schools.id, schoolId));
       }

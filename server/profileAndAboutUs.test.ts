@@ -203,7 +203,7 @@ describe("Super Admin Profile, About Us, and Test Account Isolation", () => {
   describe("3. Super Admin Profile Updates (Details & Picture)", () => {
     it("allows Super Admin to update name, email, and phone", async () => {
       const updatedName = "Master Administrator Updated";
-      const updatedPhone = "+1 555-019-9988";
+      const updatedPhone = "9876543210";
 
       const res = await makeRequest("PUT", "/api/profile", adminToken, {
         name: updatedName,
@@ -219,6 +219,24 @@ describe("Super Admin Profile, About Us, and Test Account Isolation", () => {
       const fresh = (await db!.select().from(users).where(eq(users.id, testAdminUser.id)))[0];
       expect(fresh.name).toBe(updatedName);
       expect(fresh.phone).toBe(updatedPhone);
+    });
+
+    it("rejects invalid Indian mobile numbers on profile update", async () => {
+      const invalidRes = await makeRequest("PUT", "/api/profile", adminToken, {
+        phone: "1234567890", // doesn't start with 6-9
+      });
+      expect(invalidRes.status).toBe(400);
+      expect(invalidRes.body.error).toBe("Please enter a valid 10-digit mobile number.");
+    });
+
+    it("rejects invalid Indian mobile numbers on school create and update", async () => {
+      const invalidCreate = await makeRequest("POST", "/api/schools", adminToken, {
+        name: "Invalid Phone School",
+        shortCode: "INVPH",
+        phone: "98765", // fewer than 10 digits
+      });
+      expect(invalidCreate.status).toBe(400);
+      expect(invalidCreate.body.error).toBe("Please enter a valid 10-digit mobile number.");
     });
 
     it("validates empty name or invalid email on profile update", async () => {
@@ -387,7 +405,7 @@ describe("Super Admin Profile, About Us, and Test Account Isolation", () => {
         name: "Emerald High School",
         shortCode: "EMERALD",
         // Notice: NO email provided
-        phone: "555-0199",
+        phone: "9876543210",
       });
       expect(res.status).toBe(201);
       createdSchoolId = res.body.id;

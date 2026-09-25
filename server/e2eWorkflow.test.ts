@@ -128,7 +128,7 @@ describe("Complete 16-Step End-to-End Real Workflow QA", () => {
       body: JSON.stringify({
         name: `Oakridge Academy ${suffix}`,
         shortCode: `OA${suffix}`,
-        phone: "+1-555-8888",
+        phone: "9876543210",
         email: `info@oakridge${suffix}.edu`,
       }),
     });

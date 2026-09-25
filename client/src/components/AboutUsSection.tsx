@@ -203,7 +203,7 @@ export default function AboutUsSection() {
               Insight Education Management Suite
             </h3>
             <p className="text-xs text-[#778381]">
-              Version 2.1.0 (Internal Build) · Developed by Rishu Rajak.
+              Version 2.2.0 (Internal Build) · Developed by Rishu Rajak.
             </p>
           </div>
 

@@ -24,6 +24,11 @@ import {
 } from "@/components/ui/dialog";
 import { api, type ApiAuthUser } from "@/lib/api";
 import { toast } from "sonner";
+import {
+  isValidIndianMobileNumber,
+  INDIAN_MOBILE_ERROR_MESSAGE,
+  INDIAN_MOBILE_PLACEHOLDER,
+} from "@shared/phoneValidation";
 
 interface SuperAdminProfileDialogProps {
   open: boolean;
@@ -174,6 +179,10 @@ export default function SuperAdminProfileDialog({
     }
     if (!email.trim() || !email.includes("@")) {
       toast.error("A valid email address is required.");
+      return;
+    }
+    if (phone.trim() && !isValidIndianMobileNumber(phone.trim(), false)) {
+      toast.error(INDIAN_MOBILE_ERROR_MESSAGE);
       return;
     }
 
@@ -430,7 +439,12 @@ export default function SuperAdminProfileDialog({
                       type="tel"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      placeholder="+1 (555) 019-2834"
+                      onBlur={() => {
+                        if (phone.trim() && !isValidIndianMobileNumber(phone.trim(), false)) {
+                          toast.error(INDIAN_MOBILE_ERROR_MESSAGE);
+                        }
+                      }}
+                      placeholder={INDIAN_MOBILE_PLACEHOLDER}
                       className="h-10 rounded-xl pl-9 text-xs"
                     />
                   </div>

@@ -32,6 +32,7 @@ import {
   LogOut,
   Menu,
   MoreHorizontal,
+  MoreVertical,
   Palette,
   Printer,
   QrCode,
@@ -56,6 +57,12 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -85,6 +92,11 @@ import {
 } from "@/lib/api";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
+import {
+  isValidIndianMobileNumber,
+  INDIAN_MOBILE_ERROR_MESSAGE,
+  INDIAN_MOBILE_PLACEHOLDER,
+} from "@shared/phoneValidation";
 
 const navItems = [
   { label: "Overview", icon: LayoutDashboard },
@@ -616,6 +628,9 @@ export default function Home({
     e.preventDefault();
     if (!schoolNameInput.trim() || !schoolCodeInput.trim()) {
       return toast.error("School name and short code are required");
+    }
+    if (schoolPhoneInput.trim() && !isValidIndianMobileNumber(schoolPhoneInput.trim(), false)) {
+      return toast.error(INDIAN_MOBILE_ERROR_MESSAGE);
     }
     try {
       if (editingSchool) {
@@ -1206,8 +1221,8 @@ export default function Home({
                   key={label}
                   onClick={() => goTo(label as NavLabel)}
                   className={`group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-[12px] font-semibold transition-colors ${active
-                      ? "bg-[#dff3ee] text-[#123b3b]"
-                      : "text-[#99b6b2] hover:bg-[#1b3a3a] hover:text-white"
+                    ? "bg-[#dff3ee] text-[#123b3b]"
+                    : "text-[#99b6b2] hover:bg-[#1b3a3a] hover:text-white"
                     }`}
                 >
                   <Icon
@@ -1233,16 +1248,14 @@ export default function Home({
             {/* About Us directly above Settings */}
             <button
               onClick={() => goTo("About Us")}
-              className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-[12px] font-semibold transition-colors ${
-                activeNav === "About Us"
+              className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-[12px] font-semibold transition-colors ${activeNav === "About Us"
                   ? "bg-[#dff3ee] text-[#123b3b]"
                   : "text-[#99b6b2] hover:bg-[#1b3a3a] hover:text-white"
-              }`}
+                }`}
             >
               <Info
-                className={`h-[17px] w-[17px] ${
-                  activeNav === "About Us" ? "text-[#0f7f79]" : "text-[#779b96]"
-                }`}
+                className={`h-[17px] w-[17px] ${activeNav === "About Us" ? "text-[#0f7f79]" : "text-[#779b96]"
+                  }`}
                 strokeWidth={activeNav === "About Us" ? 2.3 : 1.8}
               />
               <span className="flex-1 text-left">About Us</span>
@@ -1334,15 +1347,6 @@ export default function Home({
               </div>
             )}
 
-            <div className="relative hidden w-[200px] xl:block">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#98a4a1]" />
-              <Input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search anything..."
-                className="h-10 rounded-xl border-[#e0e6e1] bg-white pl-9 text-xs shadow-none placeholder:text-[#a1aaa8] focus-visible:ring-[#71c4a8]"
-              />
-            </div>
 
             <div ref={profileMenuRef} className="relative">
               <button
@@ -1364,8 +1368,8 @@ export default function Home({
                   ) : (
                     initialsFor(
                       authenticatedUser.name ??
-                        authenticatedUser.email ??
-                        (authenticatedUser.role === "SUPER_ADMIN" ? "Admin" : "User"),
+                      authenticatedUser.email ??
+                      (authenticatedUser.role === "SUPER_ADMIN" ? "Admin" : "User"),
                     )
                   )}
                 </div>
@@ -1373,9 +1377,8 @@ export default function Home({
                   {authenticatedUser.name?.split(" ")[0] ?? (authenticatedUser.role === "SUPER_ADMIN" ? "Admin" : "User")}
                 </span>
                 <ChevronDown
-                  className={`h-3 w-3 text-[#74817f] transition-transform duration-200 ${
-                    profileMenuOpen ? "rotate-180" : ""
-                  }`}
+                  className={`h-3 w-3 text-[#74817f] transition-transform duration-200 ${profileMenuOpen ? "rotate-180" : ""
+                    }`}
                 />
               </button>
 
@@ -1549,8 +1552,8 @@ export default function Home({
                               key={item}
                               onClick={() => setFilter(item)}
                               className={`rounded-md px-2.5 py-1.5 text-[10px] font-bold ${filter === item
-                                  ? "bg-white text-[#0f7f79] shadow-sm"
-                                  : "text-[#8a9793]"
+                                ? "bg-white text-[#0f7f79] shadow-sm"
+                                : "text-[#8a9793]"
                                 }`}
                             >
                               {item}
@@ -1884,9 +1887,6 @@ export default function Home({
                                 </div>
                                 <div className="text-[11px] text-[#8d9995] flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
                                   <span>Code: <b className="text-[#304541]">{school.shortCode}</b></span>
-                                  {school.email && <span>Email: {school.email}</span>}
-                                  {school.phone && <span>Phone: {school.phone}</span>}
-                                  {school.address && <span>Address: {school.address}</span>}
                                 </div>
                               </div>
                             </div>
@@ -1900,28 +1900,46 @@ export default function Home({
                                   aria-label={`Toggle active status for ${school.name}`}
                                 />
                                 <span
-                                  className={`text-xs font-bold ${
-                                    school.isActive ? "text-[#0f7f79]" : "text-[#8d9995]"
-                                  }`}
+                                  className={`text-xs font-bold ${school.isActive ? "text-[#0f7f79]" : "text-[#8d9995]"
+                                    }`}
                                 >
                                   {school.isActive ? "Active" : "Inactive"}
                                 </span>
                               </div>
-                              <button
-                                onClick={() => handleGenerateCredentials(school)}
-                                className="flex items-center gap-1 rounded-lg border border-[#c3dfd9] bg-[#eef7f4] px-2.5 py-1.5 text-xs font-bold text-[#0f7f79] shadow-sm hover:bg-[#dff1ec]"
-                                title="View or regenerate school login credentials and ID pass"
-                              >
-                                <KeyRound className="h-3.5 w-3.5" />
-                                ID Pass
-                              </button>
-                              <button
-                                onClick={() => handleEditSchool(school)}
-                                className="flex items-center gap-1 rounded-lg border border-[#d3ded8] bg-white px-3 py-1.5 text-xs font-bold text-[#304541] shadow-sm hover:bg-[#f2f7f4] hover:text-[#0f7f79]"
-                              >
-                                <FileEdit className="h-3.5 w-3.5" />
-                                Edit
-                              </button>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <button
+                                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#d3ded8] bg-white text-[#556561] shadow-sm hover:border-[#0f7f79] hover:bg-[#f2f7f4] hover:text-[#0f7f79] focus:outline-none"
+                                    title="Actions"
+                                    aria-label={`Actions for ${school.name}`}
+                                  >
+                                    <MoreVertical className="h-4 w-4" />
+                                  </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-36 bg-white p-1 rounded-xl shadow-lg border border-[#e2e8e3]">
+                                  <DropdownMenuItem
+                                    onClick={() => handleGenerateCredentials(school)}
+                                    className="flex items-center gap-2 px-2.5 py-2 text-xs font-semibold text-[#0f7f79] hover:bg-[#eef7f4] rounded-lg cursor-pointer"
+                                  >
+                                    <KeyRound className="h-3.5 w-3.5" />
+                                    View
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => handleEditSchool(school)}
+                                    className="flex items-center gap-2 px-2.5 py-2 text-xs font-semibold text-[#304541] hover:bg-[#f2f7f4] rounded-lg cursor-pointer"
+                                  >
+                                    <FileEdit className="h-3.5 w-3.5" />
+                                    Edit
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => handleDeleteSchool(school.id, school.name)}
+                                    className="flex items-center gap-2 px-2.5 py-2 text-xs font-semibold text-[#dc2626] hover:bg-[#fef2f2] rounded-lg cursor-pointer"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </div>
                           </div>
                         ))
@@ -2064,9 +2082,14 @@ export default function Home({
                   <Input
                     type="tel"
                     className="mt-1"
-                    placeholder="+1 555-0199"
+                    placeholder={INDIAN_MOBILE_PLACEHOLDER}
                     value={schoolPhoneInput}
                     onChange={(e) => setSchoolPhoneInput(e.target.value)}
+                    onBlur={() => {
+                      if (schoolPhoneInput.trim() && !isValidIndianMobileNumber(schoolPhoneInput.trim(), false)) {
+                        toast.error(INDIAN_MOBILE_ERROR_MESSAGE);
+                      }
+                    }}
                   />
                 </div>
               </div>
@@ -2415,7 +2438,7 @@ export default function Home({
 
       {/* Admin Card Review & Detail Modal */}
       <Dialog open={reviewModalOpen} onOpenChange={setReviewModalOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] sm:max-w-5xl xl:max-w-6xl max-w-6xl max-h-[90vh] overflow-y-auto">
           {reviewingCard && (
             <div>
               <DialogHeader>
@@ -2438,8 +2461,8 @@ export default function Home({
                         key={side}
                         onClick={() => setReviewSide(side)}
                         className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${reviewSide === side
-                            ? "bg-[#0f7f79] text-white shadow-sm"
-                            : "text-[#55605d] hover:text-[#203734]"
+                          ? "bg-[#0f7f79] text-white shadow-sm"
+                          : "text-[#55605d] hover:text-[#203734]"
                           }`}
                       >
                         {side}
@@ -2727,8 +2750,8 @@ export default function Home({
                     key={side}
                     onClick={() => setPreviewModalSide(side)}
                     className={`rounded-lg px-4 py-1.5 text-xs font-bold transition-all ${previewModalSide === side
-                        ? "bg-[#0f7f79] text-white"
-                        : "bg-[#f0efec] text-[#778381] hover:bg-[#e5e4e0]"
+                      ? "bg-[#0f7f79] text-white"
+                      : "bg-[#f0efec] text-[#778381] hover:bg-[#e5e4e0]"
                       }`}
                   >
                     {side}
@@ -2789,11 +2812,10 @@ function MetricCard({
   return (
     <Card
       onClick={onClick}
-      className={`rounded-2xl border-[#e2e8e3] bg-[#fffefa] shadow-[0_12px_35px_rgba(38,71,65,0.045)] ${
-        onClick
+      className={`rounded-2xl border-[#e2e8e3] bg-[#fffefa] shadow-[0_12px_35px_rgba(38,71,65,0.045)] ${onClick
           ? "cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_40px_rgba(38,71,65,0.09)] hover:border-[#0f7f79]/40"
           : ""
-      }`}
+        }`}
     >
       <CardContent className="p-5">
         <div className="flex items-start justify-between">
@@ -2806,9 +2828,9 @@ function MetricCard({
           <ToneIcon icon={icon} tone={tone} />
         </div>
         <div
-          className={`mt-5 flex items-center gap-1 text-[10px] font-bold ${toneStyles[tone].fg}`}
+          className={`mt-4 flex items-center gap-1.5 text-xs font-bold ${toneStyles[tone].fg}`}
         >
-          <ArrowUpRight className="h-3 w-3" />
+          <ArrowUpRight className="h-3.5 w-3.5" />
           <span className={onClick ? "hover:underline" : ""}>{change}</span>
         </div>
       </CardContent>
@@ -3059,14 +3081,14 @@ function ModuleView({
             (isSchools && authenticatedUser.role === "SUPER_ADMIN") ||
             (isTemplates && authenticatedUser.role === "SUPER_ADMIN") ||
             (isUsers && authenticatedUser.role === "SUPER_ADMIN")) && (
-            <Button
-              onClick={onCreate}
-              className="h-10 rounded-xl bg-[#0f7f79] text-xs font-bold text-white hover:bg-[#096c67]"
-            >
-              <FilePlus2 className="mr-2 h-4 w-4" />{" "}
-              {isRequests ? "New ID Card Draft" : isUsers ? "New User" : "Create new"}
-            </Button>
-          )}
+              <Button
+                onClick={onCreate}
+                className="h-10 rounded-xl bg-[#0f7f79] text-xs font-bold text-white hover:bg-[#096c67]"
+              >
+                <FilePlus2 className="mr-2 h-4 w-4" />{" "}
+                {isRequests ? "New ID Card Draft" : isUsers ? "New User" : "Create new"}
+              </Button>
+            )}
         </div>
       </div>
 
@@ -3124,8 +3146,8 @@ function ModuleView({
                         <button
                           onClick={() => onToggleTemplateStatus(template)}
                           className={`rounded-lg px-2.5 py-1.5 text-[10px] font-extrabold ${template.status === "ACTIVE"
-                              ? "bg-[#fff0e8] text-[#c65c3d] hover:bg-[#fde2d6]"
-                              : "bg-[#e1f3ed] text-[#0a716b] hover:bg-[#cbf0e4]"
+                            ? "bg-[#fff0e8] text-[#c65c3d] hover:bg-[#fde2d6]"
+                            : "bg-[#e1f3ed] text-[#0a716b] hover:bg-[#cbf0e4]"
                             }`}
                         >
                           {template.status === "ACTIVE" ? "Deactivate" : "Activate"}
@@ -3199,8 +3221,8 @@ function ModuleView({
                     key={status}
                     onClick={() => setCardStatusFilter(status)}
                     className={`rounded-lg px-2.5 py-1.5 text-[11px] font-bold transition-all ${cardStatusFilter === status
-                        ? "bg-[#0f7f79] text-white shadow-sm"
-                        : "bg-[#f0efec] text-[#55605d] hover:bg-[#e4e2de]"
+                      ? "bg-[#0f7f79] text-white shadow-sm"
+                      : "bg-[#f0efec] text-[#55605d] hover:bg-[#e4e2de]"
                       }`}
                   >
                     {status.replace(/_/g, " ")}
@@ -3606,11 +3628,10 @@ function ModuleView({
                       setSchoolsStatusFilter(status);
                       setSchoolsPage(1);
                     }}
-                    className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${
-                      schoolsStatusFilter === status
+                    className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${schoolsStatusFilter === status
                         ? "bg-[#0f7f79] text-white shadow-sm"
                         : "bg-[#edf3f0] text-[#55605d] hover:bg-[#e2ebe6]"
-                    }`}
+                      }`}
                   >
                     {status === "All" ? "All Schools" : status}
                   </button>
@@ -3662,17 +3683,6 @@ function ModuleView({
                             <div className="text-sm font-extrabold text-[#304541] flex items-center gap-2">
                               {school.name}
                             </div>
-                            <div className="text-[11px] text-[#8d9995] flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
-                              {school.email && <span>Email: {school.email}</span>}
-                              {school.email && (school.phone || school.address) && <span>·</span>}
-                              {school.phone && <span>Phone: {school.phone}</span>}
-                              {school.phone && school.address && <span>·</span>}
-                              {school.address && (
-                                <span className="truncate max-w-[220px]" title={school.address}>
-                                  Address: {school.address}
-                                </span>
-                              )}
-                            </div>
                           </div>
                         </div>
                       </td>
@@ -3711,9 +3721,8 @@ function ModuleView({
                               aria-label={`Toggle active status for ${school.name}`}
                             />
                             <span
-                              className={`text-xs font-bold ${
-                                school.isActive ? "text-[#0f7f79]" : "text-[#8d9995]"
-                              }`}
+                              className={`text-xs font-bold ${school.isActive ? "text-[#0f7f79]" : "text-[#8d9995]"
+                                }`}
                             >
                               {school.isActive ? "Active" : "Inactive"}
                             </span>
@@ -3727,30 +3736,40 @@ function ModuleView({
                       <td className="px-5 py-4 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1.5">
                           {authenticatedUser.role === "SUPER_ADMIN" && (
-                            <>
-                              <button
-                                onClick={() => onGenerateCredentials?.(school)}
-                                className="flex items-center gap-1 rounded-lg border border-[#c3dfd9] bg-[#eef7f4] px-2.5 py-1.5 text-xs font-bold text-[#0f7f79] shadow-sm hover:bg-[#dff1ec]"
-                                title="View or regenerate school login credentials and ID pass"
-                              >
-                                <KeyRound className="h-3.5 w-3.5" />
-                                ID Pass
-                              </button>
-                              <button
-                                onClick={() => onEditSchool?.(school)}
-                                className="flex items-center gap-1 rounded-lg border border-[#d3ded8] bg-white px-2.5 py-1.5 text-xs font-bold text-[#304541] shadow-sm hover:bg-[#f2f7f4] hover:text-[#0f7f79]"
-                              >
-                                <FileEdit className="h-3.5 w-3.5" />
-                                Edit
-                              </button>
-                              <button
-                                onClick={() => onDeleteSchool?.(school.id, school.name)}
-                                className="flex items-center gap-1 rounded-lg border border-[#fecaca] bg-white px-2.5 py-1.5 text-xs font-bold text-[#dc2626] shadow-sm hover:bg-[#fef2f2]"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                                Delete
-                              </button>
-                            </>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button
+                                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#d3ded8] bg-white text-[#556561] shadow-sm hover:border-[#0f7f79] hover:bg-[#f2f7f4] hover:text-[#0f7f79] focus:outline-none"
+                                  title="Actions"
+                                  aria-label={`Actions for ${school.name}`}
+                                >
+                                  <MoreVertical className="h-4 w-4" />
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-36 bg-white p-1 rounded-xl shadow-lg border border-[#e2e8e3]">
+                                <DropdownMenuItem
+                                  onClick={() => onGenerateCredentials?.(school)}
+                                  className="flex items-center gap-2 px-2.5 py-2 text-xs font-semibold text-[#0f7f79] hover:bg-[#eef7f4] rounded-lg cursor-pointer"
+                                >
+                                  <KeyRound className="h-3.5 w-3.5" />
+                                  View
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => onEditSchool?.(school)}
+                                  className="flex items-center gap-2 px-2.5 py-2 text-xs font-semibold text-[#304541] hover:bg-[#f2f7f4] rounded-lg cursor-pointer"
+                                >
+                                  <FileEdit className="h-3.5 w-3.5" />
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => onDeleteSchool?.(school.id, school.name)}
+                                  className="flex items-center gap-2 px-2.5 py-2 text-xs font-semibold text-[#dc2626] hover:bg-[#fef2f2] rounded-lg cursor-pointer"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           )}
                         </div>
                       </td>
@@ -3818,11 +3837,10 @@ function ModuleView({
                           setUserRoleFilter(role);
                           setUsersPage(1);
                         }}
-                        className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${
-                          userRoleFilter === role
+                        className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${userRoleFilter === role
                             ? "bg-[#0f7f79] text-white shadow-sm"
                             : "bg-[#edf3f0] text-[#55605d] hover:bg-[#e2ebe6]"
-                        }`}
+                          }`}
                       >
                         {role === "All" ? "All Roles" : role.replace(/_/g, " ")}
                       </button>
