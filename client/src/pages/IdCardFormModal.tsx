@@ -651,12 +651,34 @@ export default function IdCardFormModal({
 
                     <div>
                       <Label className="text-xs font-bold text-gray-700">Contact Phone</Label>
-                      <Input
-                        className="mt-1 text-xs"
-                        placeholder="+91 98765 43210"
-                        value={formData.phone ?? ""}
-                        onChange={(e) => handleFieldChange("phone", e.target.value)}
-                      />
+                      <div className="mt-1 flex items-center gap-1.5">
+                        <div className="h-9 w-12 flex items-center justify-center rounded-lg border border-gray-300 bg-gray-50 text-xs font-bold text-gray-600 select-none shrink-0">
+                          +91
+                        </div>
+                        <div className="flex-1">
+                          <Input
+                            type="tel"
+                            inputMode="numeric"
+                            maxLength={10}
+                            className={`text-xs transition-colors ${
+                              formData.phone && formData.phone.length > 0 && formData.phone.length < 10
+                                ? "border-red-500 bg-red-50/15 text-red-900 focus-visible:ring-red-400 focus-visible:border-red-500"
+                                : ""
+                            }`}
+                            placeholder="9876543210"
+                            value={formData.phone ?? ""}
+                            onChange={(e) => {
+                              const digits = e.target.value.replace(/\D/g, "").slice(0, 10);
+                              handleFieldChange("phone", digits);
+                            }}
+                          />
+                        </div>
+                      </div>
+                      {formData.phone && formData.phone.length > 0 && formData.phone.length < 10 && (
+                        <p className="mt-1 text-[11px] font-medium text-red-500">
+                          Phone number must be 10 digits ({formData.phone.length}/10)
+                        </p>
+                      )}
                     </div>
 
                     <div className="col-span-2">
@@ -701,18 +723,58 @@ export default function IdCardFormModal({
                         Additional Template Fields
                       </div>
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        {extraFields.map((customField) => (
-                          <div key={customField} className="space-y-1">
-                            <Label className="text-xs font-bold text-gray-700 capitalize">
-                              {customField.replaceAll("_", " ")} <span className="text-red-500">*</span>
-                            </Label>
-                            <Input
-                              className="text-xs"
-                              value={formData[customField] ?? ""}
-                              onChange={(e) => handleFieldChange(customField, e.target.value)}
-                            />
-                          </div>
-                        ))}
+                        {extraFields.map((customField) => {
+                          const isPhoneField =
+                            customField.toLowerCase().includes("phone") ||
+                            customField.toLowerCase().includes("mobile");
+                          const currentVal = formData[customField] ?? "";
+
+                          return (
+                            <div key={customField} className="space-y-1">
+                              <Label className="text-xs font-bold text-gray-700 capitalize">
+                                {customField.replaceAll("_", " ")} <span className="text-red-500">*</span>
+                              </Label>
+                              {isPhoneField ? (
+                                <div>
+                                  <div className="flex items-center gap-1.5">
+                                    <div className="h-9 w-12 flex items-center justify-center rounded-lg border border-gray-300 bg-gray-50 text-xs font-bold text-gray-600 select-none shrink-0">
+                                      +91
+                                    </div>
+                                    <div className="flex-1">
+                                      <Input
+                                        type="tel"
+                                        inputMode="numeric"
+                                        maxLength={10}
+                                        placeholder="9876543210"
+                                        className={`text-xs transition-colors ${
+                                          currentVal.length > 0 && currentVal.length < 10
+                                            ? "border-red-500 bg-red-50/15 text-red-900 focus-visible:ring-red-400 focus-visible:border-red-500"
+                                            : ""
+                                        }`}
+                                        value={currentVal}
+                                        onChange={(e) => {
+                                          const digits = e.target.value.replace(/\D/g, "").slice(0, 10);
+                                          handleFieldChange(customField, digits);
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
+                                  {currentVal.length > 0 && currentVal.length < 10 && (
+                                    <p className="mt-1 text-[11px] font-medium text-red-500">
+                                      Phone number must be 10 digits ({currentVal.length}/10)
+                                    </p>
+                                  )}
+                                </div>
+                              ) : (
+                                <Input
+                                  className="text-xs"
+                                  value={currentVal}
+                                  onChange={(e) => handleFieldChange(customField, e.target.value)}
+                                />
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   );

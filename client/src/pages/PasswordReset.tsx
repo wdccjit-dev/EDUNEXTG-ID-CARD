@@ -1,6 +1,6 @@
 import { FormEvent, useState } from "react";
 import { useLocation } from "wouter";
-import { ShieldCheck } from "lucide-react";
+import { ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -8,29 +8,34 @@ import { api } from "@/lib/api";
 
 export function ForgotPassword() {
   const [, navigate] = useLocation();
-  const [email, setEmail] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [sent, setSent] = useState(false);
-  const [devToken, setDevToken] = useState("");
 
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    if (!email.trim()) return toast.error("Enter your account email");
-    setBusy(true);
-    try {
-      const result = await api.auth.forgotPassword(email.trim());
-      setSent(true);
-      if (result.developmentResetToken) setDevToken(result.developmentResetToken);
-      toast.success("If that email exists, reset instructions are ready");
-    } catch (error) {
-      toast.error("Could not request a password reset", { description: error instanceof Error ? error.message : "Request failed" });
-    } finally { setBusy(false); }
-  }
+  return (
+    <AuthShell
+      title="Forgot Password"
+      subtitle="Please contact your system administrator to recover or reset your account credentials."
+    >
+      <div className="space-y-5">
+        <div className="rounded-2xl border border-[#d6e5de] bg-[#f4f8f6] p-5 text-center">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#e1f3ed] text-[#0f7f79]">
+            <ShieldAlert className="h-6 w-6" />
+          </div>
+          <h3 className="text-sm font-bold text-[#1f3733]">Contact Administrator</h3>
+          <p className="mt-2 text-xs leading-5 text-[#5e716e]">
+            Self-service password reset is disabled. For security and credential management,
+            please reach out directly to your <strong>Super Administrator</strong> to reset your login ID or password.
+          </p>
+        </div>
 
-  return <AuthShell title="Forgot password" subtitle={sent ? "Check your email for reset instructions." : "Enter your account email to request a reset."}>
-    {!sent ? <form onSubmit={submit} className="space-y-4"><label className="block text-xs font-bold text-[#38514e]">Email<Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} className="mt-2 h-11 rounded-xl" autoComplete="email" /></label><Button disabled={busy} className="h-11 w-full rounded-xl bg-[#0f7f79] font-bold hover:bg-[#096c67]">{busy ? "Sending…" : "Request reset"}</Button></form> : <div className="space-y-4"><p className="rounded-xl bg-[#e1f3ed] p-3 text-xs text-[#0a716b]">If an account exists for <strong>{email}</strong>, a reset link has been sent. This message is intentionally the same for known and unknown emails.</p>{devToken && <p className="rounded-xl bg-[#fff8d9] p-3 text-xs text-[#735b10]">Development reset token: <code className="break-all">{devToken}</code></p>}<Button onClick={() => navigate(`/reset-password${devToken ? `?token=${encodeURIComponent(devToken)}` : ""}`)} className="h-11 w-full rounded-xl bg-[#0f7f79] font-bold hover:bg-[#096c67]">Continue to reset password</Button></div>}
-    <button type="button" onClick={() => navigate("/school/login")} className="mt-4 w-full text-center text-xs font-semibold text-[#0f7f79] hover:underline">Return to login</button>
-  </AuthShell>;
+        <Button
+          type="button"
+          onClick={() => navigate("/login")}
+          className="h-11 w-full rounded-xl bg-[#0f7f79] font-bold text-white hover:bg-[#096c67] cursor-pointer"
+        >
+          Return to Login
+        </Button>
+      </div>
+    </AuthShell>
+  );
 }
 
 export function ResetPassword() {
@@ -54,7 +59,7 @@ export function ResetPassword() {
   }
 
   return <AuthShell title="Reset password" subtitle={done ? "Your password has been changed." : "Choose a new password for your application account."}>
-    {done ? <Button onClick={() => navigate("/school/login")} className="h-11 w-full rounded-xl bg-[#0f7f79] font-bold hover:bg-[#096c67]">Return to login</Button> : <form onSubmit={submit} className="space-y-4"><label className="block text-xs font-bold text-[#38514e]">Reset token<Input value={token} onChange={(event) => setToken(event.target.value)} className="mt-2 h-11 rounded-xl" /></label><label className="block text-xs font-bold text-[#38514e]">New password<Input type="password" value={password} onChange={(event) => setPassword(event.target.value)} className="mt-2 h-11 rounded-xl" autoComplete="new-password" /></label><label className="block text-xs font-bold text-[#38514e]">Confirm password<Input type="password" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} className="mt-2 h-11 rounded-xl" autoComplete="new-password" /></label><p className="text-[11px] text-[#82908e]">Use at least 8 characters. Confirmation must match.</p><Button disabled={busy} className="h-11 w-full rounded-xl bg-[#0f7f79] font-bold hover:bg-[#096c67]">{busy ? "Saving…" : "Change password"}</Button></form>}
+    {done ? <Button onClick={() => navigate("/login")} className="h-11 w-full rounded-xl bg-[#0f7f79] font-bold hover:bg-[#096c67] cursor-pointer">Return to login</Button> : <form onSubmit={submit} className="space-y-4"><label className="block text-xs font-bold text-[#38514e]">Reset token<Input value={token} onChange={(event) => setToken(event.target.value)} className="mt-2 h-11 rounded-xl" /></label><label className="block text-xs font-bold text-[#38514e]">New password<Input type="password" value={password} onChange={(event) => setPassword(event.target.value)} className="mt-2 h-11 rounded-xl" autoComplete="new-password" /></label><label className="block text-xs font-bold text-[#38514e]">Confirm password<Input type="password" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} className="mt-2 h-11 rounded-xl" autoComplete="new-password" /></label><p className="text-[11px] text-[#82908e]">Use at least 8 characters. Confirmation must match.</p><Button disabled={busy} className="h-11 w-full rounded-xl bg-[#0f7f79] font-bold hover:bg-[#096c67] cursor-pointer">{busy ? "Saving…" : "Change password"}</Button></form>}
   </AuthShell>;
 }
 

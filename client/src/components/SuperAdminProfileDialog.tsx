@@ -181,10 +181,7 @@ export default function SuperAdminProfileDialog({
       toast.error("A valid email address is required.");
       return;
     }
-    if (phone.trim() && !isValidIndianMobileNumber(phone.trim(), false)) {
-      toast.error(INDIAN_MOBILE_ERROR_MESSAGE);
-      return;
-    }
+
 
     setSavingDetails(true);
     try {
@@ -433,21 +430,35 @@ export default function SuperAdminProfileDialog({
                   <label className="block text-xs font-bold text-[#38514e]">
                     Phone / Mobile Number
                   </label>
-                  <div className="relative mt-1.5">
-                    <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8fa09d]" />
-                    <Input
-                      type="tel"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      onBlur={() => {
-                        if (phone.trim() && !isValidIndianMobileNumber(phone.trim(), false)) {
-                          toast.error(INDIAN_MOBILE_ERROR_MESSAGE);
-                        }
-                      }}
-                      placeholder={INDIAN_MOBILE_PLACEHOLDER}
-                      className="h-10 rounded-xl pl-9 text-xs"
-                    />
+                  <div className="mt-1.5 flex items-center gap-1.5">
+                    <div className="h-10 w-14 flex items-center justify-center rounded-xl border border-[#d2dbd8] bg-[#f5f8f7] text-xs font-bold text-[#2a4541] select-none shrink-0">
+                      +91
+                    </div>
+                    <div className="flex-1 relative">
+                      <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8fa09d]" />
+                      <Input
+                        type="tel"
+                        inputMode="numeric"
+                        maxLength={10}
+                        value={phone}
+                        onChange={(e) => {
+                          const digits = e.target.value.replace(/\D/g, "").slice(0, 10);
+                          setPhone(digits);
+                        }}
+                        placeholder={INDIAN_MOBILE_PLACEHOLDER}
+                        className={`h-10 rounded-xl pl-9 text-xs transition-colors ${
+                          phone.length > 0 && phone.length < 10
+                            ? "border-red-500 bg-red-50/15 text-red-900 focus-visible:ring-red-400 focus-visible:border-red-500"
+                            : ""
+                        }`}
+                      />
+                    </div>
                   </div>
+                  {phone.length > 0 && phone.length < 10 && (
+                    <p className="mt-1 text-[11px] font-medium text-red-500">
+                      Phone number must be 10 digits ({phone.length}/10)
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex justify-end pt-3">

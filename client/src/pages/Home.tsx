@@ -463,7 +463,7 @@ export default function Home({
   }, [idCards, activeSchoolId]);
 
   const pendingRequests = useMemo(
-    () => schoolApprovals.filter((item) => item.status !== "APPROVED"),
+    () => schoolApprovals.filter((item) => item.status !== "APPROVED" && item.status !== "PRINTED"),
     [schoolApprovals],
   );
 
@@ -526,10 +526,7 @@ export default function Home({
   const logout = async () => {
     try {
       await api.auth.logout();
-      window.location.href =
-        authenticatedUser.role === "SUPER_ADMIN"
-          ? "/admin/login"
-          : "/school/login";
+      window.location.href = "/login";
     } catch (error) {
       toast.error("Could not sign out", {
         description: error instanceof Error ? error.message : "Request failed",
@@ -647,9 +644,6 @@ export default function Home({
     e.preventDefault();
     if (!schoolNameInput.trim() || !schoolCodeInput.trim()) {
       return toast.error("School name and short code are required");
-    }
-    if (schoolPhoneInput.trim() && !isValidIndianMobileNumber(schoolPhoneInput.trim(), false)) {
-      return toast.error(INDIAN_MOBILE_ERROR_MESSAGE);
     }
     try {
       if (editingSchool) {
@@ -823,11 +817,15 @@ export default function Home({
     }
   };
 
-  const handleDeleteCard = async (cardId: number, num: string) => {
-    if (!confirm(`Are you sure you want to delete draft card ${num}?`)) return;
+  const handleDeleteCard = async (cardId: number, num: string, status?: string) => {
+    const isRejected = status === "REJECTED";
+    const promptMsg = isRejected
+      ? `Are you sure you want to permanently delete rejected card ${num}? It will be removed from both the admin and school sides.`
+      : `Are you sure you want to delete draft card ${num}?`;
+    if (!confirm(promptMsg)) return;
     try {
       await api.idCards.delete(cardId);
-      toast.success(`Draft card ${num} deleted`);
+      toast.success(isRejected ? `Rejected card ${num} deleted` : `Draft card ${num} deleted`);
       reloadWorkspace();
     } catch (e) {
       toast.error("Could not delete card", {
@@ -2141,18 +2139,34 @@ export default function Home({
                   <label className="text-xs font-bold text-[#304541]">
                     Phone Number
                   </label>
-                  <Input
-                    type="tel"
-                    className="mt-1"
-                    placeholder={INDIAN_MOBILE_PLACEHOLDER}
-                    value={schoolPhoneInput}
-                    onChange={(e) => setSchoolPhoneInput(e.target.value)}
-                    onBlur={() => {
-                      if (schoolPhoneInput.trim() && !isValidIndianMobileNumber(schoolPhoneInput.trim(), false)) {
-                        toast.error(INDIAN_MOBILE_ERROR_MESSAGE);
-                      }
-                    }}
-                  />
+                  <div className="mt-1 flex items-center gap-1.5">
+                    <div className="h-10 w-14 flex items-center justify-center rounded-xl border border-[#d2dbd8] bg-[#f5f8f7] text-xs font-bold text-[#2a4541] select-none shrink-0">
+                      +91
+                    </div>
+                    <div className="flex-1">
+                      <Input
+                        type="tel"
+                        inputMode="numeric"
+                        maxLength={10}
+                        placeholder={INDIAN_MOBILE_PLACEHOLDER}
+                        value={schoolPhoneInput}
+                        onChange={(e) => {
+                          const digitsOnly = e.target.value.replace(/\D/g, "").slice(0, 10);
+                          setSchoolPhoneInput(digitsOnly);
+                        }}
+                        className={`h-10 rounded-xl text-xs transition-colors ${
+                          schoolPhoneInput.length > 0 && schoolPhoneInput.length < 10
+                            ? "border-red-500 bg-red-50/15 text-red-900 focus-visible:ring-red-400 focus-visible:border-red-500"
+                            : ""
+                        }`}
+                      />
+                    </div>
+                  </div>
+                  {schoolPhoneInput.length > 0 && schoolPhoneInput.length < 10 && (
+                    <p className="mt-1 text-[11px] font-medium text-red-500">
+                      Phone number must be 10 digits ({schoolPhoneInput.length}/10)
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -2685,7 +2699,7 @@ export default function Home({
                 </div>
 
                 <div className="flex gap-2">
-                  {(authenticatedUser.role === "SUPER_ADMIN" ||
+                    {(authenticatedUser.role === "SUPER_ADMIN" ||
                     authenticatedUser.schoolId === reviewingCard.schoolId) &&
                     (reviewingCard.status === "SUBMITTED" ||
                       reviewingCard.status === "UNDER_REVIEW" ||
@@ -2716,6 +2730,22 @@ export default function Home({
                         </Button>
                       </>
                     )}
+
+                  {authenticatedUser.role === "SUPER_ADMIN" && reviewingCard.status === "REJECTED" && (
+                    <Button
+                      variant="destructive"
+                      onClick={() => {
+                        const id = reviewingCard.id;
+                        const num = reviewingCard.cardNumber;
+                        const stat = reviewingCard.status;
+                        setReviewModalOpen(false);
+                        void handleDeleteCard(id, num, stat);
+                      }}
+                      className="text-xs flex items-center gap-1.5"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> Delete Rejected Card
+                    </Button>
+                  )}
                 </div>
               </DialogFooter>
             </div>
@@ -3105,7 +3135,7 @@ function ModuleView({
   onToggleTemplateStatus: (template: ApiTemplate) => void;
   onEditCard: (cardId: number) => void;
   onSubmitCard: (cardId: number, num: string) => void;
-  onDeleteCard: (cardId: number, num: string) => void;
+  onDeleteCard: (cardId: number, num: string, status?: string) => void;
   onOpenReview: (cardId: number) => void;
   onPrintCard: (cardId: number) => void;
   onBulkPrint: () => void;
@@ -3637,7 +3667,7 @@ function ModuleView({
                             {authenticatedUser.role === "SUPER_ADMIN" ? "Review" : "View"}
                           </button>
 
-                          {/* Admin actions: Edit, Submit, Delete draft */}
+                          {/* Admin actions: Edit, Submit, Delete draft / rejected */}
                           {(card.status === "DRAFT" || card.status === "CHANGES_REQUIRED") &&
                             authenticatedUser.role === "SUPER_ADMIN" && (
                               <>
@@ -3655,7 +3685,7 @@ function ModuleView({
                                 </button>
                                 {card.status === "DRAFT" && (
                                   <button
-                                    onClick={() => onDeleteCard(card.id, card.cardNumber)}
+                                    onClick={() => onDeleteCard(card.id, card.cardNumber, card.status)}
                                     className="rounded-lg p-1.5 text-[#e74c3c] hover:bg-[#fdeae8]"
                                     title="Delete draft"
                                   >
@@ -3664,6 +3694,18 @@ function ModuleView({
                                 )}
                               </>
                             )}
+
+                          {/* Admin action: Delete rejected card */}
+                          {card.status === "REJECTED" && authenticatedUser.role === "SUPER_ADMIN" && (
+                            <button
+                              onClick={() => onDeleteCard(card.id, card.cardNumber, card.status)}
+                              className="rounded-lg bg-[#fef2f2] border border-[#fecaca] px-2.5 py-1.5 text-[11px] font-bold text-[#dc2626] hover:bg-[#fee2e2] flex items-center gap-1"
+                              title="Delete rejected card (removes from both admin and school sides)"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Delete</span>
+                            </button>
+                          )}
 
                           {/* Approval actions: When card is SUBMITTED, UNDER_REVIEW, or RESUBMITTED, School user can Approve or Reject */}
                           {(card.status === "SUBMITTED" || card.status === "UNDER_REVIEW" || card.status === "RESUBMITTED") && (

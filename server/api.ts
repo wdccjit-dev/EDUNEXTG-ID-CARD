@@ -247,13 +247,14 @@ router.put("/profile", requireRole(adminRoles), async (req, res) => {
 
     const name = req.body.name !== undefined ? String(req.body.name).trim() : undefined;
     const email = req.body.email !== undefined ? String(req.body.email).trim().toLowerCase() : undefined;
-    const phone = req.body.phone !== undefined ? String(req.body.phone).trim() : undefined;
+    const rawPhone = req.body.phone !== undefined ? (req.body.phone !== null ? String(req.body.phone).trim() : null) : undefined;
+    const phone = rawPhone ? rawPhone.replace(/\D/g, "").slice(-10) : (rawPhone === "" ? null : rawPhone);
 
     if (name !== undefined && !name) {
       return res.status(400).json({ error: "Name cannot be empty." });
     }
 
-    if (phone !== undefined && !isValidIndianMobileNumber(phone, true)) {
+    if (phone !== undefined && phone !== null && phone.length > 0 && phone.length !== 10) {
       return res.status(400).json({ error: INDIAN_MOBILE_ERROR_MESSAGE });
     }
 
@@ -457,9 +458,7 @@ router.post("/schools", requireRole(adminRoles), async (req, res) => {
     if (!shortCode) return res.status(400).json({ error: "shortCode is required" });
 
     const rawPhone = req.body.phone !== undefined && req.body.phone !== null ? String(req.body.phone).trim() : null;
-    if (rawPhone && !isValidIndianMobileNumber(rawPhone, false)) {
-      return res.status(400).json({ error: INDIAN_MOBILE_ERROR_MESSAGE });
-    }
+    const phone = rawPhone ? rawPhone.replace(/\D/g, "").slice(-10) : null;
 
     let createdSchool: any;
     let credentials: any;
@@ -624,12 +623,9 @@ const handleUpdateSchool = async (req: Request, res: Response) => {
     const nextName = req.body.name && String(req.body.name).trim() ? String(req.body.name).trim() : existing.name;
     const nextCode = req.body.shortCode && String(req.body.shortCode).trim() ? String(req.body.shortCode).trim().toUpperCase() : existing.shortCode;
     const nextEmail = req.body.email && String(req.body.email).trim() ? String(req.body.email).trim() : null;
-    const nextPhone = req.body.phone && String(req.body.phone).trim() ? String(req.body.phone).trim() : null;
+    const rawPhone = req.body.phone !== undefined ? (req.body.phone !== null ? String(req.body.phone).trim() : null) : undefined;
+    const nextPhone = rawPhone ? rawPhone.replace(/\D/g, "").slice(-10) : (rawPhone === "" ? null : (rawPhone ?? existing.phone));
     const nextAddress = req.body.address && String(req.body.address).trim() ? String(req.body.address).trim() : null;
-
-    if (req.body.phone !== undefined && !isValidIndianMobileNumber(nextPhone, true)) {
-      return res.status(400).json({ error: INDIAN_MOBILE_ERROR_MESSAGE });
-    }
 
     if (nextCode !== existing.shortCode) {
       const [conflict] = await db.select().from(schools).where(eq(schools.shortCode, nextCode)).limit(1);
@@ -1903,13 +1899,35 @@ async function transitionApproval(
   const paramId = Number(req.params.id);
   if (!paramId || isNaN(paramId)) return res.status(400).json({ error: "Invalid ID" });
 
-  let request = (await db.select().from(idCardRequests).where(eq(idCardRequests.id, paramId)))[0];
-  let card = (await db.select().from(idCards).where(eq(idCards.id, paramId)))[0];
+  const isApprovalsRoute = req.baseUrl?.includes("approvals") || req.originalUrl?.includes("/api/approvals");
+  let request: any = null;
+  let card: any = null;
 
-  if (request && !card) {
-    card = (await db.select().from(idCards).where(eq(idCards.requestId, request.id)))[0];
-  } else if (card && !request && card.requestId) {
-    request = (await db.select().from(idCardRequests).where(eq(idCardRequests.id, card.requestId)))[0];
+  if (isApprovalsRoute) {
+    request = (await db.select().from(idCardRequests).where(eq(idCardRequests.id, paramId)))[0];
+    if (request) {
+      card = (await db.select().from(idCards).where(
+        or(
+          eq(idCards.requestId, request.id),
+          and(eq(idCards.schoolId, request.schoolId), eq(idCards.cardNumber, request.admissionCode)),
+        ),
+      ))[0];
+    }
+  } else {
+    card = (await db.select().from(idCards).where(eq(idCards.id, paramId)))[0];
+    if (card && card.requestId) {
+      request = (await db.select().from(idCardRequests).where(eq(idCardRequests.id, card.requestId)))[0];
+    }
+  }
+
+  if (!request && !card) {
+    request = (await db.select().from(idCardRequests).where(eq(idCardRequests.id, paramId)))[0];
+    card = (await db.select().from(idCards).where(eq(idCards.id, paramId)))[0];
+    if (request && !card) {
+      card = (await db.select().from(idCards).where(eq(idCards.requestId, request.id)))[0];
+    } else if (card && !request && card.requestId) {
+      request = (await db.select().from(idCardRequests).where(eq(idCardRequests.id, card.requestId)))[0];
+    }
   }
 
   const schoolId = card?.schoolId ?? request?.schoolId;
@@ -1935,6 +1953,19 @@ async function transitionApproval(
   }
 
   const currentStatus = card?.status ?? request?.status ?? "DRAFT";
+
+  // Idempotent success if already in target status (e.g. APPROVED to APPROVED)
+  if (currentStatus === targetStatus) {
+    await db.transaction(async (tx) => {
+      if (request && request.status !== targetStatus) {
+        await tx.update(idCardRequests).set({ status: targetStatus }).where(eq(idCardRequests.id, request.id));
+      }
+      if (card && card.status !== targetStatus) {
+        await tx.update(idCards).set({ status: targetStatus }).where(eq(idCards.id, card.id));
+      }
+    });
+    return res.json({ success: true, status: targetStatus, alreadyTransitioned: true });
+  }
 
   // Strict transition validation
   if (targetStatus === "UNDER_REVIEW") {
@@ -2157,13 +2188,35 @@ async function handleBulkApprovalTransition(
 
     for (const cardId of cardIds) {
       if (!cardId || isNaN(cardId)) continue;
-      let request = (await db.select().from(idCardRequests).where(eq(idCardRequests.id, cardId)))[0];
-      let card = (await db.select().from(idCards).where(eq(idCards.id, cardId)))[0];
+      const isApprovalsRoute = req.baseUrl?.includes("approvals") || req.originalUrl?.includes("/api/approvals");
+      let request: any = null;
+      let card: any = null;
 
-      if (request && !card) {
-        card = (await db.select().from(idCards).where(eq(idCards.requestId, request.id)))[0];
-      } else if (card && !request && card.requestId) {
-        request = (await db.select().from(idCardRequests).where(eq(idCardRequests.id, card.requestId)))[0];
+      if (isApprovalsRoute) {
+        request = (await db.select().from(idCardRequests).where(eq(idCardRequests.id, cardId)))[0];
+        if (request) {
+          card = (await db.select().from(idCards).where(
+            or(
+              eq(idCards.requestId, request.id),
+              and(eq(idCards.schoolId, request.schoolId), eq(idCards.cardNumber, request.admissionCode)),
+            ),
+          ))[0];
+        }
+      } else {
+        card = (await db.select().from(idCards).where(eq(idCards.id, cardId)))[0];
+        if (card && card.requestId) {
+          request = (await db.select().from(idCardRequests).where(eq(idCardRequests.id, card.requestId)))[0];
+        }
+      }
+
+      if (!request && !card) {
+        request = (await db.select().from(idCardRequests).where(eq(idCardRequests.id, cardId)))[0];
+        card = (await db.select().from(idCards).where(eq(idCards.id, cardId)))[0];
+        if (request && !card) {
+          card = (await db.select().from(idCards).where(eq(idCards.requestId, request.id)))[0];
+        } else if (card && !request && card.requestId) {
+          request = (await db.select().from(idCardRequests).where(eq(idCardRequests.id, card.requestId)))[0];
+        }
       }
 
       const schoolId = card?.schoolId ?? request?.schoolId;
