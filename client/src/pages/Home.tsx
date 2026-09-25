@@ -1271,13 +1271,15 @@ export default function Home({
               <span className="flex-1 text-left">About Us</span>
             </button>
 
-            <button
-              onClick={() => toast("Settings opened")}
-              className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-[12px] font-semibold text-[#99b6b2] hover:bg-[#1b3a3a] hover:text-white"
-            >
-              <Settings2 className="h-[17px] w-[17px] text-[#779b96]" />
-              Settings
-            </button>
+            {authenticatedUser.role === "SUPER_ADMIN" && (
+              <button
+                onClick={() => toast("Settings opened")}
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-[12px] font-semibold text-[#99b6b2] hover:bg-[#1b3a3a] hover:text-white"
+              >
+                <Settings2 className="h-[17px] w-[17px] text-[#779b96]" />
+                Settings
+              </button>
+            )}
           </nav>
           <div className="flex items-center justify-between border-t border-[#294344] py-4">
             <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-[#6e928d]">
@@ -1300,29 +1302,30 @@ export default function Home({
       )}
 
       <main className="min-h-screen lg:pl-[244px]">
-        <header className="sticky top-0 z-30 flex h-[76px] items-center justify-between border-b border-[#e4e8e4] bg-[#f7f6f2]/90 px-5 backdrop-blur-xl sm:px-8 lg:px-11">
-          <div className="flex items-center gap-3">
+        <header className="sticky top-0 z-30 flex h-[76px] items-center justify-between border-b border-[#e4e8e4] bg-[#f7f6f2]/90 px-3 sm:px-8 lg:px-11 backdrop-blur-xl">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <button
               onClick={() => setSidebarOpen(true)}
-              className="rounded-lg p-2 text-[#6d7c7b] hover:bg-white lg:hidden"
+              className="rounded-lg p-2 text-[#6d7c7b] hover:bg-white lg:hidden shrink-0"
+              aria-label="Open sidebar"
             >
               <Menu className="h-5 w-5" />
             </button>
-            <div>
+            <div className="min-w-0">
               {activeNav === "Overview" && (
-                <h1 className="text-[22px] font-extrabold tracking-[-0.05em]">
+                <h1 className="text-base sm:text-[22px] font-extrabold tracking-[-0.05em] truncate">
                   {`${getGreeting()}, ${authenticatedUser.name?.split(" ")[0] ?? "there"}`}
                 </h1>
               )}
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             {/* Super Admin School Dropdown Selector */}
             {authenticatedUser.role === "SUPER_ADMIN" && schools.length > 0 && (
-              <div className="flex items-center gap-2 rounded-xl border border-[#e0e6e1] bg-white px-3 py-1.5 shadow-sm">
-                <Building2 className="h-3.5 w-3.5 text-[#0f7f79]" />
-                <span className="text-[11px] font-bold text-[#778381]">School:</span>
+              <div className="flex items-center gap-1.5 sm:gap-2 rounded-xl border border-[#e0e6e1] bg-white px-2 sm:px-3 py-1.5 shadow-sm max-w-[150px] xs:max-w-[180px] sm:max-w-none">
+                <Building2 className="h-3.5 w-3.5 text-[#0f7f79] shrink-0" />
+                <span className="hidden md:inline text-[11px] font-bold text-[#778381]">School:</span>
                 <Select
                   value={selectedSchoolId ? String(selectedSchoolId) : ""}
                   onValueChange={(val) => {
@@ -1332,7 +1335,7 @@ export default function Home({
                     toast.success(`Active school set to ${sch?.name ?? `School #${id}`}`);
                   }}
                 >
-                  <SelectTrigger className="h-7 border-0 bg-transparent px-2 text-xs font-extrabold text-[#1f3733] shadow-none focus-visible:ring-0">
+                  <SelectTrigger className="h-7 border-0 bg-transparent px-1 sm:px-2 text-xs font-extrabold text-[#1f3733] shadow-none focus-visible:ring-0 max-w-[100px] xs:max-w-[130px] sm:max-w-[200px] truncate">
                     <SelectValue placeholder="Select active school" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1549,7 +1552,7 @@ export default function Home({
                 }`}
               >
                 <Card className="overflow-hidden ui-card rounded-2xl border-[#e2e8e3] bg-[#fffefa] shadow-[0_14px_40px_rgba(38,71,65,0.05)]">
-                  <CardHeader className="flex flex-row items-start justify-between px-6 pb-3 pt-6">
+                  <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 sm:px-6 pb-3 pt-5 sm:pt-6">
                     <div>
                       <CardTitle className="text-[15px] font-extrabold tracking-[-0.02em]">
                         Approval queue
@@ -1558,14 +1561,14 @@ export default function Home({
                         Cards waiting for your review
                       </p>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <div className="hidden rounded-lg border border-[#e4e9e5] bg-[#f8faf8] p-0.5 sm:flex">
+                    <div className="flex items-center gap-2 overflow-x-auto max-w-full pb-1 sm:pb-0 [scrollbar-width:none]">
+                      <div className="flex rounded-lg border border-[#e4e9e5] bg-[#f8faf8] p-0.5 shrink-0">
                         {(["All", "Pending", "Changes required", "Rejected"] as const).map(
                           (item) => (
                             <button
                               key={item}
                               onClick={() => setFilter(item)}
-                              className={`rounded-md px-2.5 py-1.5 text-[10px] font-bold ${filter === item
+                              className={`rounded-md px-2.5 py-1.5 text-[10px] font-bold whitespace-nowrap ${filter === item
                                 ? "bg-white text-[#0f7f79] shadow-sm"
                                 : "text-[#8a9793] hover:text-[#55605d]"
                                 }`}
@@ -1577,7 +1580,9 @@ export default function Home({
                       </div>
                       <button
                         onClick={() => toast("Filters opened")}
-                        className="rounded-lg border border-[#e1e8e2] p-2 text-[#7b8985] hover:bg-[#f5f8f5]"
+                        className="rounded-lg border border-[#e1e8e2] p-2 text-[#7b8985] hover:bg-[#f5f8f5] shrink-0"
+                        title="Filter options"
+                        aria-label="Filter options"
                       >
                         <SlidersHorizontal className="h-4 w-4" />
                       </button>
@@ -1594,8 +1599,8 @@ export default function Home({
                       </div>
                     ) : (
                       <>
-                        <div className="overflow-x-auto">
-                          <table className="w-full min-w-[640px] text-left">
+                        <div className="overflow-x-auto [scrollbar-width:thin] max-w-full">
+                          <table className="w-full min-w-[620px] text-left">
                             <thead>
                               <tr className="border-y border-[#edf0ed] bg-[#fbfcfa] text-[10px] font-bold uppercase tracking-[0.13em] text-[#9aa5a1]">
                                 <th className="px-6 py-3 font-bold">Card holder</th>
@@ -2514,24 +2519,24 @@ export default function Home({
 
       {/* Admin Card Review & Detail Modal */}
       <Dialog open={reviewModalOpen} onOpenChange={setReviewModalOpen}>
-        <DialogContent className="w-[95vw] sm:max-w-5xl xl:max-w-6xl max-w-6xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] sm:max-w-5xl xl:max-w-6xl max-h-[92vh] overflow-y-auto p-4 sm:p-6">
           {reviewingCard && (
             <div>
               <DialogHeader>
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pr-2 sm:pr-6">
                   <div>
-                    <DialogTitle className="text-xl font-bold flex items-center gap-2">
+                    <DialogTitle className="text-lg sm:text-xl font-bold flex flex-wrap items-center gap-2">
                       <span>Card Review: #{reviewingCard.cardNumber}</span>
                       <span className="text-xs px-2.5 py-0.5 rounded-full font-mono font-semibold bg-[#eef5f0] text-[#0f7f79]">
                         {reviewingCard.status}
                       </span>
                     </DialogTitle>
-                    <DialogDescription>
+                    <DialogDescription className="mt-1">
                       School: {reviewingCard.schoolName || currentActiveSchool?.name || "School"} · Template: {reviewingCard.templateName || reviewingCard.template?.name || "Standard Template"}
                     </DialogDescription>
                   </div>
                   {/* Side switcher */}
-                  <div className="flex gap-1.5 bg-[#f0efec] p-1 rounded-xl">
+                  <div className="flex gap-1.5 bg-[#f0efec] p-1 rounded-xl shrink-0 self-start sm:self-auto">
                     {(["FRONT", "BACK"] as const).map((side) => (
                       <button
                         key={side}
@@ -2550,7 +2555,7 @@ export default function Home({
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 py-6 border-b border-[#edf0ed]">
                 {/* Visual Card Preview */}
-                <div className="flex flex-col items-center justify-center p-4 bg-[#f8faf8] rounded-2xl border border-[#e2e8e3]">
+                <div className="flex flex-col items-center justify-center p-3 sm:p-4 bg-[#f8faf8] rounded-2xl border border-[#e2e8e3] overflow-x-auto max-w-full [scrollbar-width:thin]">
                   <CardRenderer
                     cardWidth={reviewingCard.template?.cardWidth ?? 324}
                     cardHeight={reviewingCard.template?.cardHeight ?? 204}
@@ -2685,8 +2690,15 @@ export default function Home({
               </div>
 
               {/* Action buttons */}
-              <DialogFooter className="mt-4 flex flex-wrap gap-2 sm:justify-between">
-                <div className="flex gap-2">
+              <DialogFooter className="mt-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2 border-t border-[#edf0ed]">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setReviewModalOpen(false)}
+                    className="text-xs"
+                  >
+                    Close
+                  </Button>
                   {authenticatedUser.role === "SUPER_ADMIN" && (
                     <Button
                       variant="outline"
@@ -2698,7 +2710,7 @@ export default function Home({
                   )}
                 </div>
 
-                <div className="flex gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                     {(authenticatedUser.role === "SUPER_ADMIN" ||
                     authenticatedUser.schoolId === reviewingCard.schoolId) &&
                     (reviewingCard.status === "SUBMITTED" ||
@@ -3545,24 +3557,24 @@ function ModuleView({
       {/* 2. ID Card Requests / LifeCycle Queue */}
       {isRequests && (
         <Card className="rounded-2xl border-[#e2e8e3] bg-[#fffefa] shadow-[0_12px_35px_rgba(38,71,65,0.05)]">
-          <div className="flex flex-col gap-3 border-b border-[#edf0ed] p-5 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="relative w-full sm:w-64">
+          <div className="flex flex-col gap-3 border-b border-[#edf0ed] p-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full lg:w-auto">
+              <div className="relative w-full sm:w-64 shrink-0">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#98a4a1]" />
                 <Input
                   placeholder="Search card #, student, or school..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="h-10 rounded-xl border-[#e2e8e3] pl-9 text-xs shadow-none"
+                  className="h-10 rounded-xl border-[#e2e8e3] pl-9 text-xs shadow-none w-full"
                 />
               </div>
               {/* Status filter chips */}
-              <div className="flex flex-wrap items-center gap-1.5">
+              <div className="flex flex-wrap items-center gap-1.5 overflow-x-auto max-w-full pb-1 sm:pb-0 [scrollbar-width:none]">
                 {["All", "DRAFT", "SUBMITTED", "UNDER_REVIEW", "CHANGES_REQUIRED", "REJECTED"].map((status) => (
                   <button
                     key={status}
                     onClick={() => setCardStatusFilter(status)}
-                    className={`rounded-lg px-2.5 py-1.5 text-[11px] font-bold transition-all ${cardStatusFilter === status
+                    className={`rounded-lg px-2.5 py-1.5 text-[11px] font-bold transition-all whitespace-nowrap ${cardStatusFilter === status
                       ? "bg-[#0f7f79] text-white shadow-sm"
                       : "bg-[#f0efec] text-[#55605d] hover:bg-[#e4e2de]"
                       }`}
@@ -3574,7 +3586,7 @@ function ModuleView({
             </div>
 
             {/* Bulk Approval & Rejection Toolbar for both Admin and School */}
-            <div className="flex items-center gap-2 self-end sm:self-center">
+            <div className="flex flex-wrap items-center gap-2 self-start sm:self-end lg:self-center shrink-0">
               {selectedRequestCardIds.length > 0 && (
                 <span className="text-xs font-semibold text-[#84918e] mr-1">
                   {selectedRequestCardIds.length} of {requestCards.length} selected
@@ -3583,7 +3595,7 @@ function ModuleView({
               <Button
                 onClick={onBulkApproveRequests}
                 disabled={selectedRequestCardIds.length === 0 || bulkActionLoading}
-                className="h-10 rounded-xl bg-[#0f7f79] hover:bg-[#096c67] text-xs font-bold text-white shadow-sm"
+                className="h-9 sm:h-10 rounded-xl bg-[#0f7f79] hover:bg-[#096c67] text-xs font-bold text-white shadow-sm"
               >
                 <CheckCircle2 className="w-4 h-4 mr-1.5" /> Approve all
               </Button>
@@ -3591,15 +3603,15 @@ function ModuleView({
                 variant="outline"
                 onClick={onBulkRejectRequests}
                 disabled={selectedRequestCardIds.length === 0 || bulkActionLoading}
-                className="h-10 rounded-xl border-[#fecaca] text-[#dc2626] hover:bg-[#fef2f2] hover:text-[#b91c1c] text-xs font-bold shadow-sm"
+                className="h-9 sm:h-10 rounded-xl border-[#fecaca] text-[#dc2626] hover:bg-[#fef2f2] hover:text-[#b91c1c] text-xs font-bold shadow-sm"
               >
                 <XCircle className="w-4 h-4 mr-1.5" /> Reject all
               </Button>
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+          <div className="overflow-x-auto [scrollbar-width:thin] max-w-full">
+            <table className="w-full text-left text-xs min-w-[680px]">
               <thead className="bg-[#f8faf8] border-b border-[#edf0ed] text-[#84918e] uppercase tracking-wider font-semibold">
                 <tr>
                   <th className="px-5 py-3.5 w-12 text-center">
@@ -3734,7 +3746,7 @@ function ModuleView({
           </div>
 
           {totalRequestPages > 1 && (
-            <div className="flex items-center justify-between p-4 border-t border-[#edf0ed] bg-[#fbfdfb]">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-t border-[#edf0ed] bg-[#fbfdfb]">
               <div className="text-xs text-[#788784]">
                 Page {requestsPage} of {totalRequestPages} ({requestCards.length} {requestCards.length === 1 ? "card" : "cards"})
               </div>
@@ -3766,35 +3778,35 @@ function ModuleView({
       {/* 3. Approved Cards Tab with Bulk Actions */}
       {isApproved && (
         <Card className="rounded-2xl border-[#e2e8e3] bg-[#fffefa] shadow-[0_12px_35px_rgba(38,71,65,0.05)]">
-          <div className="flex flex-col gap-3 border-b border-[#edf0ed] p-5 sm:flex-row sm:items-center sm:justify-between">
-            <div className="relative w-full max-w-sm">
+          <div className="flex flex-col gap-3 border-b border-[#edf0ed] p-4 sm:p-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="relative w-full sm:max-w-sm">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#98a4a1]" />
               <Input
                 placeholder="Search approved cards..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="h-10 rounded-xl border-[#e2e8e3] pl-9 text-xs shadow-none"
+                className="h-10 rounded-xl border-[#e2e8e3] pl-9 text-xs shadow-none w-full"
               />
             </div>
 
             {/* Bulk Actions Toolbar (Admin only) */}
             {authenticatedUser.role === "SUPER_ADMIN" && (
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-[#84918e] mr-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-semibold text-[#84918e] mr-1">
                   {selectedApprovedCardIds.length} of {approvedCards.length} selected
                 </span>
                 <Button
                   variant="outline"
                   onClick={onBulkPrint}
                   disabled={selectedApprovedCardIds.length === 0}
-                  className="h-10 rounded-xl text-xs font-bold border-[#e2e8e3]"
+                  className="h-9 sm:h-10 rounded-xl text-xs font-bold border-[#e2e8e3]"
                 >
                   <Printer className="w-4 h-4 mr-1.5 text-[#0f7f79]" /> Bulk Print
                 </Button>
                 <Button
                   onClick={onBulkPdf}
                   disabled={selectedApprovedCardIds.length === 0}
-                  className="h-10 rounded-xl bg-[#0f7f79] hover:bg-[#096c67] text-xs font-bold text-white"
+                  className="h-9 sm:h-10 rounded-xl bg-[#0f7f79] hover:bg-[#096c67] text-xs font-bold text-white"
                 >
                   <Download className="w-4 h-4 mr-1.5" /> Download PDF
                 </Button>
@@ -3802,8 +3814,8 @@ function ModuleView({
             )}
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+          <div className="overflow-x-auto [scrollbar-width:thin] max-w-full">
+            <table className="w-full text-left text-xs min-w-[640px]">
               <thead className="bg-[#f8faf8] border-b border-[#edf0ed] text-[#84918e] uppercase tracking-wider font-semibold">
                 <tr>
                   {authenticatedUser.role === "SUPER_ADMIN" && (
@@ -3882,7 +3894,7 @@ function ModuleView({
           </div>
 
           {totalApprovedPages > 1 && (
-            <div className="flex items-center justify-between p-4 border-t border-[#edf0ed] bg-[#fbfdfb]">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-t border-[#edf0ed] bg-[#fbfdfb]">
               <div className="text-xs text-[#788784]">
                 Page {approvedPage} of {totalApprovedPages} ({approvedCards.length} {approvedCards.length === 1 ? "card" : "cards"})
               </div>
@@ -4100,7 +4112,7 @@ function ModuleView({
           </div>
 
           {totalSchoolPages > 1 && (
-            <div className="flex items-center justify-between p-4 border-t border-[#edf0ed] bg-[#fbfdfb]">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-t border-[#edf0ed] bg-[#fbfdfb]">
               <div className="text-xs text-[#788784]">
                 Page {schoolsPage} of {totalSchoolPages} ({filteredSchools.length} {filteredSchools.length === 1 ? "school" : "schools"})
               </div>
@@ -4209,7 +4221,7 @@ function ModuleView({
                 )}
 
                 {totalUserPages > 1 && (
-                  <div className="flex items-center justify-between p-4 border-t border-[#edf0ed] bg-[#fbfdfb]">
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-t border-[#edf0ed] bg-[#fbfdfb]">
                     <div className="text-xs text-[#788784]">
                       Page {usersPage} of {totalUserPages}
                     </div>

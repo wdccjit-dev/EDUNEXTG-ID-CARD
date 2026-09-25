@@ -406,7 +406,7 @@ export default function IdCardFormModal({
         </DialogHeader>
 
         {/* Two-Column Split Layout */}
-        <div className="grid min-h-0 flex-1 grid-cols-1 gap-6 overflow-hidden pt-4 lg:grid-cols-12">
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-6 overflow-y-auto lg:overflow-hidden pt-4 lg:grid-cols-12">
           {/* LEFT: Dynamic Template-Driven Form */}
           <div className="min-h-0 overflow-y-auto pr-1 space-y-5 sm:pr-4 lg:col-span-7">
             {loadingTemplate ? (
@@ -842,9 +842,10 @@ export default function IdCardFormModal({
             </div>
 
             {/* Live Card Canvas */}
-            <div className="flex-1 w-full flex items-center justify-center p-4 overflow-hidden">
+            <div className="flex-1 w-full flex items-center justify-center p-2 sm:p-4 overflow-x-auto [scrollbar-width:thin] max-w-full">
               {fullTemplate ? (
                 <div
+                  className="shrink-0"
                   style={{
                     transform: `scale(${zoomScale})`,
                     transformOrigin: "center center",
@@ -878,23 +879,24 @@ export default function IdCardFormModal({
         </div>
 
         {/* Footer Actions */}
-        <DialogFooter className="border-t pt-4 mt-2 shrink-0 w-full flex items-center justify-between sm:justify-between">
+        <DialogFooter className="border-t pt-3 sm:pt-4 mt-2 shrink-0 w-full flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
           <Button
             type="button"
             variant="outline"
             onClick={() => onOpenChange(false)}
             disabled={saving || submitting}
+            className="w-full sm:w-auto"
           >
             Cancel
           </Button>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
             <Button
               type="button"
               variant="outline"
               onClick={() => handleSave(false)}
               disabled={saving || submitting}
-              className="gap-2"
+              className="gap-2 w-full sm:w-auto"
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               Save Draft
@@ -903,7 +905,7 @@ export default function IdCardFormModal({
               type="button"
               onClick={() => handleSave(true)}
               disabled={saving || submitting}
-              className="gap-2 bg-[#0f7f79] hover:bg-[#0b6560] text-white font-semibold"
+              className="gap-2 bg-[#0f7f79] hover:bg-[#0b6560] text-white font-semibold w-full sm:w-auto"
             >
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               Submit for Approval

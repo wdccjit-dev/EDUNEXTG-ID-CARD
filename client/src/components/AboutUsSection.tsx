@@ -36,23 +36,23 @@ export default function AboutUsSection() {
           </h1>
 
           <p className="text-sm sm:text-base leading-relaxed text-[#c1d7d2] max-w-2xl">
-            Insight Education by EduNextG is the next-generation multi-tenant identity lifecycle platform.
-            From drag-and-drop dynamic card templates to cryptographic QR verification and bulk print production,
-            we empower schools and educational administrators with effortless identity management.
+            Insight Education provides educational institutions with a complete, modern platform for managing student ID cards.
+            From customizable design templates to streamlined school approvals and high-quality print generation,
+            we help schools maintain professional branding and trusted student identification.
           </p>
 
           <div className="flex flex-wrap items-center gap-4 pt-2">
             <div className="flex items-center gap-2 rounded-xl bg-white/10 px-3.5 py-2 text-xs font-semibold backdrop-blur-md">
               <ShieldCheck className="h-4 w-4 text-[#40c8bb]" />
-              <span>Multi-Tenant School Isolation</span>
+              <span>Dedicated School Portals</span>
             </div>
             <div className="flex items-center gap-2 rounded-xl bg-white/10 px-3.5 py-2 text-xs font-semibold backdrop-blur-md">
               <Printer className="h-4 w-4 text-[#f5c87b]" />
-              <span>High-Res CR80 PVC Print Engine</span>
+              <span>Print-Ready Card Production</span>
             </div>
             <div className="flex items-center gap-2 rounded-xl bg-white/10 px-3.5 py-2 text-xs font-semibold backdrop-blur-md">
               <QrCode className="h-4 w-4 text-[#93c5fd]" />
-              <span>Cryptographic QR Verification</span>
+              <span>Instant Verification & QR</span>
             </div>
           </div>
         </div>
@@ -73,9 +73,9 @@ export default function AboutUsSection() {
               Our Mission
             </h2>
             <p className="text-sm leading-relaxed text-[#5e716e]">
-              To eliminate manual card production delays, inconsistent school branding, and verification vulnerabilities.
-              We provide schools and educational trusts with an automated, tamper-proof ID card ecosystem that guarantees
-              fast turnaround, perfect brand fidelity, and uncompromised student safety.
+              To simplify student identity management for educational institutions of every size.
+              We eliminate manual design delays, ensure consistent school branding, and provide an
+              effortless verification system that keeps student data organized, accurate, and secure.
             </p>
           </CardContent>
         </Card>
@@ -89,9 +89,9 @@ export default function AboutUsSection() {
               Partnership & Trust
             </h2>
             <p className="text-sm leading-relaxed text-[#5e716e]">
-              Trusted by leading academies, K-12 institutions, and university networks. Insight Education is engineered
-              for seamless school onboarding, where administrators generate custom credentials for each school in seconds,
-              giving schools autonomous template selection while centralizing approval governance.
+              Built specifically for schools, academies, and educational groups.
+              Administrators can easily onboard schools, share curated ID templates, and oversee card
+              approvals, giving schools autonomy while maintaining institutional standards.
             </p>
           </CardContent>
         </Card>
@@ -102,14 +102,14 @@ export default function AboutUsSection() {
         <div className="flex items-center justify-between">
           <div>
             <div className="text-xs font-extrabold uppercase tracking-wider text-[#0f7f79]">
-              Platform Architecture
+              Platform Capabilities
             </div>
             <h2 className="text-2xl font-black tracking-tight text-[#182326]">
-              Engineered for Scale & Security
+              Built for Modern Education
             </h2>
           </div>
           <span className="hidden rounded-full border border-[#d6e3dc] bg-[#eef7f3] px-3 py-1 text-xs font-bold text-[#0f7f79] sm:inline-block">
-            Production Ready
+            Fast & Reliable
           </span>
         </div>
 
@@ -118,9 +118,9 @@ export default function AboutUsSection() {
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#dff3ee] text-[#0f7f79]">
               <Layers className="h-5 w-5" />
             </div>
-            <h3 className="mt-4 text-sm font-extrabold text-[#182326]">Multi-Tenant Isolation</h3>
+            <h3 className="mt-4 text-sm font-extrabold text-[#182326]">Independent School Accounts</h3>
             <p className="mt-2 text-xs leading-relaxed text-[#778381]">
-              Zero cross-school data leakage. Each institution operates in an isolated tenant scope, seeing exclusively its own students and cards.
+              Each school has its own dedicated portal with private access, ensuring student records and card data remain completely separated and confidential.
             </p>
           </div>
 
@@ -128,9 +128,9 @@ export default function AboutUsSection() {
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#e9ebfa] text-[#5c64b7]">
               <Palette className="h-5 w-5" />
             </div>
-            <h3 className="mt-4 text-sm font-extrabold text-[#182326]">Dynamic Template Studio</h3>
+            <h3 className="mt-4 text-sm font-extrabold text-[#182326]">Visual Template Designer</h3>
             <p className="mt-2 text-xs leading-relaxed text-[#778381]">
-              Live visual canvas editor supporting portrait and landscape orientations, dynamic placeholders, barcodes, and custom brand palettes.
+              Easily create and customize school ID cards with portrait and landscape layouts, custom school logos, dynamic student fields, and brand colors.
             </p>
           </div>
 
@@ -138,9 +138,9 @@ export default function AboutUsSection() {
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#fff8d9] text-[#9d7611]">
               <FileCheck2 className="h-5 w-5" />
             </div>
-            <h3 className="mt-4 text-sm font-extrabold text-[#182326]">Multi-Stage Approvals</h3>
+            <h3 className="mt-4 text-sm font-extrabold text-[#182326]">Seamless Review & Approval</h3>
             <p className="mt-2 text-xs leading-relaxed text-[#778381]">
-              Formal review lifecycle (Draft → Submitted → Reviewed → Approved → Printed) with real-time school notifications and change request audit logs.
+              A transparent review workflow where schools review student cards, request corrections with feedback notes, and approve ready-to-print designs.
             </p>
           </div>
 
@@ -148,9 +148,9 @@ export default function AboutUsSection() {
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#fff0e8] text-[#c65c3d]">
               <Printer className="h-5 w-5" />
             </div>
-            <h3 className="mt-4 text-sm font-extrabold text-[#182326]">Bulk Print Generation</h3>
+            <h3 className="mt-4 text-sm font-extrabold text-[#182326]">Print & Export Ready</h3>
             <p className="mt-2 text-xs leading-relaxed text-[#778381]">
-              High-speed PDF vector rendering engine generating single and bulk multi-page print files formatted precisely for standard PVC card printers.
+              Generate crisp print files for individual cards or entire batches with one click, formatted perfectly for professional card printers.
             </p>
           </div>
         </div>
@@ -160,33 +160,33 @@ export default function AboutUsSection() {
       <section className="rounded-3xl border border-[#dce6e1] bg-[#f2f8f5] p-6 sm:p-8">
         <div className="max-w-2xl space-y-3">
           <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#0f7f79]">
-            <Lock className="h-3.5 w-3.5" /> Security & Governance
+            <Lock className="h-3.5 w-3.5" /> Security & Trust
           </div>
           <h2 className="text-xl font-black text-[#182326]">
-            Enterprise-Grade Protection & Cryptography
+            Protected, Safe & Reliable
           </h2>
           <p className="text-xs sm:text-sm text-[#5e716e] leading-relaxed">
-            Insight Education enforces state-of-the-art security practices across all layers. All passwords are protected
-            using salted Scrypt key derivation. Application sessions utilize secure, signed JSON Web Tokens with HTTP-only
-            cookie storage. Every administrative change is logged to an immutable append-only audit trail.
+            We prioritize student data privacy and system security at every step. Insight Education combines strict
+            access permissions, encrypted credentials, and comprehensive activity tracking to ensure your institution's
+            records are always safeguarded.
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 text-xs font-bold text-[#274844]">
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-[#0f7f79]" />
-              <span>Full Role-Based Access Control (RBAC)</span>
+              <span>Role-based permissions for administrators and staff</span>
             </div>
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-[#0f7f79]" />
-              <span>Tenant-Enforced SQL Queries & API Guards</span>
+              <span>Secure student data protection across all schools</span>
             </div>
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-[#0f7f79]" />
-              <span>Tamper-Proof QR Code Verification Hashes</span>
+              <span>Instant QR code verification for card authenticity</span>
             </div>
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-[#0f7f79]" />
-              <span>Append-Only Administrative Audit Trails</span>
+              <span>Complete activity logs for review and accountability</span>
             </div>
           </div>
         </div>
@@ -203,7 +203,7 @@ export default function AboutUsSection() {
               Insight Education Management Suite
             </h3>
             <p className="text-xs text-[#778381]">
-              Version 2.2.0 (Internal Build) · Developed by Rishu Rajak.
+              Version 2.2.9 (Internal Build) · Developed by Rishu Rajak.
             </p>
           </div>
 

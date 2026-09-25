@@ -19,9 +19,9 @@ export default function DesignerToolbar({ state, dispatch, onSave, onPreview, on
   const sides: DesignerSide[] = ["FRONT", "BACK"];
 
   return (
-    <div className="flex h-14 items-center justify-between border-b border-[#e0e6e1] bg-white px-4 shadow-sm">
+    <div className="flex h-14 items-center justify-between border-b border-[#e0e6e1] bg-white px-2 sm:px-4 shadow-sm overflow-x-auto [scrollbar-width:none] min-w-0 gap-3">
       {/* Left section */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button variant="ghost" size="icon" className="h-8 w-8 text-[#778381]" onClick={onBack}>
@@ -128,7 +128,7 @@ export default function DesignerToolbar({ state, dispatch, onSave, onPreview, on
       </div>
 
       {/* Center — Zoom controls */}
-      <div className="flex items-center gap-2">
+      <div className="hidden sm:flex items-center gap-2 shrink-0">
         <Button
           variant="ghost"
           size="icon"
@@ -142,7 +142,7 @@ export default function DesignerToolbar({ state, dispatch, onSave, onPreview, on
           min={0.5}
           max={3}
           step={0.25}
-          className="w-28"
+          className="w-24 md:w-28"
           onValueChange={([v]) => dispatch({ type: "SET_ZOOM", zoom: v })}
         />
         <span className="w-10 text-center text-xs font-bold text-[#778381]">{Math.round(state.zoom * 100)}%</span>
@@ -173,7 +173,7 @@ export default function DesignerToolbar({ state, dispatch, onSave, onPreview, on
       </div>
 
       {/* Right section */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 shrink-0">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button variant="ghost" size="icon" className="h-8 w-8 text-[#778381]" onClick={onPreview}>

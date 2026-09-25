@@ -1,104 +1,105 @@
-# Insight Education · School ID Card Management System
+# Insight Education · School ID Card Management Suite
 
-A multi-tenant, INTERNAL-grade ID card design, generation, approval, and printing platform built with React 19, Express, tRPC v11, MySQL, and Drizzle ORM.
+**Insight Education Management Suite** (Version 2.2.0) by **EduNextG** is an INTERNAL-grade, multi-tenant student identity lifecycle platform. Engineered for school networks, colleges, and academies, it unifies drag-and-drop ID card template design, multi-stage approval workflows, cryptographic QR code verification, and high-resolution batch PVC print production into a single, intuitive system.
+
+Developed by **Rishu Rajak**.
 
 ---
 
-## Key Features
+## 🌟 Key Features
 
-### Multi-Tenant Architecture & Role-Based Access Control (RBAC)
+### 🏢 Multi-Tenant Architecture & Role-Based Access Control (RBAC)
 - **Role Hierarchy**: Strict role separation between `SUPER_ADMIN`, `SCHOOL_ADMIN`, `SCHOOL_OPERATOR`, and `VIEWER`.
-- **Tenant Isolation**: Schools are completely isolated at the database, query, and session layer. Cross-school data leaks and unauthorized card modifications are strictly prohibited.
+- **Tenant Data Isolation**: Schools operate in strictly isolated tenant scopes at database, API, and session layers. Cross-school data exposure is prevented by design.
 - **Super Admin Portal (`/admin`)**:
-  - **School Management**: Onboard new schools, configure short codes and metadata, manage admin credentials, and delete schools (with automatic cascading cleanup).
-  - **User Governance**: Create, edit, activate/deactivate platform operators and school administrators.
-  - **Template Designer**: Create and configure canvas-based ID card templates (portrait/landscape, dimensions, accent themes, dynamic text fields, photo placeholders, barcodes, and QR codes).
-  - **Workflow & Approvals**: Review submitted cards from schools, approve or reject with audit comments, request changes, and track production.
-  - **Audit Logs & Analytics**: Complete audit trail recording actions, timestamps, actor user IDs, IP addresses, entity types, and state diffs (`oldValues` vs `newValues`).
-  - **Platform Settings**: Manage branding, default school configurations, and system preferences.
+  - **School Governance**: Register new schools, configure unique short codes, manage school contact metadata, generate login credentials (`ID Pass`), and delete schools with automatic cascading cleanup.
+  - **User Management**: Provision, activate, or deactivate school operators and administrators.
+  - **Visual Template Designer**: Interactive canvas editor for front and back ID card templates supporting custom dimensions, portrait and landscape orientations, color palettes, photo/signature placeholders, barcodes (Code128), and QR codes.
+  - **Card Review & Approvals**: Multi-card review queue with live card previews, direct approval/rejection, change request notes, and bulk actions.
+  - **Audit Logs & Activity**: Append-only administrative and school event ledger with filterable timelines, CSV export, and clear action histories.
+  - **Platform Settings**: Exclusive to Super Admin (safely hidden from the school portal) for managing platform configurations and branding.
 
 - **School Portal (`/school`)**:
-  - **Template Selection & Assignment**: Browse and assign active templates published by the Super Admin.
-  - **ID Card Creation**: Add student and staff ID card records individually or through structured bulk entries.
+  - **Template Selection**: Browse active templates published by the Super Admin and select the school's official template.
+  - **Student ID Card Management**: Create and edit student ID card records with dynamic fields, photo uploads, and signature support.
   - **Approval Pipeline**: Track full card lifecycle (`DRAFT` → `SUBMITTED` → `UNDER_REVIEW` → `APPROVED` / `CHANGES_REQUIRED` / `REJECTED` → `PRINTED`).
-  - **Export & Print**: Generate high-resolution PDF cards (single cards or multi-card print grid sheets) with barcodes and QR codes.
-  - **Account & Security**: Self-service profile updates, password changes, and secure password reset flow.
+  - **Print & PDF Export**: Instant preview and download of single or batch print-ready cards formatted for standard CR80 PVC card dimensions.
+  - **Focused Workspace**: Streamlined interface tailored for school operators; administrative settings are restricted to Super Admin.
 
-### Security & Hardening
-- **Authentication**: Secure scrypt password hashing with unique per-user salts; HTTP-only, SameSite JWT session cookies.
-- **File Upload Security**: Strict magic-byte MIME type validation for uploads (PNG, JPEG, WebP, GIF), preventing malicious file extension spoofing.
-- **Audit Logging**: Comprehensive structured event logs on administrative actions, card state transitions, and user modifications.
+### 📱 Full Cross-Device Responsiveness
+- **Adaptive Layouts**: Optimized for mobile phones (from 320px), tablets, laptops, and ultra-wide desktop monitors.
+- **Collapsible Mobile Navigation**: Slide-out drawer with backdrop blur overlay and auto-collapse upon navigation.
+- **Scroll-Safe Split Modals**: ID card creation and review dialogs feature responsive split views (`overflow-y-auto lg:overflow-hidden`) that stack seamlessly on mobile without clipping canvas previews.
+- **Controlled Table Scrolling**: Wide tabular datasets adapt with contained horizontal scrolling (`overflow-x-auto min-w-[...]`), preserving layout structure on narrow screens.
+
+### 🔒 Security, Validation & Governance
+- **Session Authentication**: Password hashing using Scrypt with unique per-user salts; signed JWT sessions stored in HTTP-only, SameSite cookies.
+- **Phone Number Validation**: Strict 10-digit numeric constraint with a dedicated `+91` prefix badge and inline validation feedback.
+- **File Upload Protection**: Magic-byte MIME type inspection for photo and asset uploads (PNG, JPEG, WebP) to prevent file extension spoofing.
+- **Audit Trails**: Structured event logging capturing actor identities, timestamps, entity types, and state changes.
 
 ---
 
-## Technology Stack
+## 🛠️ Technology Stack
 
 - **Frontend**:
-  - React 19, TypeScript
-  - Vite 7
-  - Tailwind CSS v4 & Tailwind Animate
-  - Radix UI Primitives & Lucide React
-  - Wouter (Routing)
-  - TanStack Query v5
-  - Sonner (Toast notifications)
-  - jsPDF & JsBarcode / QRCode generator
+  - **Framework**: React 19, TypeScript, Vite 7
+  - **Styling**: Tailwind CSS v4, Tailwind Animate
+  - **UI Primitives**: Radix UI, Lucide React
+  - **Routing**: Wouter
+  - **State & Data**: TanStack Query v5, Sonner notifications
+  - **Rendering**: jsPDF, JsBarcode, QRCode
 
 - **Backend**:
-  - Node.js (v20+) & Express
-  - tRPC v11 for end-to-end type-safe APIs
-  - Drizzle ORM with MySQL (`mysql2`)
-  - Jose (JWT signing and verification via HTTP-only cookies)
-  - PDFKit for server-side ID card rendering and batch print sheets
+  - **Runtime**: Node.js (v20+) & Express
+  - **API Layer**: RESTful endpoints and tRPC v11
+  - **Database & ORM**: MySQL (`mysql2`) with Drizzle ORM
+  - **Auth & Tokens**: Jose (JWT) & Node Crypto (Scrypt)
+  - **Document Generation**: PDFKit vector rendering engine
 
 ---
 
-## Project Structure
+## 📁 Project Structure
 
 ```
-├── client/                 # Frontend Single Page Application (SPA)
-│   ├── public/             # Static assets (favicons, logos)
+├── client/                 # Frontend Single Page Application
+│   ├── public/             # Static assets, logos, and catalogs
 │   └── src/
-│       ├── components/     # Reusable UI components, dialogs, form controls
-│       ├── contexts/       # Theme, auth, and global UI contexts
-│       ├── lib/            # tRPC and REST API client adapters
-│       ├── pages/          # Portal pages (Admin, School, Designer, Login, etc.)
-│       └── App.tsx         # Route definitions and RBAC router guards
+│       ├── components/     # UI components, modals (PrintModal, CardRenderer, AuditLogs)
+│       ├── contexts/       # Global authentication and UI contexts
+│       ├── lib/            # API client adapters and utilities
+│       ├── pages/          # Pages (Home, Login, TemplateDesigner, IdCardFormModal)
+│       └── App.tsx         # Route configuration and authentication guards
 ├── drizzle/                # Database schema definitions and migrations
-│   ├── meta/               # Drizzle migration journal and snapshots
-│   ├── *.sql               # Sequential migration scripts (0000 - 0007)
-│   └── schema.ts           # Drizzle MySQL schema definition
+│   ├── meta/               # Migration snapshots and journals
+│   ├── *.sql               # Sequential migration scripts
+│   └── schema.ts           # Drizzle MySQL relational schema
 ├── server/                 # Backend server application
-│   ├── _core/              # Framework core, server bootstrap & middleware
-│   ├── api.ts              # RESTful API handlers (auth, schools, cards, templates, uploads)
-│   ├── appAuth.ts          # Scrypt password hashing, session tokens, password resets
-│   ├── db.ts               # Drizzle connection & database helper queries
-│   ├── idCards.ts          # ID card helper utilities & status transitions
-│   ├── pdf.ts              # Server-side ID card PDF generation (PDFKit)
-│   ├── routers.ts          # tRPC root router
-│   ├── storage.ts          # Storage integration (Forge S3 / local disk fallback)
-│   └── *.test.ts           # Vitest integration and isolation test suite
-├── scripts/                # Utility and development scripts
-│   └── seed-auth.ts        # Development-only account seeder (blocked in production)
-├── package.json            # Project dependencies and npm scripts
-├── pnpm-lock.yaml          # Pnpm lockfile
-├── tsconfig.json           # TypeScript configuration
-└── vite.config.ts          # Vite build and development configuration
+│   ├── _core/              # Core server framework and middleware
+│   ├── api.ts              # REST API handlers (schools, cards, templates, approvals)
+│   ├── appAuth.ts          # Authentication, Scrypt hashing, and password management
+│   ├── db.ts               # Database connection and queries
+│   ├── pdf.ts              # Server-side PDF generation
+│   ├── routers.ts          # tRPC route definitions
+│   └── storage.ts          # Storage integration
+├── scripts/                # Development and migration scripts
+│   ├── seed-auth.ts        # Development account seeder
+│   └── migrate-database.mjs# Migration runner
+├── package.json            # Dependencies and scripts
+└── tsconfig.json           # TypeScript configuration
 ```
 
 ---
 
-## Getting Started
+## 🚀 Getting Started
 
 ### Prerequisites
-- **Node.js**: v20.x or later
+- **Node.js**: v20.x or higher
 - **pnpm**: v9.x or v10.x (Recommended: `pnpm@10.4.1`)
-- **MySQL**: 8.0+ running locally or accessible via network
+- **MySQL**: 8.0+ running locally or on a remote host
 
-> [!NOTE]
-> Always use `pnpm` rather than `npm` when managing dependencies, as the project defines patches and workspace overrides in `pnpm-lock.yaml`.
-
-### 1. Environment Setup
-Create a `.env` file in the project root:
+### 1. Environment Configuration
+Create a `.env` file in the root directory (refer to `.env.example`):
 ```env
 # Database connection
 DATABASE_URL="mysql://username:password@localhost:3306/id_card_db"
@@ -109,9 +110,6 @@ JWT_SECRET="your-secure-random-jwt-secret-at-least-32-chars-long"
 # Server configuration
 PORT=3000
 NODE_ENV=development
-
-# Optional OAuth configuration (if external SSO is used)
-# OAUTH_SERVER_URL="https://oauth.example.com"
 ```
 
 ### 2. Install Dependencies
@@ -120,20 +118,20 @@ pnpm install
 ```
 
 ### 3. Database Migration
-Apply the database schema to your MySQL instance:
+Apply the database schema:
 ```bash
 pnpm db:migrate
 ```
 
 ### 4. Seed Development Accounts
-Seed initial administrative and test school accounts for local development:
+Populate initial administrative and test school accounts:
 ```bash
 pnpm db:seed-auth
 ```
-*(Note: `seed-auth` is strictly locked out when `NODE_ENV=production`)*
+*(Note: `seed-auth` is blocked when `NODE_ENV=production`)*
 
 #### Default Seed Credentials:
-| Portal | Email | Password | Role |
+| Portal | Email / Login ID | Password | Role |
 |---|---|---|---|
 | Super Admin | `admin@edunextg.com` | `Duronto321` | `SUPER_ADMIN` |
 | School Admin | `school@example.test` | `School123!` | `SCHOOL_ADMIN` |
@@ -146,64 +144,40 @@ The application will be accessible at `http://localhost:3000`.
 
 ---
 
-## Available Scripts
+## 📜 Available Scripts
 
 | Script | Command | Purpose |
 |---|---|---|
-| `pnpm dev` | `cross-env NODE_ENV=development tsx watch server/_core/index.ts` | Start local development server with hot reload |
-| `pnpm build` | `vite build && esbuild server/_core/index.ts ...` | Build client SPA and bundle Node.js server |
-| `pnpm start` | `cross-env NODE_ENV=production node dist/index.js` | Run compiled production bundle |
-| `pnpm check` | `tsc --noEmit` | Type check frontend and backend code |
-| `pnpm test` | `vitest run --fileParallelism=false` | Execute full Vitest test suite |
-| `pnpm format` | `prettier --write .` | Format codebase using Prettier |
-| `pnpm db:push` | `drizzle-kit generate && drizzle-kit migrate` | Generate and apply database migrations |
-| `pnpm db:migrate` | `node scripts/migrate-database.mjs` | Apply committed migrations without generating new files |
-| `pnpm db:setup` | `tsx scripts/setup-database.ts` | Apply migrations and create/update the initial Super Admin |
+| `pnpm dev` | `cross-env NODE_ENV=development tsx watch server/_core/index.ts` | Start development server with live reload |
+| `pnpm build` | `vite build && esbuild server/_core/index.ts ...` | Compile client SPA and server bundle |
+| `pnpm start` | `cross-env NODE_ENV=production node dist/index.js` | Run compiled production build |
+| `pnpm check` | `tsc --noEmit` | Validate TypeScript types across frontend and backend |
+| `pnpm db:migrate` | `node scripts/migrate-database.mjs` | Apply committed database migrations |
 | `pnpm db:seed-auth` | `tsx scripts/seed-auth.ts` | Seed dev accounts (Super Admin & School Admin) |
 
 ---
 
-## Troubleshooting & Tips
+## 🚢 Production Deployment
 
-- **Package Management**:
-  - Always use `pnpm` (e.g. `pnpm install`, `pnpm add -D <package>`). Running `npm install` directly can fail due to package-manager specific overrides or lockfile differences.
-- **Port Conflict (`EADDRINUSE`)**:
-  - In development (`NODE_ENV=development`), if port `3000` is occupied, the server automatically searches and binds to the next available port (e.g. `3001`, `3002`). Check terminal output for the assigned URL.
-- **`OAUTH_SERVER_URL is not configured!` Notice**:
-  - This is an informational warning for optional external SSO integration. The core system operates fully using local credential-based authentication (`/api/auth/login`).
-- **Database Connection Issues**:
-  - Ensure MySQL is running and that the user specified in `DATABASE_URL` has privileges to create and modify tables.
-
----
-
-## Production Deployment
-
-1. Copy `.env.example` to `.env` and configure `NODE_ENV=production`, `DATABASE_URL`, a unique `JWT_SECRET` of at least 32 characters, and `PORT`.
-2. Install from the lockfile, verify, and build:
+1. Configure `.env` with production database credentials, a 32+ character `JWT_SECRET`, and `NODE_ENV=production`.
+2. Install dependencies, run type checks, and build:
    ```bash
    pnpm install --frozen-lockfile
    pnpm check
-   pnpm test
    pnpm build
    ```
-3. Back up the database, then apply committed migrations:
+3. Apply database migrations:
    ```bash
    pnpm db:migrate
    ```
-4. Launch or restart the production server:
+4. Start the server using a process manager like PM2:
    ```bash
-   pnpm start
+   pm2 start dist/index.js --name "insight-education"
    ```
-
-   With PM2, use `pm2 restart id-card-management --update-env` after the build and migration complete.
-
-5. Configure the reverse proxy to use `/healthz` for liveness and `/readyz` for readiness. Production defaults to trusting one proxy hop; set `TRUST_PROXY` if your topology differs.
-
-The server validates its environment and required database tables during startup. If a migration is missing, startup fails with an actionable error instead of serving a partially working dashboard.
 
 ---
 
-## License
+## 📄 License
 MIT License
 
-DEVELOPED BY [r1shurajak](https://github.com/r1shurajak)!
+**Developed by [Rishu Rajak](https://github.com/r1shurajak)** · Built with **EduNextG**.

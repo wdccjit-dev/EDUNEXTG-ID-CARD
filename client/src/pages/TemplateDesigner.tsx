@@ -198,7 +198,7 @@ export default function TemplateDesigner() {
       />
 
       {/* Main area */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden min-w-0">
         {/* Left — Element palette */}
         <ElementPalette dispatch={dispatch} />
 
@@ -211,9 +211,9 @@ export default function TemplateDesigner() {
 
       {/* Preview dialog */}
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogContent className="max-w-[700px]">
+        <DialogContent className="w-[95vw] max-w-[700px] max-h-[92vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold">Card Preview — {state.template.name}</DialogTitle>
+            <DialogTitle className="text-base sm:text-lg font-bold">Card Preview — {state.template.name}</DialogTitle>
           </DialogHeader>
           <div className="flex flex-col items-center gap-4 py-4">
             <div className="flex gap-2">
@@ -231,18 +231,20 @@ export default function TemplateDesigner() {
                 </button>
               ))}
             </div>
-            <CardRenderer
-              cardWidth={state.template.cardWidth}
-              cardHeight={state.template.cardHeight}
-              elements={state.elements}
-              side={previewSide}
-              cardData={SAMPLE_CARD_DATA}
-              scale={Math.min(
-                1.75,
-                520 / (state.template.cardWidth || 324),
-                420 / (state.template.cardHeight || 204),
-              )}
-            />
+            <div className="overflow-x-auto max-w-full flex justify-center py-1 [scrollbar-width:thin]">
+              <CardRenderer
+                cardWidth={state.template.cardWidth}
+                cardHeight={state.template.cardHeight}
+                elements={state.elements}
+                side={previewSide}
+                cardData={SAMPLE_CARD_DATA}
+                scale={Math.min(
+                  1.75,
+                  520 / (state.template.cardWidth || 324),
+                  420 / (state.template.cardHeight || 204),
+                )}
+              />
+            </div>
             <div className="max-w-md text-center text-xs text-[#98a4a1]">
               Preview with sample data. Actual card data will replace dynamic fields during ID card generation.
             </div>

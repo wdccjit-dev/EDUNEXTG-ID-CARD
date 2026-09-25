@@ -267,7 +267,7 @@ export default function AuditLogsSection({
             <div
               role="radiogroup"
               aria-label="Audit Log Scope Selector"
-              className="relative flex items-center p-1 rounded-2xl bg-[#e3eae5] border border-[#cbd8d0] shadow-inner"
+              className="relative flex items-center p-1 rounded-2xl bg-[#e3eae5] border border-[#cbd8d0] shadow-inner max-w-full overflow-x-auto [scrollbar-width:none]"
             >
               {/* School Logs Button */}
               <button
@@ -276,7 +276,7 @@ export default function AuditLogsSection({
                   setActiveMode("school");
                   setPage(1);
                 }}
-                className={`relative z-10 flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${
+                className={`relative z-10 flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
                   activeMode === "school"
                     ? "bg-[#0f7f79] text-white shadow-md font-extrabold scale-[1.02]"
                     : "text-[#475753] hover:text-[#182326] hover:bg-black/5"
@@ -300,7 +300,7 @@ export default function AuditLogsSection({
                   setActiveMode("admin");
                   setPage(1);
                 }}
-                className={`relative z-10 flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${
+                className={`relative z-10 flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
                   activeMode === "admin"
                     ? "bg-[#0f7f79] text-white shadow-md font-extrabold scale-[1.02]"
                     : "text-[#475753] hover:text-[#182326] hover:bg-black/5"
@@ -319,7 +319,7 @@ export default function AuditLogsSection({
             </div>
 
             {/* Top Action Buttons: Export CSV & Clear logs */}
-            <div className="flex items-center gap-2 self-end sm:self-auto">
+            <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
               <button
                 type="button"
                 onClick={handleExportCSV}
@@ -519,7 +519,7 @@ export default function AuditLogsSection({
 
         {/* Pagination footer */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between border-t border-[#edf0ed] px-5 py-3 text-xs text-[#637571]">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[#edf0ed] px-4 sm:px-5 py-3 text-xs text-[#637571]">
             <div>
               Showing <b>{(currentPage - 1) * pageSize + 1}</b> to{" "}
               <b>{Math.min(currentPage * pageSize, filteredDataset.length)}</b> of{" "}

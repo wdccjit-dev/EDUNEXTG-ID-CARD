@@ -118,23 +118,23 @@ export default function PrintModal({
       `}</style>
 
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+        <DialogContent className="w-[96vw] max-w-4xl max-h-[92vh] flex flex-col p-4 sm:p-6">
           <DialogHeader>
-            <div className="flex items-center justify-between pr-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pr-2 sm:pr-6">
               <div>
-                <DialogTitle className="text-xl font-bold">
+                <DialogTitle className="text-lg sm:text-xl font-bold">
                   Print Preview {cards.length > 1 ? `(${cards.length} Cards)` : ""}
                 </DialogTitle>
-                <div className="text-xs text-gray-500 mt-1">
+                <div className="text-xs text-gray-500 mt-0.5">
                   High-fidelity output directly from template designer layout.
                 </div>
               </div>
-              <div className="flex gap-1.5 bg-gray-100 p-1 rounded-lg text-xs font-semibold">
+              <div className="flex gap-1 bg-gray-100 p-1 rounded-lg text-xs font-semibold shrink-0 self-start sm:self-auto">
                 {(["BOTH", "FRONT", "BACK"] as const).map((s) => (
                   <button
                     key={s}
                     onClick={() => setSidePreview(s)}
-                    className={`px-3 py-1 rounded-md transition-all ${
+                    className={`px-2.5 sm:px-3 py-1 rounded-md transition-all text-xs ${
                       sidePreview === s
                         ? "bg-white text-teal-800 shadow-xs"
                         : "text-gray-500 hover:text-gray-900"
@@ -150,7 +150,7 @@ export default function PrintModal({
           {/* Printable Container & Interactive Preview */}
           <div
             id="print-area"
-            className="flex-1 overflow-y-auto p-4 space-y-8 bg-gray-50/50 rounded-xl border border-gray-100"
+            className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-8 bg-gray-50/50 rounded-xl border border-gray-100"
           >
             {cards.map((card) => {
               const tmpl = card.template;
@@ -178,9 +178,9 @@ export default function PrintModal({
                     Card #{card.cardNumber} · {card.studentName || "Student"}
                   </div>
 
-                  <div className="flex flex-wrap items-center justify-center gap-6">
+                  <div className="flex flex-wrap items-center justify-center gap-6 max-w-full overflow-x-auto [scrollbar-width:thin] p-1">
                     {(sidePreview === "BOTH" || sidePreview === "FRONT") && (
-                      <div className="flex flex-col items-center gap-1.5">
+                      <div className="flex flex-col items-center gap-1.5 shrink-0">
                         <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
                           Front
                         </span>
@@ -196,7 +196,7 @@ export default function PrintModal({
                     )}
 
                     {(sidePreview === "BOTH" || sidePreview === "BACK") && (
-                      <div className="flex flex-col items-center gap-1.5">
+                      <div className="flex flex-col items-center gap-1.5 shrink-0">
                         <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
                           Back
                         </span>
@@ -216,16 +216,16 @@ export default function PrintModal({
             })}
           </div>
 
-          <DialogFooter className="flex items-center justify-between pt-3 border-t">
-            <div className="text-xs text-gray-500">
+          <DialogFooter className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-3 border-t">
+            <div className="text-[11px] sm:text-xs text-gray-500">
               Only approved cards are eligible for printing. Status will update to <strong>PRINTED</strong>.
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
               <Button
                 variant="outline"
                 onClick={handleDownloadPdf}
                 disabled={downloading}
-                className="gap-2"
+                className="gap-2 w-full sm:w-auto"
               >
                 {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
                 Download PDF
@@ -233,7 +233,7 @@ export default function PrintModal({
               <Button
                 onClick={handlePrint}
                 disabled={printing}
-                className="gap-2 bg-[#0f7f79] hover:bg-[#0b6560] text-white"
+                className="gap-2 bg-[#0f7f79] hover:bg-[#0b6560] text-white w-full sm:w-auto"
               >
                 {printing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
                 Print {cards.length > 1 ? `(${cards.length})` : "Card"}
