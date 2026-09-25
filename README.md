@@ -2,7 +2,7 @@
 
 **Insight Education Management Suite** (Version 2.2.0) by **EduNextG** is an INTERNAL-grade, multi-tenant student identity lifecycle platform. Engineered for school networks, colleges, and academies, it unifies drag-and-drop ID card template design, multi-stage approval workflows, cryptographic QR code verification, and high-resolution batch PVC print production into a single, intuitive system.
 
-Developed by **Rishu Rajak**.
+
 
 ---
 
@@ -174,6 +174,9 @@ The application will be accessible at `http://localhost:3000`.
    ```bash
    pm2 start dist/index.js --name "insight-education"
    ```
+
+
+   Developed by **Rishu Rajak**.
 
 ---
 
