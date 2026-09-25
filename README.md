@@ -176,11 +176,10 @@ The application will be accessible at `http://localhost:3000`.
    ```
 
 
-   Developed by **Rishu Rajak**.
 
 ---
 
 ## 📄 License
 MIT License
 
-**Developed by [Rishu Rajak](https://github.com/r1shurajak)** · Built with **EduNextG**.
+**Developed by [Rishu Rajak](https://github.com/r1shurajak)** ·
