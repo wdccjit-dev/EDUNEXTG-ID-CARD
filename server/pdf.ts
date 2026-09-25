@@ -176,6 +176,18 @@ async function renderCardSide(
           imgBuffer = bufferFromDataUrl(imgUrl);
         }
 
+        // Apply image shape clipping
+        const shape = (c as any).imageShape ?? "square";
+        if (shape === "circle") {
+          const radius = Math.min(w, h) / 2;
+          doc.circle(x + w / 2, y + h / 2, radius).clip();
+        } else if (shape === "rounded") {
+          const r = Math.min(w, h) * 0.16;
+          doc.roundedRect(x, y, w, h, r).clip();
+        } else if (shape === "ellipse") {
+          doc.ellipse(x + w / 2, y + h / 2, w / 2, h / 2).clip();
+        }
+
         if (imgBuffer) {
           try {
             doc.image(imgBuffer, x, y, {

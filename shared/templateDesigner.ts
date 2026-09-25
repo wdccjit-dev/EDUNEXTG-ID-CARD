@@ -95,6 +95,7 @@ export interface ElementConfig {
   // Image
   imageUrl?: string;
   objectFit?: "cover" | "contain" | "fill" | "none";
+  imageShape?: "square" | "circle" | "rounded" | "ellipse";
 
   // Dynamic field
   dynamicField?: DynamicFieldKey;

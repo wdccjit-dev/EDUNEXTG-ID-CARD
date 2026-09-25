@@ -101,7 +101,23 @@ export type ApiApproval = {
   cardNumber?: string | null;
 };
 
-export type ApiActivity = { id: number; action: string; entityType: string; entityId: number | null; createdAt: string };
+export type ApiActivity = {
+  id: number;
+  userId: number | null;
+  userName?: string | null;
+  userEmail?: string | null;
+  userRole?: string | null;
+  schoolId: number | null;
+  schoolName?: string | null;
+  schoolCode?: string | null;
+  action: string;
+  entityType: string;
+  entityId: number | null;
+  newValues?: Record<string, any> | null;
+  oldValues?: Record<string, any> | null;
+  ipAddress?: string | null;
+  createdAt: string;
+};
 export type ApiNotification = { id: number; type: string; title: string; message: string; isRead: boolean; createdAt: string };
 export type ApiAuthUser = {
   id: number;
@@ -163,6 +179,8 @@ export const api = {
     list: (schoolId: number) => request<ApiSchoolTemplate[]>(`/api/schools/${schoolId}/templates`),
     select: (schoolId: number, templateId: number) =>
       request<{ success: true; selectedTemplateId: number; selectedTemplateName: string }>(`/api/schools/${schoolId}/templates/select`, json({ templateId })),
+    unselect: (schoolId: number) =>
+      request<{ success: true }>(`/api/schools/${schoolId}/templates/unselect`, json({})),
     lock: (schoolId: number, templateId: number) => request<void>(`/api/schools/${schoolId}/templates/lock`, json({ templateId })),
     unlock: (schoolId: number, templateId: number) => request<void>(`/api/schools/${schoolId}/templates/unlock`, json({ templateId })),
   },

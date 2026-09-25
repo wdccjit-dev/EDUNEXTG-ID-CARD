@@ -379,6 +379,17 @@ export default function PropertyPanel({ selectedElement, template, dispatch }: P
                   </SelectContent>
                 </Select>
               </PropRow>
+              <PropRow label="Shape">
+                <Select value={c.imageShape ?? "square"} onValueChange={(v) => update({ imageShape: v as ElementConfig["imageShape"] })}>
+                  <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="square">Square / Rectangle</SelectItem>
+                    <SelectItem value="circle">Circle</SelectItem>
+                    <SelectItem value="rounded">Rounded Rectangle</SelectItem>
+                    <SelectItem value="ellipse">Ellipse</SelectItem>
+                  </SelectContent>
+                </Select>
+              </PropRow>
             </>
           )}
 

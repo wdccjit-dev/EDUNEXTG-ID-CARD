@@ -1162,10 +1162,59 @@ router.post("/schools/:schoolId/templates/select", requireRole(schoolManagerRole
     // Atomically reset previous default templates for this school
     await db.update(schoolTemplates).set({ isDefault: false }).where(eq(schoolTemplates.schoolId, schoolId));
 
+    const [targetSchool] = await db.select({ name: schools.name, code: schools.shortCode }).from(schools).where(eq(schools.id, schoolId));
+
     if (existing) await db.update(schoolTemplates).set({ isDefault: true, assignedByUserId: user.id }).where(eq(schoolTemplates.id, existing.id));
     else await db.insert(schoolTemplates).values({ schoolId, templateId, isDefault: true, assignedByUserId: user.id });
-    await audit(user, "SELECT_TEMPLATE", "school_template", existing?.id ?? null, schoolId, { templateId });
+    await audit(user, "SELECT_TEMPLATE", "school_template", existing?.id ?? null, schoolId, {
+      templateId,
+      templateName: targetTemplate.name,
+      schoolName: targetSchool?.name,
+      schoolCode: targetSchool?.code,
+    });
     res.json({ success: true, selectedTemplateId: templateId, selectedTemplateName: targetTemplate.name });
+  } catch (e) {
+    fail(res, e);
+  }
+});
+
+router.post("/schools/:schoolId/templates/unselect", requireRole(schoolManagerRoles), async (req, res) => {
+  try {
+    const user = currentUser(res);
+    const schoolId = requestedSchoolId(user, req.params.schoolId);
+    if (!schoolId || !canManageSchool(user, schoolId)) return res.status(403).json({ error: "School access denied" });
+    const db = await getDb();
+    if (!db) return res.status(503).json({ error: "Database not available" });
+
+    // Check if any template is locked – cannot unselect a locked template
+    const locked = (
+      await db
+        .select()
+        .from(schoolTemplates)
+        .where(and(eq(schoolTemplates.schoolId, schoolId), eq(schoolTemplates.isLocked, true), eq(schoolTemplates.isDefault, true)))
+    )[0];
+    if (locked) return res.status(409).json({ error: "Cannot unselect a locked template. Unlock it first." });
+
+    const [prevDefault] = await db
+      .select({
+        templateId: schoolTemplates.templateId,
+        templateName: idCardTemplates.name,
+      })
+      .from(schoolTemplates)
+      .leftJoin(idCardTemplates, eq(schoolTemplates.templateId, idCardTemplates.id))
+      .where(and(eq(schoolTemplates.schoolId, schoolId), eq(schoolTemplates.isDefault, true)))
+      .limit(1);
+
+    const [targetSchool] = await db.select({ name: schools.name, code: schools.shortCode }).from(schools).where(eq(schools.id, schoolId));
+
+    await db.update(schoolTemplates).set({ isDefault: false }).where(eq(schoolTemplates.schoolId, schoolId));
+    await audit(user, "UNSELECT_TEMPLATE", "school_template", null, schoolId, {
+      templateId: prevDefault?.templateId,
+      templateName: prevDefault?.templateName,
+      schoolName: targetSchool?.name,
+      schoolCode: targetSchool?.code,
+    });
+    res.json({ success: true });
   } catch (e) {
     fail(res, e);
   }
@@ -1902,6 +1951,16 @@ async function transitionApproval(
     }
   }
 
+  let studentName = request?.studentName;
+  if (!studentName && card) {
+    const [dataRow] = await db
+      .select({ val: idCardData.fieldValue })
+      .from(idCardData)
+      .where(and(eq(idCardData.idCardId, card.id), inArray(idCardData.fieldKey, ["student_name", "studentName", "name", "full_name"])))
+      .limit(1);
+    if (dataRow?.val) studentName = dataRow.val;
+  }
+
   await db.transaction(async (tx) => {
     if (request) {
       await tx
@@ -1942,9 +2001,13 @@ async function transitionApproval(
         entityId: card.id,
         newValues: {
           requestId: request?.id,
+          cardNumber: card.cardNumber,
+          studentName: studentName || request?.studentName || "Student",
+          admissionCode: request?.admissionCode,
           fromStatus: currentStatus,
           toStatus: targetStatus,
           comment,
+          reason: comment,
         } as never,
       });
     } else if (request) {
@@ -1957,7 +2020,10 @@ async function transitionApproval(
         newValues: {
           fromStatus: currentStatus,
           toStatus: targetStatus,
+          studentName: request.studentName || "Student",
+          admissionCode: request.admissionCode,
           comment,
+          reason: comment,
         } as never,
       });
     }
@@ -2167,9 +2233,12 @@ async function handleBulkApprovalTransition(
             entityId: card.id,
             newValues: {
               requestId: request?.id,
+              cardNumber: card.cardNumber,
+              studentName: request?.studentName || "Student",
               fromStatus: currentStatus,
               toStatus: targetStatus,
               comment,
+              reason: comment,
               isBulk: true,
             } as never,
           });
@@ -2460,58 +2529,132 @@ router.get("/audit-logs", async (req, res) => {
     if (!db) return res.status(503).json({ error: "Database not available" });
     const user = currentUser(res);
 
+    const baseSelect = {
+      id: auditLogs.id,
+      userId: auditLogs.userId,
+      userName: users.name,
+      userEmail: users.email,
+      userRole: users.role,
+      schoolId: auditLogs.schoolId,
+      schoolName: schools.name,
+      schoolCode: schools.shortCode,
+      action: auditLogs.action,
+      entityType: auditLogs.entityType,
+      entityId: auditLogs.entityId,
+      newValues: auditLogs.newValues,
+      oldValues: auditLogs.oldValues,
+      ipAddress: auditLogs.ipAddress,
+      createdAt: auditLogs.createdAt,
+    };
+
+    let rawRows: any[] = [];
     if (adminRoles.has(user.role)) {
       if (req.query.schoolId) {
         const sid = Number(req.query.schoolId);
-        const rows = await db
-          .select({
-            id: auditLogs.id,
-            userId: auditLogs.userId,
-            schoolId: auditLogs.schoolId,
-            action: auditLogs.action,
-            entityType: auditLogs.entityType,
-            entityId: auditLogs.entityId,
-            createdAt: auditLogs.createdAt,
-          })
+        rawRows = await db
+          .select(baseSelect)
           .from(auditLogs)
+          .leftJoin(users, eq(auditLogs.userId, users.id))
+          .leftJoin(schools, eq(auditLogs.schoolId, schools.id))
           .where(eq(auditLogs.schoolId, sid))
           .orderBy(desc(auditLogs.id))
-          .limit(200);
-        return res.json(rows);
+          .limit(500);
+      } else {
+        rawRows = await db
+          .select(baseSelect)
+          .from(auditLogs)
+          .leftJoin(users, eq(auditLogs.userId, users.id))
+          .leftJoin(schools, eq(auditLogs.schoolId, schools.id))
+          .orderBy(desc(auditLogs.id))
+          .limit(500);
       }
-      const rows = await db
-        .select({
-          id: auditLogs.id,
-          userId: auditLogs.userId,
-          schoolId: auditLogs.schoolId,
-          action: auditLogs.action,
-          entityType: auditLogs.entityType,
-          entityId: auditLogs.entityId,
-          createdAt: auditLogs.createdAt,
-        })
+    } else {
+      // School user: strictly scoped to own school
+      if (!user.schoolId) return res.json([]);
+      rawRows = await db
+        .select(baseSelect)
         .from(auditLogs)
+        .leftJoin(users, eq(auditLogs.userId, users.id))
+        .leftJoin(schools, eq(auditLogs.schoolId, schools.id))
+        .where(eq(auditLogs.schoolId, user.schoolId))
         .orderBy(desc(auditLogs.id))
-        .limit(200);
-      return res.json(rows);
+        .limit(500);
     }
 
-    // School user: strictly scoped to own school
-    if (!user.schoolId) return res.json([]);
-    const rows = await db
-      .select({
-        id: auditLogs.id,
-        userId: auditLogs.userId,
-        schoolId: auditLogs.schoolId,
-        action: auditLogs.action,
-        entityType: auditLogs.entityType,
-        entityId: auditLogs.entityId,
-        createdAt: auditLogs.createdAt,
-      })
-      .from(auditLogs)
-      .where(eq(auditLogs.schoolId, user.schoolId))
-      .orderBy(desc(auditLogs.id))
-      .limit(200);
-    res.json(rows);
+    // Post-enrichment for legacy/historical audit logs missing templateName or card details in newValues
+    const templateIdsToFetch = new Set<number>();
+    const cardIdsToFetch = new Set<number>();
+
+    for (const row of rawRows) {
+      const nv = (row.newValues && typeof row.newValues === "object") ? (row.newValues as Record<string, any>) : {};
+      if ((row.action === "SELECT_TEMPLATE" || row.action === "UNSELECT_TEMPLATE") && !nv.templateName) {
+        const tid = nv.templateId || (row.entityType === "template" ? row.entityId : null);
+        if (tid) templateIdsToFetch.add(Number(tid));
+      }
+      if (
+        (row.action === "APPROVE_ID_CARD" || row.action === "REJECT_ID_CARD" || row.action === "REQUEST_CHANGES" || row.action === "START_REVIEW") &&
+        (!nv.cardNumber || !nv.studentName)
+      ) {
+        const cid = row.entityId || nv.cardId;
+        if (cid) cardIdsToFetch.add(Number(cid));
+      }
+    }
+
+    const templateNameMap = new Map<number, string>();
+    if (templateIdsToFetch.size > 0) {
+      const tRows = await db
+        .select({ id: idCardTemplates.id, name: idCardTemplates.name })
+        .from(idCardTemplates)
+        .where(inArray(idCardTemplates.id, Array.from(templateIdsToFetch)));
+      for (const t of tRows) templateNameMap.set(t.id, t.name);
+    }
+
+    const cardDetailsMap = new Map<number, { cardNumber?: string; studentName?: string }>();
+    if (cardIdsToFetch.size > 0) {
+      const cRows = await db
+        .select({ id: idCards.id, cardNumber: idCards.cardNumber })
+        .from(idCards)
+        .where(inArray(idCards.id, Array.from(cardIdsToFetch)));
+      for (const c of cRows) cardDetailsMap.set(c.id, { cardNumber: c.cardNumber });
+
+      const dRows = await db
+        .select({ idCardId: idCardData.idCardId, fieldKey: idCardData.fieldKey, fieldValue: idCardData.fieldValue })
+        .from(idCardData)
+        .where(and(inArray(idCardData.idCardId, Array.from(cardIdsToFetch)), inArray(idCardData.fieldKey, ["student_name", "studentName", "name", "full_name"])));
+      for (const d of dRows) {
+        const existing = cardDetailsMap.get(d.idCardId) || {};
+        if (!existing.studentName && d.fieldValue) {
+          existing.studentName = d.fieldValue;
+          cardDetailsMap.set(d.idCardId, existing);
+        }
+      }
+    }
+
+    const enrichedRows = rawRows.map((row) => {
+      const nv = (row.newValues && typeof row.newValues === "object") ? { ...(row.newValues as Record<string, any>) } : {};
+      if ((row.action === "SELECT_TEMPLATE" || row.action === "UNSELECT_TEMPLATE") && !nv.templateName) {
+        const tid = nv.templateId || (row.entityType === "template" ? row.entityId : null);
+        if (tid && templateNameMap.has(Number(tid))) {
+          nv.templateName = templateNameMap.get(Number(tid));
+        }
+      }
+      if (
+        (row.action === "APPROVE_ID_CARD" || row.action === "REJECT_ID_CARD" || row.action === "REQUEST_CHANGES" || row.action === "START_REVIEW")
+      ) {
+        const cid = row.entityId || nv.cardId;
+        if (cid && cardDetailsMap.has(Number(cid))) {
+          const detail = cardDetailsMap.get(Number(cid))!;
+          if (!nv.cardNumber && detail.cardNumber) nv.cardNumber = detail.cardNumber;
+          if (!nv.studentName && detail.studentName) nv.studentName = detail.studentName;
+        }
+      }
+      return {
+        ...row,
+        newValues: nv,
+      };
+    });
+
+    res.json(enrichedRows);
   } catch (e) {
     fail(res, e);
   }

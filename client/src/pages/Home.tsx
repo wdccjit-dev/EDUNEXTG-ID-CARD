@@ -51,6 +51,7 @@ import {
 } from "lucide-react";
 import SuperAdminProfileDialog from "@/components/SuperAdminProfileDialog";
 import AboutUsSection from "@/components/AboutUsSection";
+import AuditLogsSection from "@/components/AuditLogsSection";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -308,6 +309,13 @@ export default function Home({
   const displayedActiveSchools = useMemo(
     () => activeSchools.slice(0, overviewActiveSchoolsLimit),
     [activeSchools, overviewActiveSchoolsLimit],
+  );
+
+  // Overview Recent Activity display options & filtering
+  const [overviewRecentActivityLimit, setOverviewRecentActivityLimit] = useState<number>(5);
+  const displayedRecentActivity = useMemo(
+    () => activity.slice(0, overviewRecentActivityLimit),
+    [activity, overviewRecentActivityLimit],
   );
 
   // Super Admin explicit school selection
@@ -1064,6 +1072,26 @@ export default function Home({
     }
   };
 
+  const handleUnselectTemplate = async () => {
+    if (authenticatedUser.role === "VIEWER") {
+      return toast.error("Viewer accounts are read-only");
+    }
+    const schoolId = activeSchoolId;
+    if (!schoolId) {
+      return toast.error("No school selected");
+    }
+    try {
+      await api.schoolTemplates.unselect(schoolId);
+      toast.success(`Template unselected for ${currentActiveSchool?.name ?? `School #${schoolId}`}`);
+      const freshSchools = await api.schools.list();
+      setSchools(freshSchools);
+    } catch (error) {
+      toast.error("Could not unselect template", {
+        description: error instanceof Error ? error.message : "Request failed",
+      });
+    }
+  };
+
   const handlePreviewTemplate = async (template: ApiTemplate) => {
     try {
       const full = await api.templates.get(template.id);
@@ -1506,18 +1534,22 @@ export default function Home({
                   onClick={() => goTo("Approved cards")}
                 />
                 <MetricCard
-                  label="Print-ready cards"
-                  value={String(
-                    schoolIdCards.filter((card) => card.status === "PRINTED").length,
-                  )}
+                  label="Templates"
+                  value={String(templates.length)}
                   change="Click to view"
-                  icon={Printer}
+                  icon={Palette}
                   tone="yellow"
-                  onClick={() => goTo("Approved cards")}
+                  onClick={() => goTo("ID card templates")}
                 />
               </section>
 
-              <section className="mt-6 grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(300px,0.65fr)]">
+              <section
+                className={`mt-6 grid gap-5 ${
+                  authenticatedUser.role === "SUPER_ADMIN"
+                    ? "xl:grid-cols-[minmax(0,1.35fr)_minmax(300px,0.65fr)]"
+                    : "grid-cols-1"
+                }`}
+              >
                 <Card className="overflow-hidden ui-card rounded-2xl border-[#e2e8e3] bg-[#fffefa] shadow-[0_14px_40px_rgba(38,71,65,0.05)]">
                   <CardHeader className="flex flex-row items-start justify-between px-6 pb-3 pt-6">
                     <div>
@@ -1576,7 +1608,7 @@ export default function Home({
                               </tr>
                             </thead>
                             <tbody>
-                              {filteredApprovals.map((item) => (
+                              {filteredApprovals.slice(0, 4).map((item) => (
                                 <tr
                                   key={item.id}
                                   className="group border-b border-[#f0f2ef] last:border-0 hover:bg-[#fbfdfb]"
@@ -1669,7 +1701,7 @@ export default function Home({
                         )}
                         <div className="flex items-center justify-between border-t border-[#edf0ed] px-6 py-4">
                           <span className="font-mono text-[10px] text-[#a1aaa7]">
-                            Showing {filteredApprovals.length} of {pendingRequests.length} requests
+                            Showing {Math.min(filteredApprovals.length, 4)} of {pendingRequests.length} requests
                           </span>
                           <button
                             onClick={() => goTo("ID card requests")}
@@ -1683,75 +1715,96 @@ export default function Home({
                   </CardContent>
                 </Card>
 
-                <Card className="ui-card rounded-2xl border-[#e2e8e3] bg-[#fffefa] shadow-[0_14px_40px_rgba(38,71,65,0.05)]">
-                  <CardHeader className="flex flex-row items-start justify-between px-6 pb-2 pt-6">
-                    <div>
-                      <CardTitle className="text-[15px] font-extrabold tracking-[-0.02em]">
-                        Recent activity
-                      </CardTitle>
-                      <p className="mt-1 text-xs text-[#84918e]">
-                        Your team’s latest actions
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      {activity.length > 0 && authenticatedUser.role === "SUPER_ADMIN" && (
-                        <button
-                          onClick={() => void handleClearActivity()}
-                          className="text-[10px] font-extrabold text-[#dc2626] hover:underline cursor-pointer"
-                        >
-                          Clear
-                        </button>
-                      )}
-                      <button
-                        onClick={() => goTo("Audit logs")}
-                        className="text-[10px] font-extrabold text-[#0f7f79] hover:underline cursor-pointer"
-                      >
-                        View log
-                      </button>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="px-6 pb-6 pt-4">
-                    {activity.length === 0 ? (
-                      <div className="py-8 text-center text-xs text-[#8ea49d]">
-                        No recent activity entries.
+                {authenticatedUser.role === "SUPER_ADMIN" && (
+                  <Card className="ui-card rounded-2xl border-[#e2e8e3] bg-[#fffefa] shadow-[0_14px_40px_rgba(38,71,65,0.05)]">
+                    <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-6 pb-2 pt-6">
+                      <div>
+                        <CardTitle className="text-[15px] font-extrabold tracking-[-0.02em]">
+                          Recent activity
+                        </CardTitle>
+                        <p className="mt-1 text-xs text-[#84918e]">
+                          Showing {displayedRecentActivity.length} of {activity.length} actions
+                        </p>
                       </div>
-                    ) : (
-                      <div className="space-y-5">
-                        {activity.map((item) => (
-                          <div key={item.id} className="flex gap-3">
-                            <ToneIcon icon={BookOpenCheck} tone="teal" />
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-start justify-between gap-2">
-                                <div className="text-xs font-extrabold text-[#304541]">
-                                  {item.action.replaceAll("_", " ")}
-                                </div>
-                                <span className="whitespace-nowrap font-mono text-[9px] text-[#a3adaa]">
-                                  {formatDistanceToNow(new Date(item.createdAt), {
-                                    addSuffix: true,
-                                  })}
-                                </span>
-                              </div>
-                              <p className="mt-1 text-[11px] leading-4 text-[#81908b]">
-                                {item.entityType} #{item.entityId ?? "-"}
-                              </p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {apiError ? (
-                      <div className="mt-6 rounded-xl border border-dashed border-[#fca5a5] bg-[#fff5f5] p-3 text-center">
-                        <div className="text-[10px] text-[#dc2626]">{apiError}</div>
-                      </div>
-                    ) : (
-                      <div className="mt-6 rounded-xl border border-dashed border-[#d6e4dc] bg-[#f7fbf8] p-3 text-center">
-                        <div className="font-mono text-[9px] uppercase tracking-[0.12em] text-[#8ea49d]">
-                          All systems operational
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1.5">
+                          <label htmlFor="overview-activity-limit" className="text-xs font-semibold text-[#627571]">
+                            Show:
+                          </label>
+                          <select
+                            id="overview-activity-limit"
+                            aria-label="Display count for recent activity"
+                            value={overviewRecentActivityLimit}
+                            onChange={(e) => setOverviewRecentActivityLimit(Number(e.target.value))}
+                            className="h-8 rounded-xl border border-[#d3ded8] bg-white px-2.5 text-xs font-bold text-[#304541] shadow-sm hover:border-[#0f7f79] focus:outline-none focus:ring-1 focus:ring-[#0f7f79] cursor-pointer"
+                          >
+                            <option value={5}>5</option>
+                            <option value={10}>10</option>
+                            <option value={20}>20</option>
+                          </select>
                         </div>
+                        {activity.length > 0 && authenticatedUser.role === "SUPER_ADMIN" && (
+                          <button
+                            onClick={() => void handleClearActivity()}
+                            className="text-[10px] font-extrabold text-[#dc2626] hover:underline cursor-pointer"
+                          >
+                            Clear
+                          </button>
+                        )}
+                        <button
+                          onClick={() => goTo("Audit logs")}
+                          className="text-[10px] font-extrabold text-[#0f7f79] hover:underline cursor-pointer"
+                        >
+                          View log
+                        </button>
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
+                    </CardHeader>
+                    <CardContent className="px-6 pb-6 pt-4">
+                      {displayedRecentActivity.length === 0 ? (
+                        <div className="py-8 text-center text-xs text-[#8ea49d]">
+                          No recent activity entries.
+                        </div>
+                      ) : (
+                        <div className="space-y-5">
+                          {displayedRecentActivity.map((item) => (
+                            <div key={item.id} className="flex gap-3">
+                              <ToneIcon icon={BookOpenCheck} tone="teal" />
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="text-xs font-extrabold text-[#304541]">
+                                    {item.action.replaceAll("_", " ")}
+                                  </div>
+                                  <span className="whitespace-nowrap font-mono text-[9px] text-[#a3adaa]">
+                                    {formatDistanceToNow(new Date(item.createdAt), {
+                                      addSuffix: true,
+                                    })}
+                                  </span>
+                                </div>
+                                <p className="mt-1 text-[11px] leading-4 text-[#81908b]">
+                                  {item.schoolName ? <span className="font-semibold text-[#0f7f79]">{item.schoolName}: </span> : null}
+                                  {(item.newValues as any)?.templateName ? `Template "${(item.newValues as any).templateName}"` : null}
+                                  {(item.newValues as any)?.studentName ? `Card ${(item.newValues as any)?.cardNumber || ""} for ${(item.newValues as any).studentName}` : null}
+                                  {!((item.newValues as any)?.templateName) && !((item.newValues as any)?.studentName) ? `${item.entityType} #${item.entityId ?? "-"}` : ""}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {apiError ? (
+                        <div className="mt-6 rounded-xl border border-dashed border-[#fca5a5] bg-[#fff5f5] p-3 text-center">
+                          <div className="text-[10px] text-[#dc2626]">{apiError}</div>
+                        </div>
+                      ) : (
+                        <div className="mt-6 rounded-xl border border-dashed border-[#d6e4dc] bg-[#f7fbf8] p-3 text-center">
+                          <div className="font-mono text-[9px] uppercase tracking-[0.12em] text-[#8ea49d]">
+                            All systems operational
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
               </section>
 
               <section className="mt-7 grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
@@ -1773,7 +1826,7 @@ export default function Home({
                     </button>
                   </CardHeader>
                   <CardContent className="space-y-3 px-6 pb-6">
-                    {templates.map((template) => (
+                    {templates.slice(0, 3).map((template) => (
                       <div
                         key={template.name}
                         className="flex items-center gap-3 rounded-xl border border-[#edf1ed] bg-[#fcfdfb] p-3"
@@ -1975,6 +2028,7 @@ export default function Home({
               approvals={approvals}
               activity={activity}
               onSelectTemplate={handleSelectTemplate}
+              onUnselectTemplate={handleUnselectTemplate}
               onLockTemplate={handleLockTemplate}
               onPreviewTemplate={handlePreviewTemplate}
               onToggleTemplateStatus={handleToggleTemplateStatus}
@@ -3004,6 +3058,7 @@ function ModuleView({
   approvals,
   activity,
   onSelectTemplate,
+  onUnselectTemplate,
   onLockTemplate,
   onPreviewTemplate,
   onToggleTemplateStatus,
@@ -3044,6 +3099,7 @@ function ModuleView({
   approvals: ApiApproval[];
   activity: ApiActivity[];
   onSelectTemplate: (template: ApiTemplate) => void;
+  onUnselectTemplate: () => void;
   onLockTemplate: (template: ApiTemplate) => void;
   onPreviewTemplate: (template: ApiTemplate) => void;
   onToggleTemplateStatus: (template: ApiTemplate) => void;
@@ -3086,16 +3142,27 @@ function ModuleView({
 
   const [userRoleFilter, setUserRoleFilter] = useState<string>("All");
   const [usersPage, setUsersPage] = useState<number>(1);
-  const USERS_PAGE_SIZE = 10;
+  const USERS_PAGE_SIZE = 20;
 
   // Schools table pagination & status filtering
   const [schoolsStatusFilter, setSchoolsStatusFilter] = useState<"All" | "Active" | "Inactive">("All");
   const [schoolsPage, setSchoolsPage] = useState<number>(1);
-  const SCHOOLS_PAGE_SIZE = 10;
+  const SCHOOLS_PAGE_SIZE = 20;
+
+  // ID Card Requests pagination
+  const [requestsPage, setRequestsPage] = useState<number>(1);
+  const REQUESTS_PAGE_SIZE = 20;
+
+  // Approved Cards pagination
+  const [approvedPage, setApprovedPage] = useState<number>(1);
+  const APPROVED_PAGE_SIZE = 20;
 
   useEffect(() => {
     setSchoolsPage(1);
-  }, [searchTerm, schoolsStatusFilter]);
+    setUsersPage(1);
+    setRequestsPage(1);
+    setApprovedPage(1);
+  }, [searchTerm, schoolsStatusFilter, userRoleFilter, cardStatusFilter]);
 
   const filteredSchools = useMemo(() => {
     return schools
@@ -3114,6 +3181,28 @@ function ModuleView({
           (s.address?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false),
       );
   }, [schools, schoolsStatusFilter, searchTerm]);
+
+  // Templates status filtering and search
+  const [templateStatusFilter, setTemplateStatusFilter] = useState<"All" | "ACTIVE" | "INACTIVE">("All");
+
+  const filteredTemplates = useMemo(() => {
+    return templates
+      .filter((t) => {
+        if (authenticatedUser.role !== "SUPER_ADMIN") {
+          return t.status === "ACTIVE";
+        }
+        if (templateStatusFilter === "ACTIVE") return t.status === "ACTIVE";
+        if (templateStatusFilter === "INACTIVE") return t.status !== "ACTIVE";
+        return true;
+      })
+      .filter(
+        (t) =>
+          !searchTerm ||
+          t.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (t.description?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
+          (t.meta?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false),
+      );
+  }, [templates, authenticatedUser.role, templateStatusFilter, searchTerm]);
 
   const totalSchoolPages = Math.ceil(filteredSchools.length / SCHOOLS_PAGE_SIZE) || 1;
   const paginatedSchools = useMemo(() => {
@@ -3140,6 +3229,12 @@ function ModuleView({
       );
   }, [schoolFilteredCards, cardStatusFilter, searchTerm]);
 
+  const totalRequestPages = Math.ceil(requestCards.length / REQUESTS_PAGE_SIZE) || 1;
+  const paginatedRequestCards = useMemo(() => {
+    const start = (requestsPage - 1) * REQUESTS_PAGE_SIZE;
+    return requestCards.slice(start, start + REQUESTS_PAGE_SIZE);
+  }, [requestCards, requestsPage]);
+
   const approvedCards = useMemo(() => {
     return schoolFilteredCards
       .filter((c) => c.status === "APPROVED" || c.status === "PRINTED")
@@ -3151,6 +3246,12 @@ function ModuleView({
           (c.templateName?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false),
       );
   }, [schoolFilteredCards, searchTerm]);
+
+  const totalApprovedPages = Math.ceil(approvedCards.length / APPROVED_PAGE_SIZE) || 1;
+  const paginatedApprovedCards = useMemo(() => {
+    const start = (approvedPage - 1) * APPROVED_PAGE_SIZE;
+    return approvedCards.slice(start, start + APPROVED_PAGE_SIZE);
+  }, [approvedCards, approvedPage]);
 
   const allApprovedCardIds = useMemo(() => approvedCards.map((c) => c.id), [approvedCards]);
   const allRequestCardIds = useMemo(() => requestCards.map((c) => c.id), [requestCards]);
@@ -3250,10 +3351,61 @@ function ModuleView({
 
       {/* 1. Templates Tab */}
       {isTemplates && (
-        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {templates
-            .filter((t) => authenticatedUser.role === "SUPER_ADMIN" || t.status === "ACTIVE")
-            .map((template) => (
+        <div className="space-y-5">
+          <div className="flex flex-col gap-3 rounded-2xl border border-[#e2e8e3] bg-[#fffefa] p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+            <div className="relative w-full max-w-sm">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#98a4a1]" />
+              <Input
+                placeholder="Search templates by name, description..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="h-10 rounded-xl border-[#e2e8e3] pl-9 text-xs shadow-none"
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between sm:justify-end gap-3 w-full sm:w-auto">
+              {authenticatedUser.role === "SUPER_ADMIN" && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-bold text-[#4e5c59] mr-1">Status:</span>
+                  {(["All", "ACTIVE", "INACTIVE"] as const).map((status) => (
+                    <button
+                      key={status}
+                      type="button"
+                      onClick={() => setTemplateStatusFilter(status)}
+                      className={`rounded-lg px-2.5 py-1.5 text-xs font-bold transition-all ${
+                        templateStatusFilter === status
+                          ? "bg-[#0f7f79] text-white shadow-xs"
+                          : "bg-[#edf2ee] text-[#556360] hover:bg-[#dfe6e1]"
+                      }`}
+                    >
+                      {status === "All" ? "All" : status === "ACTIVE" ? "Active" : "Inactive"}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="text-xs text-[#788784]">
+                Showing <b>{filteredTemplates.length}</b> {filteredTemplates.length === 1 ? "template" : "templates"}
+              </div>
+            </div>
+          </div>
+
+          {filteredTemplates.length === 0 ? (
+            <div className="rounded-2xl border border-[#e2e8e3] bg-[#fffefa] p-12 text-center text-sm text-[#8d9995] shadow-sm">
+              <Palette className="mx-auto mb-3 h-8 w-8 text-[#98a4a1]" />
+              <p className="font-semibold text-[#304541]">
+                {searchTerm || templateStatusFilter !== "All"
+                  ? "No templates matching your search or filter"
+                  : "No templates available"}
+              </p>
+              <p className="mt-1 text-xs text-[#98a4a1]">
+                {searchTerm
+                  ? "Try adjusting your search terms or resetting the filter."
+                  : "Create a new template to get started."}
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+              {filteredTemplates.map((template) => (
               <Card
                 key={template.id}
                 className="overflow-hidden rounded-2xl border-[#e2e8e3] bg-[#fffefa] shadow-[0_12px_35px_rgba(38,71,65,0.05)]"
@@ -3310,10 +3462,20 @@ function ModuleView({
                         </button>
                       )}
 
-                      {/* Final template badge if this is school's selected template */}
+                      {/* Final template badge + unselect button if this is school's selected template */}
                       {activeSchool?.selectedTemplateId === template.id && (
-                        <span className="inline-flex items-center gap-1 rounded-xl bg-[#0f7f79] px-3 py-2 text-xs font-bold text-white shadow-xs">
+                        <span className="inline-flex items-center gap-1 rounded-xl bg-[#0f7f79] px-1.5 pl-3 py-1.5 text-xs font-bold text-white shadow-xs">
                           <CheckCircle2 className="w-3.5 h-3.5" /> Final Selected
+                          {authenticatedUser.role !== "SUPER_ADMIN" && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); onUnselectTemplate(); }}
+                              className="ml-1 rounded-lg p-1 hover:bg-white/20 transition-colors"
+                              title="Unselect this template"
+                              aria-label="Unselect template"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </span>
                       )}
 
@@ -3345,6 +3507,8 @@ function ModuleView({
                 </CardContent>
               </Card>
             ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -3427,14 +3591,14 @@ function ModuleView({
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#edf0ed]">
-                {requestCards.length === 0 ? (
+                {paginatedRequestCards.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="px-5 py-10 text-center text-[#98a4a1]">
                       No ID card requests found matching the current filters.
                     </td>
                   </tr>
                 ) : (
-                  requestCards.map((card) => (
+                  paginatedRequestCards.map((card) => (
                     <tr key={card.id} className="hover:bg-[#fbfdfb] transition-colors">
                       <td className="px-5 py-4 text-center">
                         <Checkbox
@@ -3526,6 +3690,34 @@ function ModuleView({
               </tbody>
             </table>
           </div>
+
+          {totalRequestPages > 1 && (
+            <div className="flex items-center justify-between p-4 border-t border-[#edf0ed] bg-[#fbfdfb]">
+              <div className="text-xs text-[#788784]">
+                Page {requestsPage} of {totalRequestPages} ({requestCards.length} {requestCards.length === 1 ? "card" : "cards"})
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={requestsPage <= 1}
+                  onClick={() => setRequestsPage((p) => Math.max(1, p - 1))}
+                  className="h-8 rounded-lg text-xs font-bold"
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={requestsPage >= totalRequestPages}
+                  onClick={() => setRequestsPage((p) => Math.min(totalRequestPages, p + 1))}
+                  className="h-8 rounded-lg text-xs font-bold"
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </Card>
       )}
 
@@ -3591,14 +3783,14 @@ function ModuleView({
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#edf0ed]">
-                {approvedCards.length === 0 ? (
+                {paginatedApprovedCards.length === 0 ? (
                   <tr>
                     <td colSpan={authenticatedUser.role === "SUPER_ADMIN" ? 6 : 5} className="px-5 py-10 text-center text-[#98a4a1]">
                       No approved cards found. Submit cards and approve them to view here.
                     </td>
                   </tr>
                 ) : (
-                  approvedCards.map((card) => (
+                  paginatedApprovedCards.map((card) => (
                     <tr key={card.id} className="hover:bg-[#fbfdfb] transition-colors">
                       {authenticatedUser.role === "SUPER_ADMIN" && (
                         <td className="px-5 py-4 text-center">
@@ -3646,48 +3838,47 @@ function ModuleView({
               </tbody>
             </table>
           </div>
+
+          {totalApprovedPages > 1 && (
+            <div className="flex items-center justify-between p-4 border-t border-[#edf0ed] bg-[#fbfdfb]">
+              <div className="text-xs text-[#788784]">
+                Page {approvedPage} of {totalApprovedPages} ({approvedCards.length} {approvedCards.length === 1 ? "card" : "cards"})
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={approvedPage <= 1}
+                  onClick={() => setApprovedPage((p) => Math.max(1, p - 1))}
+                  className="h-8 rounded-lg text-xs font-bold"
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={approvedPage >= totalApprovedPages}
+                  onClick={() => setApprovedPage((p) => Math.min(totalApprovedPages, p + 1))}
+                  className="h-8 rounded-lg text-xs font-bold"
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </Card>
       )}
 
 
       {/* 5. Audit Logs Tab */}
       {isAudit && (
-        <Card className="rounded-2xl border-[#e2e8e3] bg-[#fffefa] shadow-[0_12px_35px_rgba(38,71,65,0.05)]">
-          <div className="p-5 border-b border-[#edf0ed] flex items-center justify-between">
-            <h3 className="text-sm font-bold text-[#304541]">System Audit Log & Traceability</h3>
-            {activity.length > 0 && onClearAuditLogs && (
-              <button
-                onClick={onClearAuditLogs}
-                className="text-[11px] font-extrabold text-[#dc2626] hover:underline cursor-pointer flex items-center gap-1"
-              >
-                <Trash2 className="h-3 w-3" /> Clear all
-              </button>
-            )}
-          </div>
-          <div className="divide-y divide-[#edf0ed]">
-            {activity.length === 0 ? (
-              <div className="px-5 py-10 text-center text-[#98a4a1] text-xs">
-                No activity logs recorded yet.
-              </div>
-            ) : (
-              activity.map((act) => (
-                <div key={act.id} className="flex items-center justify-between p-4 hover:bg-[#fbfdfb]">
-                  <div>
-                    <span className="inline-block font-mono text-xs font-bold text-[#0f7f79] bg-[#eef7f4] px-2 py-0.5 rounded mr-2">
-                      {act.action}
-                    </span>
-                    <span className="text-xs text-[#55605d]">
-                      {act.entityType} {act.entityId ? `#${act.entityId}` : ""}
-                    </span>
-                  </div>
-                  <div className="text-[11px] text-[#98a4a1] shrink-0 font-mono">
-                    {formatDistanceToNow(new Date(act.createdAt), { addSuffix: true })}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </Card>
+        <AuditLogsSection
+          activity={activity}
+          authenticatedUser={authenticatedUser}
+          portal={authenticatedUser.role === "SUPER_ADMIN" ? "admin" : "school"}
+          schools={schools}
+          onClearAuditLogs={onClearAuditLogs}
+        />
       )}
 
       {/* 6. Schools Table View */}

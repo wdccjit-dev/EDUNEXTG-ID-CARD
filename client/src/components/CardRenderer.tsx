@@ -122,8 +122,19 @@ function RenderElement({
           ? cardData[fieldKey] || cardData["student_photo"]
           : c.imageUrl;
 
+      // Apply image shape clipping
+      const shapeStyle: React.CSSProperties = {};
+      const shape = c.imageShape ?? "square";
+      if (shape === "circle") {
+        shapeStyle.borderRadius = "50%";
+      } else if (shape === "rounded") {
+        shapeStyle.borderRadius = "16%";
+      } else if (shape === "ellipse") {
+        shapeStyle.borderRadius = "50% / 50%";
+      }
+
       return (
-        <div style={baseStyle}>
+        <div style={{ ...baseStyle, ...shapeStyle }}>
           {dynamicImg ? (
             <img
               src={dynamicImg}
