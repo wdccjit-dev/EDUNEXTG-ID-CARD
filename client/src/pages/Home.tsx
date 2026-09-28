@@ -1259,8 +1259,8 @@ export default function Home({
             <button
               onClick={() => goTo("About Us")}
               className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-[12px] font-semibold transition-colors ${activeNav === "About Us"
-                  ? "bg-[#dff3ee] text-[#123b3b]"
-                  : "text-[#99b6b2] hover:bg-[#1b3a3a] hover:text-white"
+                ? "bg-[#dff3ee] text-[#123b3b]"
+                : "text-[#99b6b2] hover:bg-[#1b3a3a] hover:text-white"
                 }`}
             >
               <Info
@@ -1283,7 +1283,7 @@ export default function Home({
           </nav>
           <div className="flex items-center justify-between border-t border-[#294344] py-4">
             <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-[#6e928d]">
-              Insight Education v1.0
+              Insight Education v2.0
             </span>
             <span className="flex items-center gap-1.5 text-[10px] font-semibold text-[#71c4a8]">
               <span className="h-1.5 w-1.5 rounded-full bg-[#71c4a8]" />
@@ -1545,11 +1545,10 @@ export default function Home({
               </section>
 
               <section
-                className={`mt-6 grid gap-5 ${
-                  authenticatedUser.role === "SUPER_ADMIN"
+                className={`mt-6 grid gap-5 ${authenticatedUser.role === "SUPER_ADMIN"
                     ? "xl:grid-cols-[minmax(0,1.35fr)_minmax(300px,0.65fr)]"
                     : "grid-cols-1"
-                }`}
+                  }`}
               >
                 <Card className="overflow-hidden ui-card rounded-2xl border-[#e2e8e3] bg-[#fffefa] shadow-[0_14px_40px_rgba(38,71,65,0.05)]">
                   <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 sm:px-6 pb-3 pt-5 sm:pt-6">
@@ -2159,11 +2158,10 @@ export default function Home({
                           const digitsOnly = e.target.value.replace(/\D/g, "").slice(0, 10);
                           setSchoolPhoneInput(digitsOnly);
                         }}
-                        className={`h-10 rounded-xl text-xs transition-colors ${
-                          schoolPhoneInput.length > 0 && schoolPhoneInput.length < 10
+                        className={`h-10 rounded-xl text-xs transition-colors ${schoolPhoneInput.length > 0 && schoolPhoneInput.length < 10
                             ? "border-red-500 bg-red-50/15 text-red-900 focus-visible:ring-red-400 focus-visible:border-red-500"
                             : ""
-                        }`}
+                          }`}
                       />
                     </div>
                   </div>
@@ -2711,7 +2709,7 @@ export default function Home({
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                    {(authenticatedUser.role === "SUPER_ADMIN" ||
+                  {(authenticatedUser.role === "SUPER_ADMIN" ||
                     authenticatedUser.schoolId === reviewingCard.schoolId) &&
                     (reviewingCard.status === "SUBMITTED" ||
                       reviewingCard.status === "UNDER_REVIEW" ||
@@ -3033,18 +3031,17 @@ function MetricCard({
       onKeyDown={
         onClick
           ? (e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                onClick();
-              }
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onClick();
             }
+          }
           : undefined
       }
-      className={`group relative overflow-hidden rounded-2xl border ${g.border} ${g.bg} p-5 ${g.shadow} transition-all duration-300 ${
-        onClick
+      className={`group relative overflow-hidden rounded-2xl border ${g.border} ${g.bg} p-5 ${g.shadow} transition-all duration-300 ${onClick
           ? `cursor-pointer hover:-translate-y-1 ${g.shadowHover}`
           : ""
-      }`}
+        }`}
     >
       {/* Decorative ambient glow circle in background */}
       <div
@@ -3414,11 +3411,10 @@ function ModuleView({
                       key={status}
                       type="button"
                       onClick={() => setTemplateStatusFilter(status)}
-                      className={`rounded-lg px-2.5 py-1.5 text-xs font-bold transition-all ${
-                        templateStatusFilter === status
+                      className={`rounded-lg px-2.5 py-1.5 text-xs font-bold transition-all ${templateStatusFilter === status
                           ? "bg-[#0f7f79] text-white shadow-xs"
                           : "bg-[#edf2ee] text-[#556360] hover:bg-[#dfe6e1]"
-                      }`}
+                        }`}
                     >
                       {status === "All" ? "All" : status === "ACTIVE" ? "Active" : "Inactive"}
                     </button>
@@ -3448,107 +3444,107 @@ function ModuleView({
           ) : (
             <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
               {filteredTemplates.map((template) => (
-              <Card
-                key={template.id}
-                className="overflow-hidden rounded-2xl border-[#e2e8e3] bg-[#fffefa] shadow-[0_12px_35px_rgba(38,71,65,0.05)]"
-              >
-                <div className="flex h-44 items-center justify-center bg-[#eef5f0]">
-                  <CardPreview accent={template.accent as Tone} />
-                </div>
-                <CardContent className="p-5">
-                  <div className="flex items-center justify-between gap-2">
-                    <h3 className="font-extrabold text-[#304541] truncate">
-                      {template.name}
-                    </h3>
-                    {authenticatedUser.role === "SUPER_ADMIN" ? (
-                      <button
-                        onClick={() => onToggleTemplateStatus(template)}
-                        className={`rounded-lg px-2.5 py-1 text-[10px] font-extrabold transition-colors shrink-0 ${template.status === "ACTIVE"
-                          ? "bg-[#fff0e8] text-[#c65c3d] hover:bg-[#fde2d6]"
-                          : "bg-[#e1f3ed] text-[#0a716b] hover:bg-[#cbf0e4]"
-                          }`}
-                      >
-                        {template.status === "ACTIVE" ? "Deactivate" : "Activate"}
-                      </button>
-                    ) : template.status === "ACTIVE" ? (
-                      <StatusPill tone="teal">Active</StatusPill>
-                    ) : (
-                      <StatusPill tone="yellow">Inactive</StatusPill>
-                    )}
+                <Card
+                  key={template.id}
+                  className="overflow-hidden rounded-2xl border-[#e2e8e3] bg-[#fffefa] shadow-[0_12px_35px_rgba(38,71,65,0.05)]"
+                >
+                  <div className="flex h-44 items-center justify-center bg-[#eef5f0]">
+                    <CardPreview accent={template.accent as Tone} />
                   </div>
-                  {Boolean(template.description || template.meta) && (
-                    <p className="mt-1 text-xs text-[#84918e]">
-                      {template.description || template.meta}
-                    </p>
-                  )}
-                  <div className="mt-5 flex items-center justify-between gap-2">
-                    <span className="font-mono text-[10px] text-[#9aa6a2]">
-                      {template.status}
-                    </span>
-                    <div className="flex flex-1 items-center justify-end gap-2">
-                      <button
-                        onClick={() => onPreviewTemplate(template)}
-                        className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#f0efec] px-3.5 py-2 text-xs font-bold text-[#3d4946] shadow-2xs hover:bg-[#e2e0dc] transition-all"
-                      >
-                        <Eye className="w-3.5 h-3.5 text-[#55605d]" />
-                        <span>Preview</span>
-                      </button>
-
-                      {authenticatedUser.role === "SUPER_ADMIN" && (
+                  <CardContent className="p-5">
+                    <div className="flex items-center justify-between gap-2">
+                      <h3 className="font-extrabold text-[#304541] truncate">
+                        {template.name}
+                      </h3>
+                      {authenticatedUser.role === "SUPER_ADMIN" ? (
                         <button
-                          onClick={() => navigate(`/admin/templates/${template.id}/design`)}
-                          className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#e9ebfa] px-3.5 py-2 text-xs font-bold text-[#5c64b7] shadow-2xs hover:bg-[#d8dbf3] transition-all"
+                          onClick={() => onToggleTemplateStatus(template)}
+                          className={`rounded-lg px-2.5 py-1 text-[10px] font-extrabold transition-colors shrink-0 ${template.status === "ACTIVE"
+                            ? "bg-[#fff0e8] text-[#c65c3d] hover:bg-[#fde2d6]"
+                            : "bg-[#e1f3ed] text-[#0a716b] hover:bg-[#cbf0e4]"
+                            }`}
                         >
-                          <Palette className="w-3.5 h-3.5 text-[#5c64b7]" />
-                          <span>Design</span>
+                          {template.status === "ACTIVE" ? "Deactivate" : "Activate"}
                         </button>
+                      ) : template.status === "ACTIVE" ? (
+                        <StatusPill tone="teal">Active</StatusPill>
+                      ) : (
+                        <StatusPill tone="yellow">Inactive</StatusPill>
                       )}
+                    </div>
+                    {Boolean(template.description || template.meta) && (
+                      <p className="mt-1 text-xs text-[#84918e]">
+                        {template.description || template.meta}
+                      </p>
+                    )}
+                    <div className="mt-5 flex items-center justify-between gap-2">
+                      <span className="font-mono text-[10px] text-[#9aa6a2]">
+                        {template.status}
+                      </span>
+                      <div className="flex flex-1 items-center justify-end gap-2">
+                        <button
+                          onClick={() => onPreviewTemplate(template)}
+                          className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#f0efec] px-3.5 py-2 text-xs font-bold text-[#3d4946] shadow-2xs hover:bg-[#e2e0dc] transition-all"
+                        >
+                          <Eye className="w-3.5 h-3.5 text-[#55605d]" />
+                          <span>Preview</span>
+                        </button>
 
-                      {/* Final template badge + unselect button if this is school's selected template */}
-                      {activeSchool?.selectedTemplateId === template.id && (
-                        <span className="inline-flex items-center gap-1 rounded-xl bg-[#0f7f79] px-1.5 pl-3 py-1.5 text-xs font-bold text-white shadow-xs">
-                          <CheckCircle2 className="w-3.5 h-3.5" /> Final Selected
-                          {authenticatedUser.role !== "SUPER_ADMIN" && (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); onUnselectTemplate(); }}
-                              className="ml-1 rounded-lg p-1 hover:bg-white/20 transition-colors"
-                              title="Unselect this template"
-                              aria-label="Unselect template"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </span>
-                      )}
-
-                      {/* Select as Final Template button for School users when not currently selected */}
-                      {authenticatedUser.role !== "SUPER_ADMIN" &&
-                        template.status === "ACTIVE" &&
-                        activeSchool?.selectedTemplateId !== template.id && (
+                        {authenticatedUser.role === "SUPER_ADMIN" && (
                           <button
-                            onClick={() => onSelectTemplate(template)}
-                            className="inline-flex items-center justify-center gap-1 rounded-xl bg-[#e1f3ed] px-3 py-2 text-xs font-bold text-[#0a716b] hover:bg-[#cbf0e4] transition-all"
+                            onClick={() => navigate(`/admin/templates/${template.id}/design`)}
+                            className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#e9ebfa] px-3.5 py-2 text-xs font-bold text-[#5c64b7] shadow-2xs hover:bg-[#d8dbf3] transition-all"
                           >
-                            Select as Final Template
+                            <Palette className="w-3.5 h-3.5 text-[#5c64b7]" />
+                            <span>Design</span>
                           </button>
                         )}
 
-                      {/* Delete button for Super Admin - smaller and compact */}
-                      {authenticatedUser.role === "SUPER_ADMIN" && (
-                        <button
-                          onClick={() => onDeleteTemplate?.(template.id, template.name)}
-                          className="rounded-lg border border-[#fecaca] bg-[#fff5f5] p-2 text-[#dc2626] hover:bg-[#fee2e2] transition-colors"
-                          title={`Delete ${template.name}`}
-                          aria-label={`Delete ${template.name}`}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
+                        {/* Final template badge + unselect button if this is school's selected template */}
+                        {activeSchool?.selectedTemplateId === template.id && (
+                          <span className="inline-flex items-center gap-1 rounded-xl bg-[#0f7f79] px-1.5 pl-3 py-1.5 text-xs font-bold text-white shadow-xs">
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Final Selected
+                            {authenticatedUser.role !== "SUPER_ADMIN" && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); onUnselectTemplate(); }}
+                                className="ml-1 rounded-lg p-1 hover:bg-white/20 transition-colors"
+                                title="Unselect this template"
+                                aria-label="Unselect template"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </span>
+                        )}
+
+                        {/* Select as Final Template button for School users when not currently selected */}
+                        {authenticatedUser.role !== "SUPER_ADMIN" &&
+                          template.status === "ACTIVE" &&
+                          activeSchool?.selectedTemplateId !== template.id && (
+                            <button
+                              onClick={() => onSelectTemplate(template)}
+                              className="inline-flex items-center justify-center gap-1 rounded-xl bg-[#e1f3ed] px-3 py-2 text-xs font-bold text-[#0a716b] hover:bg-[#cbf0e4] transition-all"
+                            >
+                              Select as Final Template
+                            </button>
+                          )}
+
+                        {/* Delete button for Super Admin - smaller and compact */}
+                        {authenticatedUser.role === "SUPER_ADMIN" && (
+                          <button
+                            onClick={() => onDeleteTemplate?.(template.id, template.name)}
+                            className="rounded-lg border border-[#fecaca] bg-[#fff5f5] p-2 text-[#dc2626] hover:bg-[#fee2e2] transition-colors"
+                            title={`Delete ${template.name}`}
+                            aria-label={`Delete ${template.name}`}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           )}
         </div>
@@ -3960,8 +3956,8 @@ function ModuleView({
                       setSchoolsPage(1);
                     }}
                     className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${schoolsStatusFilter === status
-                        ? "bg-[#0f7f79] text-white shadow-sm"
-                        : "bg-[#edf3f0] text-[#55605d] hover:bg-[#e2ebe6]"
+                      ? "bg-[#0f7f79] text-white shadow-sm"
+                      : "bg-[#edf3f0] text-[#55605d] hover:bg-[#e2ebe6]"
                       }`}
                   >
                     {status === "All" ? "All Schools" : status}
@@ -4169,8 +4165,8 @@ function ModuleView({
                           setUsersPage(1);
                         }}
                         className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${userRoleFilter === role
-                            ? "bg-[#0f7f79] text-white shadow-sm"
-                            : "bg-[#edf3f0] text-[#55605d] hover:bg-[#e2ebe6]"
+                          ? "bg-[#0f7f79] text-white shadow-sm"
+                          : "bg-[#edf3f0] text-[#55605d] hover:bg-[#e2ebe6]"
                           }`}
                       >
                         {role === "All" ? "All Roles" : role.replace(/_/g, " ")}
