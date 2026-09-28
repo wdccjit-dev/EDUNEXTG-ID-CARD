@@ -20,8 +20,10 @@ import {
 import { getDb } from "./db";
 import { ENV } from "./_core/env";
 import { authenticateApplicationRequest, clearApplicationSession, createPasswordReset, hashPassword, loginUser, resetPassword, setApplicationSession, signApplicationSession, verifyPassword } from "./appAuth";
-import { generateSingleCardPdf, generateBulkCardPdf, type CardPdfData } from "./pdf";
+import { generateSingleCardPdf, generateBulkCardPdf, type CardPdfData, type PrintPdfOptions } from "./pdf";
 import { isValidIndianMobileNumber, INDIAN_MOBILE_ERROR_MESSAGE } from "../shared/types";
+import { generateExampleExcelBuffer, parseExcelBuffer } from "./excel";
+import { getAvailableDynamicFields } from "../shared/templateDesigner";
 
 const router = Router();
 const adminRoles = new Set(["SUPER_ADMIN"]);
@@ -254,7 +256,7 @@ router.put("/profile", requireRole(adminRoles), async (req, res) => {
       return res.status(400).json({ error: "Name cannot be empty." });
     }
 
-    if (phone !== undefined && phone !== null && phone.length > 0 && phone.length !== 10) {
+    if (rawPhone !== undefined && rawPhone !== null && rawPhone !== "" && !isValidIndianMobileNumber(rawPhone, false)) {
       return res.status(400).json({ error: INDIAN_MOBILE_ERROR_MESSAGE });
     }
 
@@ -458,6 +460,9 @@ router.post("/schools", requireRole(adminRoles), async (req, res) => {
     if (!shortCode) return res.status(400).json({ error: "shortCode is required" });
 
     const rawPhone = req.body.phone !== undefined && req.body.phone !== null ? String(req.body.phone).trim() : null;
+    if (rawPhone && !isValidIndianMobileNumber(rawPhone, false)) {
+      return res.status(400).json({ error: INDIAN_MOBILE_ERROR_MESSAGE });
+    }
     const phone = rawPhone ? rawPhone.replace(/\D/g, "").slice(-10) : null;
 
     let createdSchool: any;
@@ -624,6 +629,9 @@ const handleUpdateSchool = async (req: Request, res: Response) => {
     const nextCode = req.body.shortCode && String(req.body.shortCode).trim() ? String(req.body.shortCode).trim().toUpperCase() : existing.shortCode;
     const nextEmail = req.body.email && String(req.body.email).trim() ? String(req.body.email).trim() : null;
     const rawPhone = req.body.phone !== undefined ? (req.body.phone !== null ? String(req.body.phone).trim() : null) : undefined;
+    if (rawPhone !== undefined && rawPhone !== null && rawPhone !== "" && !isValidIndianMobileNumber(rawPhone, false)) {
+      return res.status(400).json({ error: INDIAN_MOBILE_ERROR_MESSAGE });
+    }
     const nextPhone = rawPhone ? rawPhone.replace(/\D/g, "").slice(-10) : (rawPhone === "" ? null : (rawPhone ?? existing.phone));
     const nextAddress = req.body.address && String(req.body.address).trim() ? String(req.body.address).trim() : null;
 
@@ -2376,6 +2384,39 @@ router.post("/id-cards/:id/print", requireRole(adminRoles), async (req, res) => 
   }
 });
 
+router.post("/id-cards/:id/mark-printed", requireRole(adminRoles), async (req, res) => {
+  try {
+    const user = currentUser(res);
+    const db = await getDb();
+    if (!db) return res.status(503).json({ error: "Database not available" });
+    const id = Number(req.params.id);
+    const card = (await db.select().from(idCards).where(eq(idCards.id, id)))[0];
+    if (!card || !canReadSchool(user, card.schoolId)) return res.status(403).json({ error: "ID card access denied" });
+
+    if (card.status !== "APPROVED" && card.status !== "PRINTED") {
+      return res.status(400).json({ error: `Only APPROVED cards may be printed. Current status: ${card.status}` });
+    }
+
+    if (card.status === "APPROVED") {
+      await db.update(idCards).set({ status: "PRINTED", printedAt: new Date() }).where(eq(idCards.id, id));
+      await db.insert(approvalHistory).values({
+        idCardId: id,
+        fromStatus: "APPROVED",
+        toStatus: "PRINTED",
+        action: "PRINT_ID_CARD",
+        actedByUserId: user.id,
+      });
+    } else {
+      await db.update(idCards).set({ printedAt: new Date() }).where(eq(idCards.id, id));
+    }
+
+    await audit(user, "PRINT_ID_CARD", "id_card", id, card.schoolId);
+    res.json({ success: true, status: "PRINTED", printedAt: new Date() });
+  } catch (e) {
+    fail(res, e);
+  }
+});
+
 router.post("/id-cards/bulk-print", requireRole(adminRoles), async (req, res) => {
   try {
     const user = currentUser(res);
@@ -2457,11 +2498,12 @@ router.get("/id-cards/:id/pdf", requireRole(adminRoles), async (req, res) => {
     const pdfData = await fetchCardPdfData(db, id);
     if (!pdfData) return res.status(404).json({ error: "Template or card data missing for PDF" });
 
-    const pdfBuffer = await generateSingleCardPdf(pdfData);
-    await audit(user, "DOWNLOAD_ID_CARD_PDF", "id_card", id, card.schoolId);
+    const side = (req.query.side as "FRONT" | "BACK" | "BOTH") || "BOTH";
+    const pdfBuffer = await generateSingleCardPdf(pdfData, { side });
+    await audit(user, "DOWNLOAD_ID_CARD_PDF", "id_card", id, card.schoolId, { side });
 
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `inline; filename="id_card_${card.cardNumber}.pdf"`);
+    res.setHeader("Content-Disposition", `inline; filename="id_card_${card.cardNumber}_${side.toLowerCase()}.pdf"`);
     res.setHeader("Content-Length", pdfBuffer.length);
     res.end(pdfBuffer);
   } catch (e) {
@@ -2489,11 +2531,12 @@ router.post("/id-cards/bulk-pdf", requireRole(adminRoles), async (req, res) => {
 
     if (pdfCards.length === 0) return res.status(404).json({ error: "No valid cards found for PDF" });
 
-    const pdfBuffer = await generateBulkCardPdf(pdfCards);
-    await audit(user, "DOWNLOAD_ID_CARD_PDF", "id_card", null, null, { count: pdfCards.length });
+    const side = (req.body.side as "FRONT" | "BACK" | "BOTH") || (req.query.side as "FRONT" | "BACK" | "BOTH") || "BOTH";
+    const pdfBuffer = await generateBulkCardPdf(pdfCards, { side });
+    await audit(user, "DOWNLOAD_ID_CARD_PDF", "id_card", null, null, { count: pdfCards.length, side });
 
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `inline; filename="bulk_id_cards_${Date.now()}.pdf"`);
+    res.setHeader("Content-Disposition", `inline; filename="bulk_id_cards_${side.toLowerCase()}_${Date.now()}.pdf"`);
     res.setHeader("Content-Length", pdfBuffer.length);
     res.end(pdfBuffer);
   } catch (e) {
@@ -2735,7 +2778,7 @@ router.delete("/audit-logs", async (req, res) => {
   }
 });
 
-router.get("/approvals", async (_req, res) => {
+router.get("/approvals", async (req, res) => {
   try {
     const db = await getDb();
     if (!db) return res.status(503).json({ error: "Database not available" });
@@ -2768,16 +2811,288 @@ router.get("/approvals", async (_req, res) => {
         ),
       );
 
+    const statusParam = req.query.status ? String(req.query.status).trim() : undefined;
+    const isFiltered = statusParam && statusParam !== "All";
+
     if (adminRoles.has(user.role)) {
-      const rows = await baseQuery.orderBy(desc(idCardRequests.createdAt));
+      let rows;
+      if (isFiltered) {
+        rows = await baseQuery
+          .where(eq(idCardRequests.status, statusParam as any))
+          .orderBy(desc(idCardRequests.createdAt));
+      } else {
+        rows = await baseQuery.orderBy(desc(idCardRequests.createdAt));
+      }
       return res.json(rows);
     }
 
     if (!user.schoolId) return res.json([]);
-    const rows = await baseQuery
-      .where(eq(idCardRequests.schoolId, user.schoolId))
-      .orderBy(desc(idCardRequests.createdAt));
+    let rows;
+    if (isFiltered) {
+      rows = await baseQuery
+        .where(and(eq(idCardRequests.schoolId, user.schoolId), eq(idCardRequests.status, statusParam as any)))
+        .orderBy(desc(idCardRequests.createdAt));
+    } else {
+      rows = await baseQuery
+        .where(eq(idCardRequests.schoolId, user.schoolId))
+        .orderBy(desc(idCardRequests.createdAt));
+    }
     res.json(rows);
+  } catch (e) {
+    fail(res, e);
+  }
+});
+
+// ─── ID CARD REQUESTS EXCEL IMPORT & EXAMPLE DOWNLOAD ─────────────────────
+router.get("/id-card-requests/example-excel", async (req, res) => {
+  try {
+    const user = currentUser(res);
+    const db = await getDb();
+    if (!db) return res.status(503).json({ error: "Database not available" });
+
+    // Determine target school
+    let schoolId: number | null = null;
+    if (adminRoles.has(user.role)) {
+      schoolId = req.query.schoolId ? Number(req.query.schoolId) : null;
+    } else {
+      schoolId = user.schoolId;
+    }
+
+    // Determine template: check query, school's locked/default, or active template
+    let templateId: number | null = req.query.templateId ? Number(req.query.templateId) : null;
+    if (!templateId && schoolId) {
+      const schoolTmpl =
+        (await db.select().from(schoolTemplates).where(and(eq(schoolTemplates.schoolId, schoolId), eq(schoolTemplates.isLocked, true))))[0] ||
+        (await db.select().from(schoolTemplates).where(and(eq(schoolTemplates.schoolId, schoolId), eq(schoolTemplates.isDefault, true))))[0];
+      templateId = schoolTmpl?.templateId ?? null;
+    }
+    if (!templateId) {
+      const activeTmpl = (await db.select().from(idCardTemplates).where(eq(idCardTemplates.status, "ACTIVE")).limit(1))[0];
+      templateId = activeTmpl?.id ?? null;
+    }
+
+    let elements: any[] = [];
+    if (templateId) {
+      const tableElements = await db.select().from(templateElements).where(eq(templateElements.templateId, templateId));
+      if (tableElements.length > 0) {
+        elements = tableElements;
+      } else {
+        const tmpl = (await db.select().from(idCardTemplates).where(eq(idCardTemplates.id, templateId)))[0] as any;
+        if (tmpl?.canvasData && Array.isArray(tmpl.canvasData.elements)) {
+          elements = tmpl.canvasData.elements;
+        } else if (tmpl?.meta) {
+          try {
+            const parsed = JSON.parse(tmpl.meta);
+            if (Array.isArray(parsed?.elements)) elements = parsed.elements;
+          } catch {}
+        }
+      }
+    }
+
+    // Dynamic field list driven by designer/template configuration
+    const availableFields = getAvailableDynamicFields(elements);
+    const excelBuffer = generateExampleExcelBuffer(availableFields);
+
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="id_card_requests_template.xlsx"`);
+    res.setHeader("Content-Length", excelBuffer.length);
+    res.end(excelBuffer);
+  } catch (e) {
+    fail(res, e);
+  }
+});
+
+router.post("/id-card-requests/upload-excel", requireRole(schoolWriteRoles), async (req, res) => {
+  try {
+    const user = currentUser(res);
+    const db = await getDb();
+    if (!db) return res.status(503).json({ error: "Database not available" });
+
+    const { fileBase64, filename } = req.body;
+    if (!fileBase64) {
+      return res.status(400).json({ error: "No Excel file provided" });
+    }
+
+    // Validate file extension
+    const ext = path.extname(filename || "").toLowerCase();
+    if (ext && ![".xlsx", ".xls", ".csv"].includes(ext)) {
+      return res.status(400).json({ error: "Invalid file type. Please upload an Excel (.xlsx, .xls) or CSV file." });
+    }
+
+    // Determine target school strictly respecting RBAC and multi-tenant isolation
+    let schoolId: number;
+    if (adminRoles.has(user.role)) {
+      schoolId = Number(req.body.schoolId);
+      if (!schoolId) {
+        return res.status(400).json({ error: "School ID is required for Excel import" });
+      }
+    } else {
+      if (!user.schoolId) {
+        return res.status(403).json({ error: "You are not assigned to a school" });
+      }
+      if (req.body.schoolId && Number(req.body.schoolId) !== user.schoolId) {
+        return res.status(403).json({ error: "Forbidden: You cannot upload cards for another school" });
+      }
+      schoolId = user.schoolId;
+    }
+
+    const school = (await db.select().from(schools).where(eq(schools.id, schoolId)))[0];
+    if (!school) {
+      return res.status(404).json({ error: "School not found" });
+    }
+    if (!school.isActive && !adminRoles.has(user.role)) {
+      return res.status(403).json({ error: "School is currently inactive" });
+    }
+
+    // Determine template
+    let templateId = Number(req.body.templateId);
+    if (!templateId) {
+      const schoolTmpl =
+        (await db.select().from(schoolTemplates).where(and(eq(schoolTemplates.schoolId, schoolId), eq(schoolTemplates.isLocked, true))))[0] ||
+        (await db.select().from(schoolTemplates).where(and(eq(schoolTemplates.schoolId, schoolId), eq(schoolTemplates.isDefault, true))))[0];
+      templateId = schoolTmpl?.templateId ?? (await db.select().from(idCardTemplates).where(eq(idCardTemplates.status, "ACTIVE")).limit(1))[0]?.id;
+    }
+
+    if (!templateId) {
+      return res.status(400).json({ error: "No active ID card template found for this school" });
+    }
+
+    const template = (await db.select().from(idCardTemplates).where(eq(idCardTemplates.id, templateId)))[0];
+    if (!template) {
+      return res.status(404).json({ error: "Selected template not found" });
+    }
+
+    const tmplElements = await db.select().from(templateElements).where(eq(templateElements.templateId, templateId));
+    const availableFields = getAvailableDynamicFields(tmplElements);
+
+    // Decode base64 buffer
+    let fileBuffer: Buffer;
+    try {
+      const cleanBase64 = fileBase64.includes(",") ? fileBase64.split(",")[1] : fileBase64;
+      fileBuffer = Buffer.from(cleanBase64, "base64");
+    } catch {
+      return res.status(400).json({ error: "Malformed file encoding" });
+    }
+
+    // Max 10MB limit
+    if (fileBuffer.length > 10 * 1024 * 1024) {
+      return res.status(400).json({ error: "File exceeds 10MB limit" });
+    }
+
+    // Parse Excel safely
+    let parseResult: ReturnType<typeof parseExcelBuffer>;
+    try {
+      parseResult = parseExcelBuffer(fileBuffer, availableFields);
+    } catch (parseErr: any) {
+      return res.status(400).json({ error: parseErr.message || "Failed to read Excel spreadsheet" });
+    }
+
+    if (parseResult.rows.length === 0) {
+      return res.status(400).json({
+        error: "No valid data rows found in the uploaded file",
+        details: parseResult.errors.map((e) => `Row ${e.rowNumber}: ${e.reason}`),
+      });
+    }
+
+    let successCount = 0;
+    const failedRows: Array<{ rowNumber: number; reason: string }> = [...parseResult.errors];
+    const createdCardIds: number[] = [];
+
+    // Query existing card numbers and request admission codes for this school to avoid duplicates
+    const [existingCards, existingRequests] = await Promise.all([
+      db.select({ cardNumber: idCards.cardNumber }).from(idCards).where(eq(idCards.schoolId, schoolId)),
+      db.select({ admissionCode: idCardRequests.admissionCode }).from(idCardRequests).where(eq(idCardRequests.schoolId, schoolId)),
+    ]);
+    const existingCardSet = new Set<string>([
+      ...existingCards.map((c) => c.cardNumber.toUpperCase()),
+      ...existingRequests.map((r) => r.admissionCode.toUpperCase()),
+    ]);
+
+    for (const row of parseResult.rows) {
+      const studentName = row.studentName || row.data["student_name"] || "Student";
+      let admissionCode = row.admissionCode || row.data["admission_number"] || row.data["roll_number"];
+
+      if (!admissionCode) {
+        admissionCode = await generateCardNumber(schoolId);
+      }
+
+      if (existingCardSet.has(admissionCode.toUpperCase())) {
+        failedRows.push({
+          rowNumber: row.rowNumber,
+          reason: `Student admission code / card number '${admissionCode}' already exists for this school.`,
+        });
+        continue;
+      }
+
+      try {
+        await db.transaction(async (tx) => {
+          // 1. Create idCardRequests entry
+          const reqRes = await tx.insert(idCardRequests).values({
+            studentName,
+            admissionCode,
+            schoolId,
+            status: "DRAFT",
+            templateId,
+            requestedByUserId: user.id,
+            submittedAt: null,
+          });
+          const reqId = Number(reqRes[0].insertId);
+
+          // 2. Create idCards entry
+          const cardRes = await tx.insert(idCards).values({
+            schoolId,
+            templateId,
+            requestId: reqId,
+            cardNumber: admissionCode,
+            status: "DRAFT",
+            submittedByUserId: user.id,
+          });
+          const cardId = Number(cardRes[0].insertId);
+          createdCardIds.push(cardId);
+
+          // 3. Save dynamic fields in id_card_data
+          // CRITICAL: Only fields that have non-empty values are inserted!
+          for (const [fieldKey, val] of Object.entries(row.data)) {
+            if (val !== undefined && val !== null && String(val).trim() !== "") {
+              await tx.insert(idCardData).values({
+                idCardId: cardId,
+                fieldKey,
+                fieldValue: String(val).trim(),
+              });
+            }
+          }
+        });
+
+        existingCardSet.add(admissionCode.toUpperCase());
+        successCount++;
+      } catch (insertErr: any) {
+        let msg = insertErr?.message || "Database insert error";
+        if (insertErr?.code === "ER_DUP_ENTRY" || insertErr?.errno === 1062) {
+          msg = `Student admission code / card number '${admissionCode}' already exists for this school.`;
+        }
+        failedRows.push({
+          rowNumber: row.rowNumber,
+          reason: msg,
+        });
+      }
+    }
+
+    // Audit log
+    await audit(user, "UPLOAD_EXCEL_REQUESTS", "school", schoolId, schoolId, {
+      filename: filename || "upload.xlsx",
+      totalRows: parseResult.rows.length,
+      successCount,
+      failedCount: failedRows.length,
+      templateId,
+    });
+
+    res.json({
+      success: true,
+      processed: successCount,
+      failed: failedRows.length,
+      total: parseResult.rows.length,
+      errors: failedRows.length > 0 ? failedRows : undefined,
+    });
   } catch (e) {
     fail(res, e);
   }

@@ -204,20 +204,45 @@ export const api = {
     reject: (id: number, reason: string) => request<{ success: true; status: string }>(`/api/id-cards/${id}/reject`, json({ reason })),
     print: (id: number) => request<{ success: true; status: string; printedAt: string }>(`/api/id-cards/${id}/print`, json({})),
     bulkPrint: (cardIds: number[]) => request<{ success: true; count: number }>("/api/id-cards/bulk-print", json({ cardIds })),
-    pdfUrl: (id: number) => `/api/id-cards/${id}/pdf`,
-    bulkPdf: async (cardIds: number[]) => {
+    pdfUrl: (id: number, side?: "FRONT" | "BACK" | "BOTH") =>
+      `/api/id-cards/${id}/pdf${side ? `?side=${side}` : ""}`,
+    bulkPdf: async (cardIds: number[], side?: "FRONT" | "BACK" | "BOTH") => {
       const res = await fetch("/api/id-cards/bulk-pdf", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cardIds }),
+        body: JSON.stringify({ cardIds, side: side || "BOTH" }),
       });
       if (!res.ok) throw new Error("Bulk PDF generation failed");
       return res.blob();
     },
   },
+  requests: {
+    downloadExampleExcel: async (params?: { schoolId?: number; templateId?: number }) => {
+      const sp = new URLSearchParams();
+      if (params?.schoolId) sp.set("schoolId", String(params.schoolId));
+      if (params?.templateId) sp.set("templateId", String(params.templateId));
+      const qs = sp.toString();
+      const res = await fetch(`/api/id-card-requests/example-excel${qs ? `?${qs}` : ""}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to download example Excel file");
+      return res.blob();
+    },
+    uploadExcel: (body: { fileBase64: string; filename: string; schoolId?: number; templateId?: number }) =>
+      request<{
+        success: true;
+        processed: number;
+        failed: number;
+        total: number;
+        errors?: Array<{ rowNumber: number; reason: string }>;
+      }>("/api/id-card-requests/upload-excel", json(body)),
+  },
   approvals: {
-    list: () => request<ApiApproval[]>("/api/approvals"),
+    list: (params?: { status?: string }) => {
+      const queryStr = params?.status && params.status !== "All" ? `?status=${params.status}` : "";
+      return request<ApiApproval[]>(`/api/approvals${queryStr}`);
+    },
     review: (id: number) => request<{ success: true; status: string }>(`/api/approvals/${id}/review`, json({})),
     requestChanges: (id: number, comment: string) => request<{ success: true; status: string }>(`/api/approvals/${id}/request-changes`, json({ comment })),
     resubmit: (id: number) => request<{ success: true; status: string }>(`/api/approvals/${id}/resubmit`, json({})),

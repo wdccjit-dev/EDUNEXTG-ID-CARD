@@ -65,24 +65,71 @@ export default function TemplateDesigner() {
         setInitialTemplate(meta);
         dispatch({ type: "UPDATE_TEMPLATE", changes: meta });
 
-        // Load elements
-        if (tmpl.elements && tmpl.elements.length > 0) {
-          const designerElements: DesignerElement[] = tmpl.elements.map((el, idx) => ({
-            id: el.id,
-            elementKey: el.elementKey,
-            elementType: el.elementType as DesignerElement["elementType"],
-            label: el.label ?? null,
-            config: (el.config as ElementConfig) ?? {
-              x: 20,
-              y: 20,
-              width: 100,
-              height: 30,
-              side: "FRONT",
-              rotation: 0,
-              opacity: 1,
-            },
-            sortOrder: el.sortOrder ?? idx,
-          }));
+        // Load elements (from tmpl.elements or fallback to tmpl.meta elements)
+        let rawElements = tmpl.elements;
+        if ((!rawElements || rawElements.length === 0) && (tmpl as any).meta) {
+          try {
+            const metaParsed = typeof (tmpl as any).meta === "string" ? JSON.parse((tmpl as any).meta) : (tmpl as any).meta;
+            if (Array.isArray(metaParsed?.elements) && metaParsed.elements.length > 0) {
+              rawElements = metaParsed.elements;
+            }
+          } catch {
+            // ignore JSON error
+          }
+        }
+
+        if (rawElements && rawElements.length > 0) {
+          const designerElements: DesignerElement[] = rawElements.map((el: any, idx: number) => {
+            let parsedConfig: Record<string, any> = {};
+            if (typeof el.config === "string") {
+              try {
+                parsedConfig = JSON.parse(el.config) || {};
+              } catch {
+                parsedConfig = {};
+              }
+            } else if (el.config && typeof el.config === "object") {
+              parsedConfig = { ...el.config };
+            }
+
+            const elementType = (el.elementType || "TEXT") as DesignerElement["elementType"];
+            const side = parsedConfig.side === "BACK" ? "BACK" : "FRONT";
+
+            // If DYNAMIC_FIELD, ensure dynamicField is correctly populated
+            let dynamicField = parsedConfig.dynamicField || el.dynamicField;
+            if (!dynamicField && elementType === "DYNAMIC_FIELD" && el.label) {
+              const trimmed = String(el.label).trim();
+              if (trimmed.startsWith("{{") && trimmed.endsWith("}}")) {
+                dynamicField = trimmed.slice(2, -2).trim();
+              }
+            }
+            if (elementType === "DYNAMIC_FIELD" && !dynamicField) {
+              dynamicField = "student_name";
+            }
+
+            const elementKey = el.elementKey || `${elementType.toLowerCase()}_${Date.now()}_${idx + 1}`;
+            const label = el.label ?? (elementType === "DYNAMIC_FIELD" ? `{{${dynamicField}}}` : null);
+
+            const mergedConfig: ElementConfig = {
+              x: typeof parsedConfig.x === "number" ? parsedConfig.x : 20,
+              y: typeof parsedConfig.y === "number" ? parsedConfig.y : 20,
+              width: typeof parsedConfig.width === "number" ? parsedConfig.width : (elementType === "DYNAMIC_FIELD" ? 120 : 100),
+              height: typeof parsedConfig.height === "number" ? parsedConfig.height : 30,
+              side,
+              rotation: typeof parsedConfig.rotation === "number" ? parsedConfig.rotation : 0,
+              opacity: typeof parsedConfig.opacity === "number" ? parsedConfig.opacity : 1,
+              ...parsedConfig,
+              ...(elementType === "DYNAMIC_FIELD" ? { dynamicField } : {}),
+            };
+
+            return {
+              id: el.id,
+              elementKey,
+              elementType,
+              label,
+              config: mergedConfig,
+              sortOrder: el.sortOrder ?? idx,
+            };
+          });
           setInitialElements(designerElements);
           dispatch({ type: "LOAD_ELEMENTS", elements: designerElements });
         } else {
@@ -134,13 +181,25 @@ export default function TemplateDesigner() {
 
     setSaving(true);
     try {
-      const elementsPayload = state.elements.map((el, idx) => ({
-        elementKey: el.elementKey,
-        elementType: el.elementType,
-        label: el.label,
-        config: el.config,
-        sortOrder: idx,
-      }));
+      const elementsPayload = state.elements.map((el, idx) => {
+        const dynamicField = el.elementType === "DYNAMIC_FIELD"
+          ? (el.config.dynamicField || (el.label?.startsWith("{{") && el.label.endsWith("}}") ? el.label.slice(2, -2).trim() : "student_name"))
+          : undefined;
+        const label = el.elementType === "DYNAMIC_FIELD"
+          ? `{{${dynamicField}}}`
+          : el.label;
+
+        return {
+          elementKey: el.elementKey,
+          elementType: el.elementType,
+          label,
+          config: {
+            ...el.config,
+            ...(dynamicField ? { dynamicField } : {}),
+          },
+          sortOrder: idx,
+        };
+      });
 
       await api.templates.update(templateId, {
         name: t.name,

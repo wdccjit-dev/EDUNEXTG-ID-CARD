@@ -93,12 +93,26 @@ function RenderElement({
       );
 
     case "DYNAMIC_FIELD": {
-      const field = c.dynamicField ?? "student_name";
-      const value = cardData[field] ?? `{{${field}}}`;
+      const field =
+        c.dynamicField ||
+        (element.label && element.label.startsWith("{{") && element.label.endsWith("}}")
+          ? element.label.slice(2, -2).trim()
+          : "student_name");
+      let value = cardData[field];
+      if (value === undefined) {
+        if (field === "admission_number" || field === "admission_no") {
+          value = cardData["admission_number"] ?? cardData["admission_no"];
+        } else if (field === "roll_number" || field === "roll_no") {
+          value = cardData["roll_number"] ?? cardData["roll_no"];
+        } else if (field === "phone" || field === "mobile" || field === "contact") {
+          value = cardData["phone"] ?? cardData["mobile"] ?? cardData["contact"];
+        }
+      }
+      const displayValue = value !== undefined ? value : (cardData === SAMPLE_CARD_DATA ? `{{${field}}}` : "");
       const fieldDef = DYNAMIC_FIELDS.find((f) => f.key === field);
       return (
         <div style={{ ...baseStyle, ...textStyle, display: "flex", alignItems: "center" }}>
-          <span style={{ width: "100%" }} title={fieldDef?.label ?? field}>{value}</span>
+          <span style={{ width: "100%" }} title={fieldDef?.label ?? field}>{displayValue}</span>
         </div>
       );
     }

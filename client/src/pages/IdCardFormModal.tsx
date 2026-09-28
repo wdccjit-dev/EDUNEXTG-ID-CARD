@@ -125,9 +125,15 @@ export default function IdCardFormModal({
     loadTemplatesForSchool(newSchoolId);
   };
 
+  // Track template fetch version to force re-fetch when modal opens
+  const [fetchSeq, setFetchSeq] = useState(0);
+
   // Initialize or reset form data whenever dialog opens or initialCard changes
   useEffect(() => {
     if (!open) return;
+
+    // Trigger fresh load of the active template whenever modal opens
+    setFetchSeq((s) => s + 1);
 
     if (initialCard) {
       setCardNumber(initialCard.cardNumber);
@@ -153,45 +159,116 @@ export default function IdCardFormModal({
     }
   }, [open, initialCard, currentSchoolId, schoolName, schoolCode, availableTemplates]);
 
-  // Load full template details & elements whenever selected template changes
+  // Load full template details & elements whenever selected template or modal open version changes
   useEffect(() => {
     if (!selectedTemplateId) {
       setFullTemplate(null);
       return;
     }
+
+    // Immediately seed with availableTemplates elements if present to avoid blank flicker
+    const matchedAvailable = availableTemplates.find((t) => t.id === selectedTemplateId);
+    if (matchedAvailable && matchedAvailable.elements && matchedAvailable.elements.length > 0) {
+      setFullTemplate((prev) => (prev?.id === selectedTemplateId ? prev : matchedAvailable));
+    }
+
     setLoadingTemplate(true);
     api.templates
       .get(selectedTemplateId)
       .then((tmpl) => setFullTemplate(tmpl))
       .catch((err) => {
         console.error("Failed to load template", err);
-        toast.error("Could not load template details");
+        // Fall back to availableTemplates if network error
+        if (matchedAvailable) {
+          setFullTemplate(matchedAvailable);
+        } else {
+          toast.error("Could not load template details");
+        }
       })
       .finally(() => setLoadingTemplate(false));
-  }, [selectedTemplateId]);
+  }, [selectedTemplateId, fetchSeq]);
+
+  // Helper to safely extract elements list from template (elements array or meta)
+  const templateElementList = useMemo(() => {
+    if (fullTemplate?.elements && Array.isArray(fullTemplate.elements) && fullTemplate.elements.length > 0) {
+      return fullTemplate.elements;
+    }
+    // Check fallback in availableTemplates
+    const fallbackTmpl = availableTemplates.find((t) => t.id === selectedTemplateId);
+    if (fallbackTmpl?.elements && Array.isArray(fallbackTmpl.elements) && fallbackTmpl.elements.length > 0) {
+      return fallbackTmpl.elements;
+    }
+    // Check if elements are stored in meta
+    if (fullTemplate?.meta) {
+      try {
+        const metaObj = typeof fullTemplate.meta === "string" ? JSON.parse(fullTemplate.meta) : fullTemplate.meta;
+        if (Array.isArray(metaObj?.elements)) {
+          return metaObj.elements as ApiTemplateElement[];
+        }
+      } catch {
+        /* ignore parse error */
+      }
+    }
+    return fullTemplate?.elements ?? [];
+  }, [fullTemplate, availableTemplates, selectedTemplateId]);
 
   // Determine required dynamic fields from template elements
   const requiredDynamicFields = useMemo(() => {
-    if (!fullTemplate?.elements) return [];
+    if (!templateElementList || templateElementList.length === 0) return [];
     const fields = new Set<string>();
-    for (const el of fullTemplate.elements) {
-      if (el.elementType === "DYNAMIC_FIELD") {
-        const cfg = el.config as Record<string, any> | null;
-        if (cfg?.dynamicField) {
-          fields.add(cfg.dynamicField);
+
+    for (const el of templateElementList) {
+      const rawType = (el.elementType || (el as any).type || "").toUpperCase();
+
+      // Safely parse config if it's a string
+      let cfg: Record<string, any> = {};
+      if (typeof el.config === "string") {
+        try {
+          cfg = JSON.parse(el.config);
+        } catch {
+          cfg = {};
+        }
+      } else if (el.config && typeof el.config === "object") {
+        cfg = el.config as Record<string, any>;
+      }
+
+      if (rawType === "DYNAMIC_FIELD") {
+        const fieldKey =
+          cfg.dynamicField ||
+          (el as any).dynamicField ||
+          (el.label && el.label.startsWith("{{") && el.label.endsWith("}}")
+            ? el.label.slice(2, -2).trim()
+            : undefined);
+
+        if (fieldKey && typeof fieldKey === "string" && fieldKey.trim()) {
+          fields.add(fieldKey.trim());
+        }
+      } else if (rawType === "QR_CODE" && cfg.qrField) {
+        if (typeof cfg.qrField === "string" && cfg.qrField.trim()) {
+          fields.add(cfg.qrField.trim());
+        }
+      } else if (rawType === "BARCODE" && cfg.barcodeField) {
+        if (typeof cfg.barcodeField === "string" && cfg.barcodeField.trim()) {
+          fields.add(cfg.barcodeField.trim());
         }
       }
     }
     return Array.from(fields);
-  }, [fullTemplate]);
+  }, [templateElementList]);
 
   const templateHasPhoto = useMemo(() => {
-    return (fullTemplate?.elements ?? []).some((el) => el.elementType === "PHOTO");
-  }, [fullTemplate]);
+    return templateElementList.some((el) => {
+      const t = (el.elementType || (el as any).type || "").toUpperCase();
+      return t === "PHOTO";
+    });
+  }, [templateElementList]);
 
   const templateHasSignature = useMemo(() => {
-    return (fullTemplate?.elements ?? []).some((el) => el.elementType === "SIGNATURE");
-  }, [fullTemplate]);
+    return templateElementList.some((el) => {
+      const t = (el.elementType || (el as any).type || "").toUpperCase();
+      return t === "SIGNATURE";
+    });
+  }, [templateElementList]);
 
   // Helper to update field values
   const handleFieldChange = (key: string, value: string) => {
@@ -254,9 +331,20 @@ export default function IdCardFormModal({
     // If submitting, validate required fields client-side
     if (submitAfterSave) {
       for (const field of requiredDynamicFields) {
-        if (!formData[field] || !formData[field].trim()) {
+        // Resolve field with alias fallback
+        let val = formData[field]?.trim();
+        if (!val) {
+          if (field === "admission_number" || field === "admission_no") {
+            val = (formData["admission_number"] || formData["admission_no"])?.trim();
+          } else if (field === "roll_number" || field === "roll_no") {
+            val = (formData["roll_number"] || formData["roll_no"])?.trim();
+          } else if (field === "phone" || field === "mobile" || field === "contact") {
+            val = (formData["phone"] || formData["mobile"] || formData["contact"])?.trim();
+          }
+        }
+        if (!val) {
           const fieldDef = DYNAMIC_FIELDS.find((f) => f.key === field);
-          return toast.error(`Please fill in required field: ${fieldDef?.label || field}`);
+          return toast.error(`Please fill in required field: ${fieldDef?.label || field.replaceAll("_", " ")}`);
         }
       }
       if (templateHasPhoto && !photoUrl && !formData["photo"] && !formData["student_photo"]) {
@@ -317,23 +405,33 @@ export default function IdCardFormModal({
 
   // Convert elements for CardRenderer
   const rendererElements: DesignerElement[] = useMemo(() => {
-    if (!fullTemplate?.elements) return [];
-    return fullTemplate.elements.map((el, i) => ({
-      elementKey: el.elementKey,
-      elementType: el.elementType as any,
-      label: el.label ?? null,
-      config: (el.config as any) ?? {
-        x: 20,
-        y: 20,
-        width: 100,
-        height: 30,
-        side: "FRONT",
-        rotation: 0,
-        opacity: 1,
-      },
-      sortOrder: el.sortOrder ?? i,
-    }));
-  }, [fullTemplate]);
+    if (!templateElementList || templateElementList.length === 0) return [];
+    return templateElementList.map((el, i) => {
+      let cfg: any = el.config;
+      if (typeof cfg === "string") {
+        try {
+          cfg = JSON.parse(cfg);
+        } catch {
+          cfg = {};
+        }
+      }
+      return {
+        elementKey: el.elementKey,
+        elementType: (el.elementType || (el as any).type) as any,
+        label: el.label ?? null,
+        config: cfg ?? {
+          x: 20,
+          y: 20,
+          width: 100,
+          height: 30,
+          side: "FRONT",
+          rotation: 0,
+          opacity: 1,
+        },
+        sortOrder: el.sortOrder ?? i,
+      };
+    });
+  }, [templateElementList]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -503,7 +601,9 @@ export default function IdCardFormModal({
                   </div>
 
                   <div>
-                    <Label className="text-xs font-bold text-gray-700">Admission Code / Number</Label>
+                    <Label className="text-xs font-bold text-gray-700">
+                      Admission Code / Number {(requiredDynamicFields.includes("admission_number") || requiredDynamicFields.includes("admission_no")) && <span className="text-red-500">*</span>}
+                    </Label>
                     <Input
                       className="mt-1 text-xs"
                       placeholder="e.g. ADM-2026-001"
@@ -533,7 +633,9 @@ export default function IdCardFormModal({
 
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                       <div>
-                        <Label className="text-xs font-bold text-gray-700">Class</Label>
+                        <Label className="text-xs font-bold text-gray-700">
+                          Class {requiredDynamicFields.includes("class") && <span className="text-red-500">*</span>}
+                        </Label>
                         <Input
                           className="mt-1 text-xs"
                           placeholder="e.g. 10"
@@ -543,7 +645,9 @@ export default function IdCardFormModal({
                       </div>
 
                       <div>
-                        <Label className="text-xs font-bold text-gray-700">Section</Label>
+                        <Label className="text-xs font-bold text-gray-700">
+                          Section {requiredDynamicFields.includes("section") && <span className="text-red-500">*</span>}
+                        </Label>
                         <Input
                           className="mt-1 text-xs"
                           placeholder="e.g. A"
@@ -553,7 +657,9 @@ export default function IdCardFormModal({
                       </div>
 
                       <div>
-                        <Label className="text-xs font-bold text-gray-700">Roll Number</Label>
+                        <Label className="text-xs font-bold text-gray-700">
+                          Roll Number {(requiredDynamicFields.includes("roll_number") || requiredDynamicFields.includes("roll_no")) && <span className="text-red-500">*</span>}
+                        </Label>
                         <Input
                           className="mt-1 text-xs"
                           placeholder="e.g. 15"
@@ -696,25 +802,32 @@ export default function IdCardFormModal({
 
                 {/* Extra dynamic fields discovered from template */}
                 {(() => {
+                  const standardKeys = new Set([
+                    "student_name",
+                    "class",
+                    "section",
+                    "roll_number",
+                    "roll_no",
+                    "admission_number",
+                    "admission_no",
+                    "dob",
+                    "gender",
+                    "blood_group",
+                    "father_name",
+                    "mother_name",
+                    "guardian_name",
+                    "phone",
+                    "mobile",
+                    "contact",
+                    "address",
+                    "school_name",
+                    "school_code",
+                    "photo",
+                    "student_photo",
+                    "signature",
+                  ]);
                   const extraFields = requiredDynamicFields.filter(
-                    (f) =>
-                      ![
-                        "student_name",
-                        "class",
-                        "section",
-                        "roll_number",
-                        "admission_number",
-                        "dob",
-                        "gender",
-                        "blood_group",
-                        "father_name",
-                        "mother_name",
-                        "guardian_name",
-                        "phone",
-                        "address",
-                        "school_name",
-                        "school_code",
-                      ].includes(f),
+                    (f) => !standardKeys.has(f.toLowerCase().trim()),
                   );
                   if (extraFields.length === 0) return null;
                   return (

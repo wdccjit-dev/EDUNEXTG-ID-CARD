@@ -56,9 +56,19 @@ async function renderCardSide(
   cardData: Record<string, string>,
   cardWidth: number,
   cardHeight: number,
+  originX: number = 0,
+  originY: number = 0,
+  scale: number = 1,
 ) {
+  doc.save();
+  if (scale !== 1) {
+    doc.scale(scale);
+  }
+  const effOriginX = originX / scale;
+  const effOriginY = originY / scale;
+
   // Background canvas fill (white default)
-  doc.rect(0, 0, cardWidth, cardHeight).fill("#ffffff");
+  doc.rect(effOriginX, effOriginY, cardWidth, cardHeight).fill("#ffffff");
 
   const sideElements = elements
     .filter((el) => el.config.side === side)
@@ -66,8 +76,8 @@ async function renderCardSide(
 
   for (const el of sideElements) {
     const c = el.config;
-    const x = c.x ?? 0;
-    const y = c.y ?? 0;
+    const x = effOriginX + (c.x ?? 0);
+    const y = effOriginY + (c.y ?? 0);
     const w = c.width ?? 100;
     const h = c.height ?? 30;
 
@@ -120,7 +130,13 @@ async function renderCardSide(
           text = c.content ?? "";
         } else {
           const fieldKey = c.dynamicField ?? "student_name";
-          text = cardData[fieldKey] ?? `[${fieldKey}]`;
+          // If field is empty or unpopulated, omit it completely (do not render [fieldKey])
+          text = cardData[fieldKey] !== undefined ? String(cardData[fieldKey]) : "";
+        }
+
+        if (!text) {
+          // Empty dynamic field - omitted
+          break;
         }
 
         // Draw background if configured
@@ -253,12 +269,22 @@ async function renderCardSide(
 
     doc.restore();
   }
+  doc.restore();
+}
+
+export interface PrintPdfOptions {
+  side?: "FRONT" | "BACK" | "BOTH";
+  layout?: "sheet" | "card";
 }
 
 /**
- * Generate a PDF Buffer for a single ID card (Page 1: Front, Page 2: Back)
+ * Generate a PDF Buffer for a single ID card
  */
-export async function generateSingleCardPdf(card: CardPdfData): Promise<Buffer> {
+export async function generateSingleCardPdf(
+  card: CardPdfData,
+  options: PrintPdfOptions = {},
+): Promise<Buffer> {
+  const side = options.side || "BOTH";
   const cardWidth = card.template.cardWidth || 324;
   const cardHeight = card.template.cardHeight || 204;
 
@@ -286,13 +312,15 @@ export async function generateSingleCardPdf(card: CardPdfData): Promise<Buffer> 
   const chunks: Buffer[] = [];
   doc.on("data", (chunk) => chunks.push(chunk));
 
-  // Front Page
-  doc.addPage({ size: [cardWidth, cardHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
-  await renderCardSide(doc, elements, "FRONT", card.cardData, cardWidth, cardHeight);
+  if (side === "FRONT" || side === "BOTH") {
+    doc.addPage({ size: [cardWidth, cardHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+    await renderCardSide(doc, elements, "FRONT", card.cardData, cardWidth, cardHeight);
+  }
 
-  // Back Page
-  doc.addPage({ size: [cardWidth, cardHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
-  await renderCardSide(doc, elements, "BACK", card.cardData, cardWidth, cardHeight);
+  if (side === "BACK" || side === "BOTH") {
+    doc.addPage({ size: [cardWidth, cardHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+    await renderCardSide(doc, elements, "BACK", card.cardData, cardWidth, cardHeight);
+  }
 
   doc.end();
 
@@ -303,13 +331,18 @@ export async function generateSingleCardPdf(card: CardPdfData): Promise<Buffer> 
 }
 
 /**
- * Generate a combined PDF Buffer for multiple ID cards
+ * Generate a combined PDF Buffer for multiple ID cards using physical 10-up card layout per A4 page.
+ * Implements max 10 cards per page, strict card design preservation, and horizontal mirroring for back sides.
  */
-export async function generateBulkCardPdf(cards: CardPdfData[]): Promise<Buffer> {
+export async function generateBulkCardPdf(
+  cards: CardPdfData[],
+  options: PrintPdfOptions = {},
+): Promise<Buffer> {
   if (cards.length === 0) {
     throw new Error("No cards provided for bulk PDF generation");
   }
 
+  const side = options.side || "BOTH";
   const doc = new PDFDocument({
     autoFirstPage: false,
     margins: { top: 0, bottom: 0, left: 0, right: 0 },
@@ -318,33 +351,90 @@ export async function generateBulkCardPdf(cards: CardPdfData[]): Promise<Buffer>
   const chunks: Buffer[] = [];
   doc.on("data", (chunk) => chunks.push(chunk));
 
-  for (const card of cards) {
-    const cardWidth = card.template.cardWidth || 324;
-    const cardHeight = card.template.cardHeight || 204;
+  // A4 sheet dimensions in points (72 DPI)
+  const A4_WIDTH = 595.28;
+  const A4_HEIGHT = 841.89;
+  const CARDS_PER_PAGE = 10;
+  const numPages = Math.ceil(cards.length / CARDS_PER_PAGE);
 
-    const elements: DesignerElement[] = (card.template.elements || []).map((el, i) => ({
-      elementKey: el.elementKey,
-      elementType: el.elementType as any,
-      label: el.label ?? null,
-      config: (el.config as ElementConfig) ?? {
-        x: 20,
-        y: 20,
-        width: 100,
-        height: 30,
-        side: "FRONT",
-        rotation: 0,
-        opacity: 1,
-      },
-      sortOrder: el.sortOrder ?? i,
-    }));
+  for (let p = 0; p < numPages; p++) {
+    const pageCards = cards.slice(p * CARDS_PER_PAGE, (p + 1) * CARDS_PER_PAGE);
 
-    // Front
-    doc.addPage({ size: [cardWidth, cardHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
-    await renderCardSide(doc, elements, "FRONT", card.cardData, cardWidth, cardHeight);
+    const sampleTmpl = pageCards[0].template;
+    const cardW = sampleTmpl.cardWidth || 324;
+    const cardH = sampleTmpl.cardHeight || 204;
 
-    // Back
-    doc.addPage({ size: [cardWidth, cardHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
-    await renderCardSide(doc, elements, "BACK", card.cardData, cardWidth, cardHeight);
+    // Scale slightly if needed so a 2-col x 5-row grid fits cleanly within A4
+    const scale = Math.min(1, Math.min(265 / cardW, 154 / cardH));
+    const slotW = cardW * scale;
+    const slotH = cardH * scale;
+
+    const gapX = 18;
+    const gapY = 8;
+    const marginX = (A4_WIDTH - (2 * slotW + gapX)) / 2;
+    const marginY = (A4_HEIGHT - (5 * slotH + 4 * gapY)) / 2;
+
+    const renderSheetSide = async (targetSide: "FRONT" | "BACK") => {
+      doc.addPage({ size: "A4", margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+
+      for (let r = 0; r < 5; r++) {
+        for (let c = 0; c < 2; c++) {
+          const slotX = marginX + c * (slotW + gapX);
+          const slotY = marginY + r * (slotH + gapY);
+
+          let cardIndex: number;
+          if (targetSide === "FRONT") {
+            cardIndex = 2 * r + c;
+          } else {
+            // Horizontal Mirroring for Back Side:
+            // When the printed sheet is flipped horizontally for printing the back side,
+            // Column 0 maps to the card from Column 1 (2*r + 1), and Column 1 maps to Column 0 (2*r).
+            cardIndex = c === 0 ? 2 * r + 1 : 2 * r;
+          }
+
+          if (cardIndex < pageCards.length) {
+            const card = pageCards[cardIndex];
+            const elements: DesignerElement[] = (card.template.elements || []).map((el, i) => ({
+              elementKey: el.elementKey,
+              elementType: el.elementType as any,
+              label: el.label ?? null,
+              config: (el.config as ElementConfig) ?? {
+                x: 20,
+                y: 20,
+                width: 100,
+                height: 30,
+                side: "FRONT",
+                rotation: 0,
+                opacity: 1,
+              },
+              sortOrder: el.sortOrder ?? i,
+            }));
+
+            await renderCardSide(
+              doc,
+              elements,
+              targetSide,
+              card.cardData,
+              cardW,
+              cardH,
+              slotX,
+              slotY,
+              scale,
+            );
+          }
+        }
+      }
+    };
+
+    if (side === "FRONT") {
+      await renderSheetSide("FRONT");
+    } else if (side === "BACK") {
+      await renderSheetSide("BACK");
+    } else {
+      // Print Both: Front page followed by Back page (mirrored) for double-sided sheet alignment
+      await renderSheetSide("FRONT");
+      await renderSheetSide("BACK");
+    }
   }
 
   doc.end();

@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import CardRenderer from "@/components/CardRenderer";
 import IdCardFormModal from "./IdCardFormModal";
 import PrintModal from "@/components/PrintModal";
+import ExcelUploadModal from "@/components/ExcelUploadModal";
 import ApprovalTimeline from "@/components/ApprovalTimeline";
 import { DYNAMIC_FIELDS, SAMPLE_CARD_DATA, type DesignerElement } from "@shared/templateDesigner";
 import {
@@ -44,6 +45,7 @@ import {
   SlidersHorizontal,
   Sparkles,
   Trash2,
+  Upload,
   User,
   Users,
   X,
@@ -385,6 +387,33 @@ export default function Home({
   // Preview & template preview
   const [previewModalTemplate, setPreviewModalTemplate] = useState<ApiTemplate | null>(null);
   const [previewModalSide, setPreviewModalSide] = useState<"FRONT" | "BACK">("FRONT");
+
+  // Excel upload modal
+  const [excelUploadOpen, setExcelUploadOpen] = useState(false);
+
+  const handleDownloadExampleExcel = async (templateId?: number) => {
+    try {
+      const targetTemplateId = templateId || currentActiveSchool?.selectedTemplateId || undefined;
+      const targetSchoolId = currentActiveSchool?.id || authenticatedUser.schoolId || undefined;
+      const blob = await api.requests.downloadExampleExcel({
+        templateId: targetTemplateId,
+        schoolId: targetSchoolId,
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `ID_Card_Requests_Template_${targetTemplateId || "Standard"}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success("Example Excel file downloaded successfully");
+    } catch (err: any) {
+      toast.error("Download failed", {
+        description: err instanceof Error ? err.message : "Failed to download example Excel",
+      });
+    }
+  };
 
   const reloadWorkspace = async () => {
     try {
@@ -2069,6 +2098,8 @@ export default function Home({
                 }
               }}
               onRejectCardDirect={(id: number) => handleOpenReview(id)}
+              onOpenExcelUpload={() => setExcelUploadOpen(true)}
+              onDownloadExampleExcel={handleDownloadExampleExcel}
             />
           )}
         </div>
@@ -2515,6 +2546,19 @@ export default function Home({
         }}
       />
 
+      {/* Excel Upload Modal */}
+      <ExcelUploadModal
+        open={excelUploadOpen}
+        onOpenChange={setExcelUploadOpen}
+        schools={schools}
+        activeSchoolId={currentActiveSchool?.id ?? (authenticatedUser.schoolId ?? undefined)}
+        templates={templates}
+        userRole={authenticatedUser.role}
+        onUploadSuccess={() => {
+          reloadWorkspace();
+        }}
+      />
+
       {/* Admin Card Review & Detail Modal */}
       <Dialog open={reviewModalOpen} onOpenChange={setReviewModalOpen}>
         <DialogContent className="w-[95vw] sm:max-w-5xl xl:max-w-6xl max-h-[92vh] overflow-y-auto p-4 sm:p-6">
@@ -2525,7 +2569,13 @@ export default function Home({
                   <div>
                     <DialogTitle className="text-lg sm:text-xl font-bold flex flex-wrap items-center gap-2">
                       <span>Card Review: #{reviewingCard.cardNumber}</span>
-                      <span className="text-xs px-2.5 py-0.5 rounded-full font-mono font-semibold bg-[#eef5f0] text-[#0f7f79]">
+                      <span className={`text-xs px-2.5 py-0.5 rounded-full font-mono font-semibold ${
+                        reviewingCard.status === "PRINTED"
+                          ? "bg-[#e9ebfa] text-[#5c64b7] border border-[#cbd0f2]"
+                          : reviewingCard.status === "APPROVED"
+                          ? "bg-[#dff3ee] text-[#0b716b] border border-[#b7e3d9]"
+                          : "bg-[#eef5f0] text-[#0f7f79]"
+                      }`}>
                         {reviewingCard.status}
                       </span>
                     </DialogTitle>
@@ -3126,6 +3176,8 @@ function ModuleView({
   onGenerateCredentials,
   onApproveCardDirect,
   onRejectCardDirect,
+  onOpenExcelUpload,
+  onDownloadExampleExcel,
 }: {
   label: NavLabel;
   onBack: () => void;
@@ -3167,6 +3219,8 @@ function ModuleView({
   onGenerateCredentials?: (school: ApiSchool) => void;
   onApproveCardDirect?: (cardId: number, num: string) => void;
   onRejectCardDirect?: (cardId: number) => void;
+  onOpenExcelUpload?: () => void;
+  onDownloadExampleExcel?: (templateId?: number) => void;
 }) {
   const [, navigate] = useLocation();
   const [cardStatusFilter, setCardStatusFilter] = useState<string>("All");
@@ -3316,8 +3370,9 @@ function ModuleView({
   const getStatusTone = (status: string): Tone => {
     switch (status) {
       case "APPROVED":
-      case "PRINTED":
         return "teal";
+      case "PRINTED":
+        return "indigo";
       case "SUBMITTED":
       case "UNDER_REVIEW":
         return "yellow";
@@ -3371,6 +3426,25 @@ function ModuleView({
             >
               <FileText className="h-4 w-4" /> View Demo Templates
             </a>
+          )}
+
+          {isRequests && authenticatedUser.role !== "VIEWER" && (
+            <>
+              <Button
+                variant="outline"
+                onClick={() => onDownloadExampleExcel?.(activeSchool?.selectedTemplateId ?? undefined)}
+                className="h-10 rounded-xl border-[#d1ded9] text-[#0f7f79] hover:bg-[#eef7f4] text-xs font-bold shadow-sm"
+              >
+                <Download className="mr-2 h-4 w-4" /> Download Example Excel
+              </Button>
+              <Button
+                variant="outline"
+                onClick={onOpenExcelUpload}
+                className="h-10 rounded-xl border-[#0f7f79] text-[#0f7f79] hover:bg-[#eef7f4] text-xs font-bold shadow-sm"
+              >
+                <Upload className="mr-2 h-4 w-4" /> Upload Excel
+              </Button>
+            </>
           )}
 
           {((isRequests && authenticatedUser.role === "SUPER_ADMIN") ||
@@ -3564,20 +3638,31 @@ function ModuleView({
                   className="h-10 rounded-xl border-[#e2e8e3] pl-9 text-xs shadow-none w-full"
                 />
               </div>
-              {/* Status filter chips */}
-              <div className="flex flex-wrap items-center gap-1.5 overflow-x-auto max-w-full pb-1 sm:pb-0 [scrollbar-width:none]">
-                {["All", "DRAFT", "SUBMITTED", "UNDER_REVIEW", "CHANGES_REQUIRED", "REJECTED"].map((status) => (
-                  <button
-                    key={status}
-                    onClick={() => setCardStatusFilter(status)}
-                    className={`rounded-lg px-2.5 py-1.5 text-[11px] font-bold transition-all whitespace-nowrap ${cardStatusFilter === status
-                      ? "bg-[#0f7f79] text-white shadow-sm"
-                      : "bg-[#f0efec] text-[#55605d] hover:bg-[#e4e2de]"
-                      }`}
+              {/* Status Filter dropdown */}
+              <div className="flex items-center gap-2 shrink-0">
+                <label htmlFor="id-card-request-status-filter" className="text-xs font-semibold text-[#55605d] shrink-0">
+                  Status:
+                </label>
+                <Select
+                  value={cardStatusFilter}
+                  onValueChange={(val) => setCardStatusFilter(val)}
+                >
+                  <SelectTrigger
+                    id="id-card-request-status-filter"
+                    aria-label="Status Filter"
+                    className="h-10 w-[170px] rounded-xl border-[#e2e8e3] bg-white text-xs font-medium"
                   >
-                    {status.replace(/_/g, " ")}
-                  </button>
-                ))}
+                    <SelectValue placeholder="All" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="All">All</SelectItem>
+                    <SelectItem value="DRAFT">DRAFT</SelectItem>
+                    <SelectItem value="SUBMITTED">SUBMITTED</SelectItem>
+                    <SelectItem value="UNDER_REVIEW">UNDER REVIEW</SelectItem>
+                    <SelectItem value="CHANGES_REQUIRED">CHANGES REQUIRED</SelectItem>
+                    <SelectItem value="REJECTED">REJECTED</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -3860,7 +3945,7 @@ function ModuleView({
                         {card.templateName}
                       </td>
                       <td className="px-5 py-4">
-                        <StatusPill tone="teal">
+                        <StatusPill tone={getStatusTone(card.status)}>
                           {card.status}
                         </StatusPill>
                       </td>

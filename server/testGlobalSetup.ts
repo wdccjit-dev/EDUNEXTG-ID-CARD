@@ -55,11 +55,39 @@ async function purgeTestArtifacts() {
     `);
 
     await conn.execute(`
+      DELETE FROM idCardData WHERE idCardId IN (
+        SELECT id FROM idCards WHERE schoolId IN (
+          SELECT id FROM schools WHERE email LIKE '%@test.local' OR shortCode LIKE 'ST%' OR shortCode LIKE 'SCA%' OR shortCode LIKE 'SCB%' OR shortCode LIKE 'UA%' OR shortCode LIKE 'UB%' OR name LIKE '%Test%'
+        )
+      )
+    `).catch(() => {});
+
+    await conn.execute(`
+      DELETE FROM idCards WHERE schoolId IN (
+        SELECT id FROM schools WHERE email LIKE '%@test.local' OR shortCode LIKE 'ST%' OR shortCode LIKE 'SCA%' OR shortCode LIKE 'SCB%' OR shortCode LIKE 'UA%' OR shortCode LIKE 'UB%' OR name LIKE '%Test%'
+      )
+    `).catch(() => {});
+
+    await conn.execute(`
+      DELETE FROM idCardRequests WHERE schoolId IN (
+        SELECT id FROM schools WHERE email LIKE '%@test.local' OR shortCode LIKE 'ST%' OR shortCode LIKE 'SCA%' OR shortCode LIKE 'SCB%' OR shortCode LIKE 'UA%' OR shortCode LIKE 'UB%' OR name LIKE '%Test%'
+      )
+    `).catch(() => {});
+
+    await conn.execute(`
+      DELETE FROM schoolTemplates WHERE schoolId IN (
+        SELECT id FROM schools WHERE email LIKE '%@test.local' OR shortCode LIKE 'ST%' OR shortCode LIKE 'SCA%' OR shortCode LIKE 'SCB%' OR shortCode LIKE 'UA%' OR shortCode LIKE 'UB%' OR name LIKE '%Test%'
+      )
+    `).catch(() => {});
+
+    await conn.execute(`
       DELETE FROM schools 
       WHERE email LIKE '%@test.local' 
          OR shortCode LIKE 'ST%' 
          OR shortCode LIKE 'SCA%' 
          OR shortCode LIKE 'SCB%' 
+         OR shortCode LIKE 'UA%' 
+         OR shortCode LIKE 'UB%' 
          OR name LIKE '%Test%'
     `);
 

@@ -100,9 +100,18 @@ function designerReducer(state: DesignerState, action: DesignerAction): Designer
       const withUndo = pushUndo(state);
       return {
         ...withUndo,
-        elements: withUndo.elements.map((el) =>
-          el.elementKey === action.key ? { ...el, config: { ...el.config, ...action.changes } } : el,
-        ),
+        elements: withUndo.elements.map((el) => {
+          if (el.elementKey !== action.key) return el;
+          const updatedConfig = { ...el.config, ...action.changes };
+          let updatedLabel = el.label;
+          if (
+            (el.elementType === "DYNAMIC_FIELD" || action.changes.dynamicField !== undefined) &&
+            action.changes.dynamicField
+          ) {
+            updatedLabel = `{{${action.changes.dynamicField}}}`;
+          }
+          return { ...el, label: updatedLabel, config: updatedConfig };
+        }),
         isDirty: true,
       };
     }

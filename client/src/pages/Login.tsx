@@ -1,6 +1,6 @@
 import { FormEvent, useState } from "react";
 import { useLocation } from "wouter";
-import { ShieldAlert } from "lucide-react";
+import { Eye, EyeOff, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -10,6 +10,7 @@ export default function Login() {
   const [, navigate] = useLocation();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [showContactAdminModal, setShowContactAdminModal] = useState(false);
 
@@ -89,18 +90,34 @@ export default function Login() {
               />
             </label>
 
-            <label className="block text-xs font-bold text-[#38514e]">
-              Password
-              <Input
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder="••••••••"
-                className="mt-2 h-11 rounded-xl"
-                autoComplete="current-password"
-                required
-              />
-            </label>
+            <div className="block text-xs font-bold text-[#38514e]">
+              <label htmlFor="login-password">Password</label>
+              <div className="relative mt-2">
+                <Input
+                  id="login-password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder="••••••••"
+                  className="h-11 rounded-xl pr-10"
+                  autoComplete="current-password"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#778381] hover:text-[#203734] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7f79] rounded-md p-1 cursor-pointer transition-colors"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  title={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" aria-hidden="true" />
+                  ) : (
+                    <Eye className="h-4 w-4" aria-hidden="true" />
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
 
           <Button
