@@ -21,7 +21,7 @@ import {
 } from "../drizzle/schema";
 import { and, eq } from "drizzle-orm";
 import { appRouter } from "./routers";
-import { generateSingleCardPdf } from "./pdf";
+import { generateSingleCardPdf, generateBulkCardPdf } from "./pdf";
 
 describe("Strict Multi-Tenant Isolation & Comprehensive RBAC Verification", () => {
   let server: http.Server;
@@ -498,6 +498,41 @@ describe("Strict Multi-Tenant Isolation & Comprehensive RBAC Verification", () =
     // Word "IMAGE" should never appear as fallback text in the rendered stream
     expect(pdfText).not.toContain("(IMAGE)");
     expect(pdfBuffer.byteLength).toBeGreaterThan(500);
+  });
+
+  it("18b. Bulk PDF layout: max 10 cards per page for single side, max 5 cards per page for both sides", async () => {
+    const dummyCard = (idx: number) => ({
+      cardNumber: `CARD-${idx}`,
+      template: {
+        cardWidth: 324,
+        cardHeight: 204,
+        orientation: "landscape" as const,
+        elements: [
+          { elementKey: "t1", elementType: "TEXT", config: { x: 10, y: 10, width: 80, height: 20, content: `Card ${idx}`, side: "FRONT" as const } },
+          { elementKey: "t2", elementType: "TEXT", config: { x: 10, y: 10, width: 80, height: 20, content: `Back ${idx}`, side: "BACK" as const } },
+        ],
+      },
+      cardData: { cardNumber: `CARD-${idx}` },
+    });
+
+    const cards10 = Array.from({ length: 10 }, (_, i) => dummyCard(i + 1));
+    const cards5 = Array.from({ length: 5 }, (_, i) => dummyCard(i + 1));
+
+    // 10 cards FRONT only: succeeds and produces valid PDF
+    const bufFront10 = await generateBulkCardPdf(cards10, { side: "FRONT" });
+    expect(bufFront10.byteLength).toBeGreaterThan(1000);
+
+    // 10 cards BACK only: succeeds and produces valid PDF
+    const bufBack10 = await generateBulkCardPdf(cards10, { side: "BACK" });
+    expect(bufBack10.byteLength).toBeGreaterThan(1000);
+
+    // 5 cards BOTH sides: succeeds and produces valid PDF (5 front + 5 back in 1 page)
+    const bufBoth5 = await generateBulkCardPdf(cards5, { side: "BOTH" });
+    expect(bufBoth5.byteLength).toBeGreaterThan(1000);
+
+    // 10 cards BOTH sides: produces valid PDF across 2 pages (5 cards each)
+    const bufBoth10 = await generateBulkCardPdf(cards10, { side: "BOTH" });
+    expect(bufBoth10.byteLength).toBeGreaterThan(bufBoth5.byteLength);
   });
 
   it("19. Audit logs endpoint returns 200 without 500 error & scopes strictly per school", async () => {

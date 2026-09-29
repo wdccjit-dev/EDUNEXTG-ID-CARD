@@ -2643,39 +2643,77 @@ router.get("/audit-logs", async (req, res) => {
       createdAt: auditLogs.createdAt,
     };
 
-    let rawRows: any[] = [];
+    let logEntries: any[] = [];
     if (adminRoles.has(user.role)) {
       if (req.query.schoolId) {
         const sid = Number(req.query.schoolId);
-        rawRows = await db
-          .select(baseSelect)
+        logEntries = await db
+          .select()
           .from(auditLogs)
-          .leftJoin(users, eq(auditLogs.userId, users.id))
-          .leftJoin(schools, eq(auditLogs.schoolId, schools.id))
           .where(eq(auditLogs.schoolId, sid))
           .orderBy(desc(auditLogs.id))
-          .limit(500);
+          .limit(200);
       } else {
-        rawRows = await db
-          .select(baseSelect)
+        logEntries = await db
+          .select()
           .from(auditLogs)
-          .leftJoin(users, eq(auditLogs.userId, users.id))
-          .leftJoin(schools, eq(auditLogs.schoolId, schools.id))
           .orderBy(desc(auditLogs.id))
-          .limit(500);
+          .limit(200);
       }
     } else {
       // School user: strictly scoped to own school
       if (!user.schoolId) return res.json([]);
-      rawRows = await db
-        .select(baseSelect)
+      logEntries = await db
+        .select()
         .from(auditLogs)
-        .leftJoin(users, eq(auditLogs.userId, users.id))
-        .leftJoin(schools, eq(auditLogs.schoolId, schools.id))
         .where(eq(auditLogs.schoolId, user.schoolId))
         .orderBy(desc(auditLogs.id))
-        .limit(500);
+        .limit(200);
     }
+
+    // Fetch related users and schools in batch
+    const userIds = Array.from(new Set(logEntries.map((l) => l.userId).filter((id): id is number => typeof id === "number")));
+    const schoolIds = Array.from(new Set(logEntries.map((l) => l.schoolId).filter((id): id is number => typeof id === "number")));
+
+    const userMap = new Map<number, { name: string | null; email: string | null; role: string }>();
+    if (userIds.length > 0) {
+      const uRows = await db
+        .select({ id: users.id, name: users.name, email: users.email, role: users.role })
+        .from(users)
+        .where(inArray(users.id, userIds));
+      for (const u of uRows) userMap.set(u.id, u);
+    }
+
+    const schoolMap = new Map<number, { name: string | null; shortCode: string | null }>();
+    if (schoolIds.length > 0) {
+      const sRows = await db
+        .select({ id: schools.id, name: schools.name, shortCode: schools.shortCode })
+        .from(schools)
+        .where(inArray(schools.id, schoolIds));
+      for (const s of sRows) schoolMap.set(s.id, s);
+    }
+
+    const rawRows = logEntries.map((l) => {
+      const u = l.userId ? userMap.get(l.userId) : null;
+      const s = l.schoolId ? schoolMap.get(l.schoolId) : null;
+      return {
+        id: l.id,
+        userId: l.userId,
+        userName: u?.name ?? null,
+        userEmail: u?.email ?? null,
+        userRole: u?.role ?? null,
+        schoolId: l.schoolId,
+        schoolName: s?.name ?? null,
+        schoolCode: s?.shortCode ?? null,
+        action: l.action,
+        entityType: l.entityType,
+        entityId: l.entityId,
+        newValues: l.newValues,
+        oldValues: l.oldValues,
+        ipAddress: l.ipAddress,
+        createdAt: l.createdAt,
+      };
+    });
 
     // Post-enrichment for legacy/historical audit logs missing templateName or card details in newValues
     const templateIdsToFetch = new Set<number>();

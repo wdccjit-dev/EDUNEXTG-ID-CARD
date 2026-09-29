@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { createPortal } from "react-dom";
 import CardRenderer from "@/components/CardRenderer";
 import type { ApiIdCardDetail } from "@/lib/api";
 import { api } from "@/lib/api";
@@ -32,15 +33,20 @@ export default function PrintModal({
   const [previewSide, setPreviewSide] = useState<"BOTH" | "FRONT" | "BACK">("BOTH");
   const [activePrintSide, setActivePrintSide] = useState<"BOTH" | "FRONT" | "BACK">("BOTH");
 
-  // Chunk cards into batches of up to 10 cards per printed sheet (2 columns x 5 rows)
-  const CARDS_PER_PAGE = 10;
+  // Effective side for layout chunking and rendering
+  const currentSide = printing ? activePrintSide : previewSide;
+
+  // Maximum cards per sheet:
+  // - When printing FRONT or BACK only: 10 cards per sheet (2 cols x 5 rows)
+  // - When printing BOTH sides: 5 cards per sheet (5 front on col 0, 5 back on col 1)
+  const cardsPerPage = currentSide === "BOTH" ? 5 : 10;
   const cardBatches = useMemo(() => {
     const batches: ApiIdCardDetail[][] = [];
-    for (let i = 0; i < cards.length; i += CARDS_PER_PAGE) {
-      batches.push(cards.slice(i, i + CARDS_PER_PAGE));
+    for (let i = 0; i < cards.length; i += cardsPerPage) {
+      batches.push(cards.slice(i, i + cardsPerPage));
     }
     return batches;
-  }, [cards]);
+  }, [cards, cardsPerPage]);
 
   const executePrint = async (targetSide: "BOTH" | "FRONT" | "BACK") => {
     if (cards.length === 0) return;
@@ -61,11 +67,13 @@ export default function PrintModal({
       );
       if (onPrinted) onPrinted();
 
-      // Allow DOM to update activePrintSide before invoking print dialog
+      // Allow React to re-render DOM and layout to settle before opening browser print dialog
       setTimeout(() => {
         window.print();
-        setPrinting(false);
-      }, 100);
+        setTimeout(() => {
+          setPrinting(false);
+        }, 500);
+      }, 300);
     } catch (err) {
       toast.error("Failed to record print status", {
         description: err instanceof Error ? err.message : "Print operation failed",
@@ -128,54 +136,229 @@ export default function PrintModal({
     }));
   };
 
-  // Determine which side is displayed: during printing use activePrintSide, in modal use previewSide
-  const currentSide = printing ? activePrintSide : previewSide;
+  // Render batch sheets content (shared between interactive preview and print)
+  const renderSheets = (isForPrint = false) => {
+    return cardBatches.map((batchCards, batchIdx) => {
+      const sampleCard = batchCards[0];
+      const cardW = sampleCard.template?.cardWidth || 324;
+      const cardH = sampleCard.template?.cardHeight || 204;
+      const previewScale = 0.88;
+
+      // Helper for BOTH sides (5 rows x 2 cols: Col 0 = Front, Col 1 = Back)
+      const renderBothSidesGrid = () => {
+        const slots = [];
+        for (let r = 0; r < 5; r++) {
+          const card = r < batchCards.length ? batchCards[r] : null;
+
+          // Column 0: Front
+          slots.push(
+            <div
+              key={`slot-${r}-0-front`}
+              className="print-card-slot"
+              style={{
+                width: `${cardW * previewScale}px`,
+                height: `${cardH * previewScale}px`,
+              }}
+            >
+              {card ? (
+                <div className="relative shadow-sm print:shadow-none">
+                  <CardRenderer
+                    cardWidth={cardW}
+                    cardHeight={cardH}
+                    elements={getCardElements(card)}
+                    side="FRONT"
+                    cardData={{ ...card.dataMap, cardNumber: card.cardNumber }}
+                    scale={previewScale}
+                  />
+                </div>
+              ) : (
+                <div className="w-full h-full border border-dashed border-gray-200/50 rounded-lg no-print flex items-center justify-center text-[10px] text-gray-300">
+                  Empty slot
+                </div>
+              )}
+            </div>,
+          );
+
+          // Column 1: Back
+          slots.push(
+            <div
+              key={`slot-${r}-1-back`}
+              className="print-card-slot"
+              style={{
+                width: `${cardW * previewScale}px`,
+                height: `${cardH * previewScale}px`,
+              }}
+            >
+              {card ? (
+                <div className="relative shadow-sm print:shadow-none">
+                  <CardRenderer
+                    cardWidth={cardW}
+                    cardHeight={cardH}
+                    elements={getCardElements(card)}
+                    side="BACK"
+                    cardData={{ ...card.dataMap, cardNumber: card.cardNumber }}
+                    scale={previewScale}
+                  />
+                </div>
+              ) : (
+                <div className="w-full h-full border border-dashed border-gray-200/50 rounded-lg no-print flex items-center justify-center text-[10px] text-gray-300">
+                  Empty slot
+                </div>
+              )}
+            </div>,
+          );
+        }
+        return slots;
+      };
+
+      // Helper for single side (FRONT or BACK only): 10 cards in 2 columns x 5 rows
+      const renderSingleSideGrid = (side: "FRONT" | "BACK") => {
+        const slots = [];
+        for (let r = 0; r < 5; r++) {
+          for (let c = 0; c < 2; c++) {
+            const cardIndex = 2 * r + c;
+            const card = cardIndex < batchCards.length ? batchCards[cardIndex] : null;
+
+            slots.push(
+              <div
+                key={`slot-${r}-${c}-${side}`}
+                className="print-card-slot"
+                style={{
+                  width: `${cardW * previewScale}px`,
+                  height: `${cardH * previewScale}px`,
+                }}
+              >
+                {card ? (
+                  <div className="relative shadow-sm print:shadow-none">
+                    <CardRenderer
+                      cardWidth={cardW}
+                      cardHeight={cardH}
+                      elements={getCardElements(card)}
+                      side={side}
+                      cardData={{ ...card.dataMap, cardNumber: card.cardNumber }}
+                      scale={previewScale}
+                    />
+                  </div>
+                ) : (
+                  <div className="w-full h-full border border-dashed border-gray-200/50 rounded-lg no-print flex items-center justify-center text-[10px] text-gray-300">
+                    Empty slot
+                  </div>
+                )}
+              </div>,
+            );
+          }
+        }
+        return slots;
+      };
+
+      return (
+        <div key={`batch-${batchIdx}`} className={isForPrint ? "print-sheet-wrapper" : "space-y-6"}>
+          {currentSide === "BOTH" ? (
+            <div className="print-page-sheet bg-white rounded-2xl border border-gray-200 p-4 shadow-sm print:p-0 print:border-none print:shadow-none print:rounded-none">
+              {!isForPrint && (
+                <div className="col-span-2 text-xs font-bold text-[#55605d] pb-2 border-b border-gray-100 flex items-center justify-between no-print mb-2">
+                  <span>
+                    Sheet {batchIdx + 1} — Front & Back Side-by-Side (Cards {batchIdx * cardsPerPage + 1}–{Math.min((batchIdx + 1) * cardsPerPage, cards.length)})
+                  </span>
+                  <span className="text-[11px] font-mono text-gray-400">Max 5 cards (5 Front + 5 Back) / page</span>
+                </div>
+              )}
+              <div className="col-span-2 grid grid-cols-2 gap-3 justify-items-center items-center">
+                {renderBothSidesGrid()}
+              </div>
+            </div>
+          ) : (
+            <div className="print-page-sheet bg-white rounded-2xl border border-gray-200 p-4 shadow-sm print:p-0 print:border-none print:shadow-none print:rounded-none">
+              {!isForPrint && (
+                <div className="col-span-2 text-xs font-bold text-[#55605d] pb-2 border-b border-gray-100 flex items-center justify-between no-print mb-2">
+                  <span>
+                    Sheet {batchIdx + 1} — {currentSide === "FRONT" ? "Front Side Only" : "Back Side Only"} (Cards {batchIdx * cardsPerPage + 1}–{Math.min((batchIdx + 1) * cardsPerPage, cards.length)})
+                  </span>
+                  <span className="text-[11px] font-mono text-gray-400">Max 10 cards / page</span>
+                </div>
+              )}
+              <div className="col-span-2 grid grid-cols-2 gap-3 justify-items-center items-center">
+                {renderSingleSideGrid(currentSide)}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    });
+  };
 
   return (
     <>
       <style>{`
         @page {
           size: A4 portrait;
-          margin: 10mm 8mm;
+          margin: 8mm 6mm;
+        }
+        @media screen {
+          #dedicated-print-portal {
+            display: none !important;
+          }
         }
         @media print {
+          /* Hide standard DOM tree in print */
+          #root,
+          [data-slot="dialog-portal"],
+          [data-slot="dialog-overlay"],
+          header,
+          nav,
+          aside,
+          .no-print {
+            display: none !important;
+          }
+
           html, body {
             margin: 0 !important;
             padding: 0 !important;
             background: #ffffff !important;
+            height: auto !important;
+            overflow: visible !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
-          body * {
-            visibility: hidden;
-          }
-          #print-area, #print-area * {
-            visibility: visible;
-          }
-          #print-area {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-            margin: 0;
-            padding: 0;
+
+          /* Ensure dedicated print portal is the ONLY visible block */
+          #dedicated-print-portal {
+            display: block !important;
+            position: static !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
             background: #ffffff !important;
+            visibility: visible !important;
           }
-          .print-page-sheet {
+          #dedicated-print-portal * {
+            visibility: visible !important;
+          }
+
+          .print-sheet-wrapper {
             page-break-after: always;
             break-after: page;
             page-break-inside: avoid;
             break-inside: avoid;
+            margin: 0 0 0 0;
+            padding: 0;
+          }
+          .print-sheet-wrapper:last-child {
+            page-break-after: auto;
+            break-after: auto;
+          }
+
+          .print-page-sheet {
             width: 100%;
-            max-width: 194mm;
+            max-width: 198mm;
             margin: 0 auto;
             padding: 0;
-            display: grid !important;
-            grid-template-columns: repeat(2, 1fr) !important;
-            grid-template-rows: repeat(5, auto) !important;
-            gap: 3mm 4mm !important;
-            justify-items: center;
-            align-items: center;
-            box-sizing: border-box;
+            background: #ffffff !important;
+            border: none !important;
+            box-shadow: none !important;
           }
+
           .print-card-slot {
             page-break-inside: avoid;
             break-inside: avoid;
@@ -184,11 +367,16 @@ export default function PrintModal({
             align-items: center;
             box-sizing: border-box;
           }
-          .no-print {
-            display: none !important;
-          }
         }
       `}</style>
+
+      {/* Dedicated Portal Rendered Directly at Body Level for Clean, Unclipped Printing */}
+      {open && typeof document !== "undefined" && createPortal(
+        <div id="dedicated-print-portal" aria-hidden="true">
+          {renderSheets(true)}
+        </div>,
+        document.body,
+      )}
 
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="w-[98vw] sm:max-w-5xl xl:max-w-6xl max-h-[94vh] flex flex-col p-4 sm:p-6">
@@ -203,7 +391,11 @@ export default function PrintModal({
                   </span>
                 </DialogTitle>
                 <div className="text-xs text-gray-500 mt-1">
-                  10 ID cards per A4 page. Physical layout with automatic horizontal mirroring for back sides.
+                  {currentSide === "BOTH"
+                    ? "Up to 5 cards per A4 page (5 Front + 5 Back side-by-side)."
+                    : currentSide === "FRONT"
+                      ? "Up to 10 Front cards per A4 page (2 columns x 5 rows)."
+                      : "Up to 10 Back cards per A4 page (2 columns x 5 rows)."}
                 </div>
               </div>
 
@@ -227,98 +419,12 @@ export default function PrintModal({
             </div>
           </DialogHeader>
 
-          {/* Printable Container & Interactive Preview */}
+          {/* Interactive Preview in Modal */}
           <div
             id="print-area"
             className="flex-1 overflow-y-auto p-3 sm:p-5 space-y-8 bg-[#f8faf8] rounded-2xl border border-[#e2e8e3] max-h-[62vh]"
           >
-            {cardBatches.map((batchCards, batchIdx) => {
-              const sampleCard = batchCards[0];
-              const cardW = sampleCard.template?.cardWidth || 324;
-              const cardH = sampleCard.template?.cardHeight || 204;
-              // On screen / in print: cards fit nicely into 2 columns x 5 rows
-              const previewScale = 0.88;
-
-              // Helper to render a 10-slot grid for a sheet side
-              const renderSheetSideGrid = (side: "FRONT" | "BACK") => {
-                const slots = [];
-                for (let r = 0; r < 5; r++) {
-                  for (let c = 0; c < 2; c++) {
-                    let cardIndex: number;
-                    if (side === "FRONT") {
-                      cardIndex = 2 * r + c;
-                    } else {
-                      // Horizontal Mirroring for Back:
-                      // Left col (c=0) maps to right card (2*r + 1),
-                      // Right col (c=1) maps to left card (2*r + 0).
-                      cardIndex = c === 0 ? 2 * r + 1 : 2 * r;
-                    }
-
-                    const card = cardIndex < batchCards.length ? batchCards[cardIndex] : null;
-
-                    slots.push(
-                      <div
-                        key={`slot-${r}-${c}-${side}`}
-                        className="print-card-slot"
-                        style={{
-                          width: `${cardW * previewScale}px`,
-                          height: `${cardH * previewScale}px`,
-                        }}
-                      >
-                        {card ? (
-                          <div className="relative shadow-sm print:shadow-none">
-                            <CardRenderer
-                              cardWidth={cardW}
-                              cardHeight={cardH}
-                              elements={getCardElements(card)}
-                              side={side}
-                              cardData={{ ...card.dataMap, cardNumber: card.cardNumber }}
-                              scale={previewScale}
-                            />
-                          </div>
-                        ) : (
-                          // Empty slot placeholder for visual consistency (invisible when printed)
-                          <div className="w-full h-full border border-dashed border-gray-200/50 rounded-lg no-print flex items-center justify-center text-[10px] text-gray-300">
-                            Empty slot
-                          </div>
-                        )}
-                      </div>,
-                    );
-                  }
-                }
-                return slots;
-              };
-
-              return (
-                <div key={`batch-${batchIdx}`} className="space-y-6">
-                  {/* Front Sheet */}
-                  {(currentSide === "BOTH" || currentSide === "FRONT") && (
-                    <div className="print-page-sheet bg-white rounded-2xl border border-gray-200 p-4 shadow-sm print:p-0 print:border-none print:shadow-none print:rounded-none">
-                      <div className="col-span-2 text-xs font-bold text-[#55605d] pb-2 border-b border-gray-100 flex items-center justify-between no-print mb-2">
-                        <span>Sheet {batchIdx + 1} — Front Side (Cards {batchIdx * CARDS_PER_PAGE + 1}–{Math.min((batchIdx + 1) * CARDS_PER_PAGE, cards.length)})</span>
-                        <span className="text-[11px] font-mono text-gray-400">Max 10 cards / page</span>
-                      </div>
-                      <div className="col-span-2 grid grid-cols-2 gap-3 justify-items-center items-center">
-                        {renderSheetSideGrid("FRONT")}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Back Sheet (Horizontally Mirrored) */}
-                  {(currentSide === "BOTH" || currentSide === "BACK") && (
-                    <div className="print-page-sheet bg-white rounded-2xl border border-gray-200 p-4 shadow-sm print:p-0 print:border-none print:shadow-none print:rounded-none">
-                      <div className="col-span-2 text-xs font-bold text-[#55605d] pb-2 border-b border-gray-100 flex items-center justify-between no-print mb-2">
-                        <span>Sheet {batchIdx + 1} — Back Side (Mirrored for Double-Sided Physical Printing)</span>
-                        <span className="text-[11px] font-mono text-[#0f7f79]">Horizontal Mirrored</span>
-                      </div>
-                      <div className="col-span-2 grid grid-cols-2 gap-3 justify-items-center items-center">
-                        {renderSheetSideGrid("BACK")}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+            {renderSheets(false)}
           </div>
 
           <DialogFooter className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 pt-3 border-t border-[#edf0ed]">

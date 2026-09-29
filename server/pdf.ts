@@ -354,7 +354,10 @@ export async function generateBulkCardPdf(
   // A4 sheet dimensions in points (72 DPI)
   const A4_WIDTH = 595.28;
   const A4_HEIGHT = 841.89;
-  const CARDS_PER_PAGE = 10;
+  // Maximum cards per sheet:
+  // - When printing FRONT or BACK only: 10 cards per page (2 cols x 5 rows)
+  // - When printing BOTH sides: 5 cards per page (5 front on col 0, 5 back on col 1)
+  const CARDS_PER_PAGE = side === "BOTH" ? 5 : 10;
   const numPages = Math.ceil(cards.length / CARDS_PER_PAGE);
 
   for (let p = 0; p < numPages; p++) {
@@ -374,46 +377,78 @@ export async function generateBulkCardPdf(
     const marginX = (A4_WIDTH - (2 * slotW + gapX)) / 2;
     const marginY = (A4_HEIGHT - (5 * slotH + 4 * gapY)) / 2;
 
-    const renderSheetSide = async (targetSide: "FRONT" | "BACK") => {
+    const getCardElements = (card: CardPdfData): DesignerElement[] => {
+      return (card.template.elements || []).map((el, i) => ({
+        elementKey: el.elementKey,
+        elementType: el.elementType as any,
+        label: el.label ?? null,
+        config: (el.config as ElementConfig) ?? {
+          x: 20,
+          y: 20,
+          width: 100,
+          height: 30,
+          side: "FRONT",
+          rotation: 0,
+          opacity: 1,
+        },
+        sortOrder: el.sortOrder ?? i,
+      }));
+    };
+
+    if (side === "BOTH") {
+      // 5 cards max per page: Column 0 = Front Side, Column 1 = Back Side of the same card
+      doc.addPage({ size: "A4", margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+
+      for (let r = 0; r < pageCards.length; r++) {
+        const card = pageCards[r];
+        const elements = getCardElements(card);
+
+        // Column 0: FRONT
+        const slotXFront = marginX;
+        const slotY = marginY + r * (slotH + gapY);
+        await renderCardSide(
+          doc,
+          elements,
+          "FRONT",
+          card.cardData,
+          cardW,
+          cardH,
+          slotXFront,
+          slotY,
+          scale,
+        );
+
+        // Column 1: BACK
+        const slotXBack = marginX + (slotW + gapX);
+        await renderCardSide(
+          doc,
+          elements,
+          "BACK",
+          card.cardData,
+          cardW,
+          cardH,
+          slotXBack,
+          slotY,
+          scale,
+        );
+      }
+    } else {
+      // FRONT or BACK only: 10 cards per page (2 columns x 5 rows)
       doc.addPage({ size: "A4", margins: { top: 0, bottom: 0, left: 0, right: 0 } });
 
       for (let r = 0; r < 5; r++) {
         for (let c = 0; c < 2; c++) {
-          const slotX = marginX + c * (slotW + gapX);
-          const slotY = marginY + r * (slotH + gapY);
-
-          let cardIndex: number;
-          if (targetSide === "FRONT") {
-            cardIndex = 2 * r + c;
-          } else {
-            // Horizontal Mirroring for Back Side:
-            // When the printed sheet is flipped horizontally for printing the back side,
-            // Column 0 maps to the card from Column 1 (2*r + 1), and Column 1 maps to Column 0 (2*r).
-            cardIndex = c === 0 ? 2 * r + 1 : 2 * r;
-          }
-
+          const cardIndex = 2 * r + c;
           if (cardIndex < pageCards.length) {
             const card = pageCards[cardIndex];
-            const elements: DesignerElement[] = (card.template.elements || []).map((el, i) => ({
-              elementKey: el.elementKey,
-              elementType: el.elementType as any,
-              label: el.label ?? null,
-              config: (el.config as ElementConfig) ?? {
-                x: 20,
-                y: 20,
-                width: 100,
-                height: 30,
-                side: "FRONT",
-                rotation: 0,
-                opacity: 1,
-              },
-              sortOrder: el.sortOrder ?? i,
-            }));
+            const elements = getCardElements(card);
+            const slotX = marginX + c * (slotW + gapX);
+            const slotY = marginY + r * (slotH + gapY);
 
             await renderCardSide(
               doc,
               elements,
-              targetSide,
+              side,
               card.cardData,
               cardW,
               cardH,
@@ -424,16 +459,6 @@ export async function generateBulkCardPdf(
           }
         }
       }
-    };
-
-    if (side === "FRONT") {
-      await renderSheetSide("FRONT");
-    } else if (side === "BACK") {
-      await renderSheetSide("BACK");
-    } else {
-      // Print Both: Front page followed by Back page (mirrored) for double-sided sheet alignment
-      await renderSheetSide("FRONT");
-      await renderSheetSide("BACK");
     }
   }
 

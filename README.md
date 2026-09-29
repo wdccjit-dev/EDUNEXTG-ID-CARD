@@ -123,18 +123,12 @@ Apply the database schema:
 pnpm db:migrate
 ```
 
-### 4. Seed Development Accounts
-Populate initial administrative and test school accounts:
+### 4. Seed Development 
 ```bash
 pnpm db:seed-auth
 ```
 *(Note: `seed-auth` is blocked when `NODE_ENV=production`)*
 
-#### Default Seed Credentials:
-| Portal | Email / Login ID | Password | Role |
-|---|---|---|---|
-| Super Admin | `admin@edunextg.com` | `Duronto321` | `SUPER_ADMIN` |
-| School Admin | `school@example.test` | `School123!` | `SCHOOL_ADMIN` |
 
 ### 5. Start Development Server
 ```bash
