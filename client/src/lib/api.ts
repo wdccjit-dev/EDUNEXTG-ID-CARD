@@ -1,3 +1,11 @@
+export type ApiSchoolDeletionSummary = {
+  schoolName: string;
+  shortCode: string;
+  cards: number;
+  users: number;
+  requests: number;
+};
+
 export type ApiSchool = {
   id: number;
   name: string;
@@ -155,7 +163,9 @@ export const api = {
     list: () => request<ApiSchool[]>("/api/schools"),
     create: (body: Partial<ApiSchool>) => request<ApiSchool>("/api/schools", json(body)),
     update: (id: number, body: Partial<ApiSchool>) => request<ApiSchool>(`/api/schools/${id}`, put(body)),
-    delete: (id: number) => request<void>(`/api/schools/${id}`, { method: "DELETE" }),
+    delete: (id: number) =>
+      request<{ success: true; deleted?: ApiSchoolDeletionSummary }>(`/api/schools/${id}`, { method: "DELETE" }),
+    deletionSummary: (id: number) => request<ApiSchoolDeletionSummary>(`/api/schools/${id}/deletion-summary`),
     setStatus: (id: number, isActive: boolean) =>
       request<{ success: true; school?: ApiSchool }>(`/api/schools/${id}/status`, patch({ isActive })),
     generateCredentials: (id: number) =>

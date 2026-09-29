@@ -32,29 +32,43 @@ export interface CardPdfData {
   cardData: Record<string, string>;
 }
 
-import fs from "fs";
+/** True only for PNG, JPEG or WebP bytes (magic-number check, never trusts the declared MIME type). */
+export function isSupportedImageBuffer(buf: Buffer): boolean {
+  if (buf.length < 12) return false;
+  const isPng = buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
+  const isJpeg = buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff;
+  const isWebp = buf.toString("ascii", 0, 4) === "RIFF" && buf.toString("ascii", 8, 12) === "WEBP";
+  return isPng || isJpeg || isWebp;
+}
 
-/** Helper to extract image buffer from data URL, raw base64, or local file */
-function bufferFromDataUrl(dataUrl: string): Buffer | null {
+/**
+ * Extract an image buffer from a data URL or raw base64 string.
+ *
+ * SECURITY: card field values are user-controlled, so this must never touch the
+ * filesystem. Anything that is not inline base64 image data (file paths such as
+ * "/etc/passwd" or "../../.env", URLs, etc.) returns null and the caller draws
+ * the neutral placeholder instead.
+ */
+export function bufferFromDataUrl(dataUrl: string): Buffer | null {
   try {
-    const trimmed = dataUrl.trim();
+    const trimmed = String(dataUrl ?? "").trim();
+    let base64Str: string | null = null;
+
     if (trimmed.startsWith("data:")) {
       const commaIdx = trimmed.indexOf(",");
-      if (commaIdx !== -1) {
-        const base64Str = trimmed.slice(commaIdx + 1).replace(/[\r\n\s]/g, "");
-        return Buffer.from(base64Str, "base64");
-      }
+      if (commaIdx === -1) return null;
+      const header = trimmed.slice(0, commaIdx).toLowerCase();
+      if (!header.includes(";base64")) return null;
+      base64Str = trimmed.slice(commaIdx + 1);
+    } else {
+      base64Str = trimmed;
     }
-    // Check if raw base64 string
-    const cleanRaw = trimmed.replace(/[\r\n\s]/g, "");
-    if (/^[A-Za-z0-9+/=]{50,}$/.test(cleanRaw)) {
-      return Buffer.from(cleanRaw, "base64");
-    }
-    // Check if local file path
-    if (fs.existsSync(trimmed)) {
-      return fs.readFileSync(trimmed);
-    }
-    return null;
+
+    const clean = base64Str.replace(/[\r\n\s]/g, "");
+    if (!/^[A-Za-z0-9+/]+={0,2}$/.test(clean) || clean.length < 50) return null;
+
+    const buf = Buffer.from(clean, "base64");
+    return isSupportedImageBuffer(buf) ? buf : null;
   } catch (err) {
     console.warn("[PDF] Failed to parse image buffer:", err);
     return null;

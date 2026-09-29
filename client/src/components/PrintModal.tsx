@@ -359,33 +359,33 @@ export default function PrintModal({ open, onOpenChange, cards, onPrinted }: Pri
       )}
 
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="w-[98vw] sm:max-w-5xl xl:max-w-6xl max-h-[94vh] flex flex-col p-4 sm:p-6">
+        <DialogContent className="w-[98vw] sm:max-w-5xl xl:max-w-6xl max-h-[94vh] flex flex-col rounded-2xl border border-[#e2e8e3] bg-[#fffefa] p-4 shadow-xl sm:p-6">
           <DialogHeader>
             <div className="flex flex-col gap-4">
               <div className="flex flex-wrap items-start justify-between gap-3 pr-2 sm:pr-6">
                 <div>
-                  <DialogTitle className="text-lg sm:text-xl font-bold flex items-center gap-2">
+                  <DialogTitle className="flex items-center gap-2 text-lg font-extrabold text-[#182326] sm:text-xl">
                     <span>Print Preview</span>
                     <span className="text-xs px-2 py-0.5 rounded-full bg-[#eef7f4] text-[#0f7f79] font-semibold">
                       {orderedCards.length} {orderedCards.length === 1 ? "Card" : "Cards"} · {pageCount}{" "}
                       {pageCount === 1 ? "Page" : "Pages"}
                     </span>
                   </DialogTitle>
-                  <div className="text-xs text-gray-500 mt-1">
+                  <div className="mt-1 text-xs text-[#84918e]">
                     A4 landscape · 5 columns × 2 rows · 2 mm gap · cards stay in the same slots on both sides.
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1 bg-[#f0efec] p-1 rounded-xl text-xs font-semibold shrink-0">
+                <div className="flex shrink-0 items-center gap-1 rounded-xl border border-[#e4e9e5] bg-[#f8faf8] p-1 text-xs font-semibold">
                   {(["FRONT", "BACK"] as const).map((side) => (
                     <button
                       key={side}
                       type="button"
                       onClick={() => setPreviewSide(side)}
-                      className={`px-3 py-1.5 rounded-lg transition-all text-xs font-bold ${
+                      className={`cursor-pointer rounded-lg px-3 py-1.5 text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7f79] focus-visible:ring-offset-1 ${
                         previewSide === side
-                          ? "bg-[#0f7f79] text-white shadow-xs"
-                          : "text-[#55605d] hover:text-[#203734]"
+                          ? "bg-white text-[#0f7f79] shadow-sm"
+                          : "text-[#8a9793] hover:text-[#55605d]"
                       }`}
                     >
                       {side === "FRONT" ? "Front" : "Back"}
@@ -400,7 +400,7 @@ export default function PrintModal({ open, onOpenChange, cards, onPrinted }: Pri
                   <select
                     value={printMode}
                     onChange={(event) => setPrintMode(event.target.value as PrintMode)}
-                    className="h-9 min-w-48 rounded-lg border border-[#dfe7e2] bg-white px-2.5 text-xs text-[#203734]"
+                    className="h-9 min-w-48 cursor-pointer rounded-xl border border-[#d3ded8] bg-white px-2.5 text-xs font-bold text-[#304541] shadow-sm hover:border-[#0f7f79] focus:outline-none focus:ring-1 focus:ring-[#0f7f79]"
                   >
                     <option value="FRONT_ONLY">Front only</option>
                     <option value="BACK_ONLY">Back only</option>
@@ -409,7 +409,7 @@ export default function PrintModal({ open, onOpenChange, cards, onPrinted }: Pri
                 </label>
 
                 {printMode === "DUPLEX" && (
-                  <label className="flex h-9 items-center gap-2 rounded-lg border border-[#dfe7e2] bg-white px-3 font-semibold text-[#45544f]">
+                  <label className="flex h-9 cursor-pointer items-center gap-2 rounded-xl border border-[#dfe6e1] bg-white px-3 text-xs font-bold text-[#38514e] shadow-sm transition-colors hover:border-[#0f7f79]">
                     <input
                       type="checkbox"
                       checked={separateFiles}
@@ -425,7 +425,7 @@ export default function PrintModal({ open, onOpenChange, cards, onPrinted }: Pri
 
           <div
             id="print-area"
-            className="flex-1 overflow-y-auto p-3 sm:p-5 space-y-8 bg-[#f8faf8] rounded-2xl border border-[#e2e8e3] max-h-[62vh]"
+            className="max-h-[62vh] flex-1 space-y-8 overflow-y-auto rounded-2xl border border-[#e2e8e3] bg-[#f7f6f2] p-3 sm:p-5"
           >
             {batches.map((batch, index) => renderPage(batch, index, previewSide, false))}
             {orderedCards.length === 0 && (
@@ -436,7 +436,7 @@ export default function PrintModal({ open, onOpenChange, cards, onPrinted }: Pri
           </div>
 
           <DialogFooter className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 pt-3 border-t border-[#edf0ed]">
-            <div className="text-[11px] text-gray-500">
+            <div className="text-[11px] text-[#84918e]">
               Only approved cards are eligible for printing. Status updates to <strong>PRINTED</strong> when you print.
             </div>
 
@@ -446,7 +446,7 @@ export default function PrintModal({ open, onOpenChange, cards, onPrinted }: Pri
                 type="button"
                 onClick={handleDownloadPdf}
                 disabled={downloading || orderedCards.length === 0}
-                className="h-10 text-xs font-bold border-[#dfe7e2] text-[#203734] hover:bg-[#edf3f0]"
+                className="h-10 rounded-xl border-[#dce5df] bg-white px-4 text-xs font-bold text-[#38514e] shadow-sm hover:bg-[#edf5f0]"
               >
                 {downloading ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Download className="h-4 w-4 mr-1.5" />}
                 {downloading ? "Preparing PDF…" : separateFiles && printMode === "DUPLEX" ? "Download PDFs" : "Download PDF"}
@@ -456,7 +456,7 @@ export default function PrintModal({ open, onOpenChange, cards, onPrinted }: Pri
                 type="button"
                 onClick={executePrint}
                 disabled={printing || orderedCards.length === 0}
-                className="h-10 bg-[#0f7f79] hover:bg-[#096c67] text-white text-xs font-bold rounded-xl shadow-xs"
+                className="h-10 rounded-xl bg-[#0f7f79] px-4 text-xs font-bold text-white shadow-[0_8px_18px_rgba(15,127,121,0.18)] hover:bg-[#096c67]"
               >
                 {printing ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Printer className="h-4 w-4 mr-1.5" />}
                 {printing ? "Preparing…" : printMode === "FRONT_ONLY" ? "Print Front" : printMode === "BACK_ONLY" ? "Print Back" : "Print Duplex"}

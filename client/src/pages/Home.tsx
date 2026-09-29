@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import CardRenderer from "@/components/CardRenderer";
 import IdCardFormModal from "./IdCardFormModal";
 import PrintModal from "@/components/PrintModal";
+import DeleteSchoolDialog from "@/components/DeleteSchoolDialog";
 import ExcelUploadModal from "@/components/ExcelUploadModal";
 import ApprovalTimeline from "@/components/ApprovalTimeline";
 import { DYNAMIC_FIELDS, SAMPLE_CARD_DATA, type DesignerElement } from "@shared/templateDesigner";
@@ -340,6 +341,7 @@ export default function Home({
   // Modal dialog states replacing browser prompts
   const [schoolModalOpen, setSchoolModalOpen] = useState(false);
   const [editingSchool, setEditingSchool] = useState<ApiSchool | null>(null);
+  const [schoolPendingDelete, setSchoolPendingDelete] = useState<{ id: number; name: string; shortCode?: string } | null>(null);
   const [schoolNameInput, setSchoolNameInput] = useState("");
   const [schoolCodeInput, setSchoolCodeInput] = useState("");
   const [schoolEmailInput, setSchoolEmailInput] = useState("");
@@ -612,45 +614,52 @@ export default function Home({
     }
   };
 
-  const handleDeleteSchool = async (schoolId: number, schoolName: string) => {
+  // Opens the confirmation dialog (both delete buttons call this). The actual deletion
+  // happens in confirmDeleteSchool once the user has typed the school name.
+  const handleDeleteSchool = (schoolId: number, schoolName: string) => {
     if (authenticatedUser.role !== "SUPER_ADMIN") {
-      return toast.error("Only Super Admins can delete schools");
-    }
-    if (!window.confirm(`Are you sure you want to delete "${schoolName}"? All associated data and user accounts will be deleted.`)) {
+      toast.error("Only Super Admins can delete schools");
       return;
     }
-    // 1. Optimistically remove from state immediately
-    setSchools((prev) => prev.filter((s) => s.id !== schoolId));
-    setUsers((prev) => prev.filter((u) => u.schoolId !== schoolId));
-    if (selectedSchoolId === schoolId) {
-      const remaining = schools.filter((s) => s.id !== schoolId);
-      setSelectedSchoolId(remaining[0]?.id ?? null);
-    }
+    const school = schools.find((s) => s.id === schoolId);
+    setSchoolPendingDelete({ id: schoolId, name: schoolName, shortCode: school?.shortCode });
+  };
 
+  // Deletes on the server FIRST; the UI only changes after the server confirms.
+  // Throws on failure so DeleteSchoolDialog stays open.
+  const confirmDeleteSchool = async (school: { id: number; name: string }) => {
     try {
-      await api.schools.delete(schoolId);
-      toast.success(`School "${schoolName}" and its accounts deleted successfully`);
-      // 2. Fetch fresh list from server in background to ensure total sync
+      const result = await api.schools.delete(school.id);
+      const cardCount = result?.deleted?.cards;
       const [freshSchools, freshUsers] = await Promise.all([
-        api.schools.list().catch(() => []),
-        api.users.list().catch(() => []),
+        api.schools.list().catch(() => null),
+        api.users.list().catch(() => null),
       ]);
-      setSchools(freshSchools);
-      setUsers(freshUsers);
-      if (selectedSchoolId === schoolId) {
-        setSelectedSchoolId(freshSchools[0]?.id ?? null);
+      if (freshSchools) {
+        setSchools(freshSchools);
+      } else {
+        setSchools((prev) => prev.filter((s) => s.id !== school.id));
       }
+      if (freshUsers) {
+        setUsers(freshUsers);
+      } else {
+        setUsers((prev) => prev.filter((u) => u.schoolId !== school.id));
+      }
+      if (selectedSchoolId === school.id) {
+        const remaining = (freshSchools ?? schools.filter((s) => s.id !== school.id));
+        setSelectedSchoolId(remaining[0]?.id ?? null);
+      }
+      setSchoolPendingDelete(null);
+      toast.success(
+        typeof cardCount === "number"
+          ? `School "${school.name}" and its ${cardCount} ID card${cardCount === 1 ? "" : "s"} were deleted`
+          : `School "${school.name}" and all its ID cards were deleted`,
+      );
     } catch (error) {
-      // Revert if delete failed
-      const [freshSchools, freshUsers] = await Promise.all([
-        api.schools.list().catch(() => []),
-        api.users.list().catch(() => []),
-      ]);
-      if (freshSchools.length > 0) setSchools(freshSchools);
-      if (freshUsers.length > 0) setUsers(freshUsers);
       toast.error("Could not delete school", {
         description: error instanceof Error ? error.message : "Request failed",
       });
+      throw error;
     }
   };
 
@@ -2534,6 +2543,13 @@ export default function Home({
         onSaved={() => {
           reloadWorkspace();
         }}
+      />
+
+      {/* Delete School confirmation */}
+      <DeleteSchoolDialog
+        school={schoolPendingDelete}
+        onClose={() => setSchoolPendingDelete(null)}
+        onConfirm={confirmDeleteSchool}
       />
 
       {/* Print & Bulk Print Modal */}

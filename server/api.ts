@@ -691,14 +691,55 @@ const handleSchoolStatusUpdate = async (req: any, res: any) => {
 router.patch("/schools/:id/status", requireRole(adminRoles), handleSchoolStatusUpdate);
 router.post("/schools/:id/status", requireRole(adminRoles), handleSchoolStatusUpdate);
 
+async function getSchoolDeletionSummary(db: NonNullable<Awaited<ReturnType<typeof getDb>>>, schoolId: number) {
+  const [school] = await db
+    .select({ id: schools.id, name: schools.name, shortCode: schools.shortCode })
+    .from(schools)
+    .where(eq(schools.id, schoolId))
+    .limit(1);
+  if (!school) return null;
+
+  const [cardCount] = await db.select({ total: sql<number>`count(*)` }).from(idCards).where(eq(idCards.schoolId, schoolId));
+  const [userCount] = await db.select({ total: sql<number>`count(*)` }).from(users).where(eq(users.schoolId, schoolId));
+  const [requestCount] = await db.select({ total: sql<number>`count(*)` }).from(idCardRequests).where(eq(idCardRequests.schoolId, schoolId));
+
+  return {
+    schoolName: school.name,
+    shortCode: school.shortCode,
+    cards: Number(cardCount?.total ?? 0),
+    users: Number(userCount?.total ?? 0),
+    requests: Number(requestCount?.total ?? 0),
+  };
+}
+
+// SUPER_ADMIN only (adminRoles). Used by the delete confirmation dialog to show what will be removed.
+router.get("/schools/:id/deletion-summary", requireRole(adminRoles), async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: "Invalid school id" });
+    const db = await getDb();
+    if (!db) return res.status(503).json({ error: "Database not available" });
+
+    const summary = await getSchoolDeletionSummary(db, id);
+    if (!summary) return res.status(404).json({ error: "School not found" });
+    res.json(summary);
+  } catch (e) {
+    fail(res, e);
+  }
+});
+
 router.delete("/schools/:id", requireRole(adminRoles), async (req, res) => {
   try {
     const id = Number(req.params.id);
-    if (!id) return res.status(400).json({ error: "Invalid school id" });
+    if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: "Invalid school id" });
     const db = await getDb();
     if (!db) return res.status(503).json({ error: "Database not available" });
 
     const actor = currentUser(res);
+
+    // Capture what is about to be removed BEFORE deleting, for the response and the audit trail.
+    const summary = await getSchoolDeletionSummary(db, id);
+    if (!summary) return res.status(404).json({ error: "School not found" });
 
     // Wrap entire cascade in a transaction to prevent partial deletes
     await db.transaction(async (tx) => {
@@ -730,8 +771,14 @@ router.delete("/schools/:id", requireRole(adminRoles), async (req, res) => {
       await tx.delete(schools).where(eq(schools.id, id));
     });
 
-    await audit(actor, "DELETE_SCHOOL", "school", id, null, null);
-    res.status(200).json({ success: true });
+    await audit(actor, "DELETE_SCHOOL", "school", id, null, {
+      schoolName: summary.schoolName,
+      shortCode: summary.shortCode,
+      cards: summary.cards,
+      users: summary.users,
+      requests: summary.requests,
+    });
+    res.status(200).json({ success: true, deleted: summary });
   } catch (e) {
     fail(res, e);
   }
