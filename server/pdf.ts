@@ -1,6 +1,19 @@
 import PDFDocument from "pdfkit";
 import QRCode from "qrcode";
 import type { DesignerElement, ElementConfig } from "../shared/templateDesigner";
+import {
+  A4_LANDSCAPE_MM,
+  computeCardScaleInCell,
+  computeCardSizeMm,
+  computeGridPositions,
+  computePageCount,
+  computePageSlotIndexes,
+  computeSheetLayout,
+  DEFAULT_TEMPLATE_CARD_SIZE,
+  MM_TO_PDF_POINT,
+  PRINT_GRID_COLUMNS,
+  PRINT_GRID_ROWS,
+} from "../shared/printLayout";
 
 export interface CardPdfData {
   cardNumber: string;
@@ -48,6 +61,19 @@ function bufferFromDataUrl(dataUrl: string): Buffer | null {
   }
 }
 
+/** Draw a neutral vector avatar for a missing student or guardian photo. */
+function drawPhotoPlaceholder(doc: PDFKit.PDFDocument, x: number, y: number, w: number, h: number) {
+  const radius = Math.min(w, h) / 2;
+  const centerX = x + w / 2;
+  const centerY = y + h / 2;
+
+  doc.save();
+  doc.circle(centerX, centerY, radius).fill("#e5e7eb");
+  doc.circle(centerX, centerY - radius * 0.24, radius * 0.23).fill("#9ca3af");
+  doc.ellipse(centerX, centerY + radius * 0.56, radius * 0.55, radius * 0.38).fill("#9ca3af");
+  doc.restore();
+}
+
 /** Render a single side of an ID card onto the current page of PDFDocument */
 async function renderCardSide(
   doc: PDFKit.PDFDocument,
@@ -66,6 +92,9 @@ async function renderCardSide(
   }
   const effOriginX = originX / scale;
   const effOriginY = originY / scale;
+
+  // Keep every template element, including wrapped text, inside its own card.
+  doc.rect(effOriginX, effOriginY, cardWidth, cardHeight).clip();
 
   // Background canvas fill (white default)
   doc.rect(effOriginX, effOriginY, cardWidth, cardHeight).fill("#ffffff");
@@ -167,6 +196,7 @@ async function renderCardSide(
           width: w,
           height: h,
           align,
+          lineBreak: true,
           ellipsis: true,
         });
         break;
@@ -217,8 +247,16 @@ async function renderCardSide(
             doc.rect(x, y, w, h).fill("#f3f4f6");
           }
         } else {
-          // Placeholder box without any text printed into the PDF
-          doc.rect(x, y, w, h).fill("#f9fafb");
+          const isPhotoElement =
+            el.elementType === "PHOTO" ||
+            Boolean(fieldKey?.toLowerCase().includes("photo")) ||
+            (shape === "circle" && el.elementType === "IMAGE");
+          if (isPhotoElement) {
+            drawPhotoPlaceholder(doc, x, y, w, h);
+          } else {
+            // Keep non-photo image placeholders neutral and free of labels.
+            doc.rect(x, y, w, h).fill("#f3f4f6");
+          }
         }
         break;
       }
@@ -275,6 +313,8 @@ async function renderCardSide(
 export interface PrintPdfOptions {
   side?: "FRONT" | "BACK" | "BOTH";
   layout?: "sheet" | "card";
+  mode?: "FRONT_ONLY" | "BACK_ONLY" | "DUPLEX" | "SEPARATE";
+  cropMarks?: boolean;
 }
 
 /**
@@ -284,50 +324,7 @@ export async function generateSingleCardPdf(
   card: CardPdfData,
   options: PrintPdfOptions = {},
 ): Promise<Buffer> {
-  const side = options.side || "BOTH";
-  const cardWidth = card.template.cardWidth || 324;
-  const cardHeight = card.template.cardHeight || 204;
-
-  const elements: DesignerElement[] = (card.template.elements || []).map((el, i) => ({
-    elementKey: el.elementKey,
-    elementType: el.elementType as any,
-    label: el.label ?? null,
-    config: (el.config as ElementConfig) ?? {
-      x: 20,
-      y: 20,
-      width: 100,
-      height: 30,
-      side: "FRONT",
-      rotation: 0,
-      opacity: 1,
-    },
-    sortOrder: el.sortOrder ?? i,
-  }));
-
-  const doc = new PDFDocument({
-    autoFirstPage: false,
-    margins: { top: 0, bottom: 0, left: 0, right: 0 },
-  });
-
-  const chunks: Buffer[] = [];
-  doc.on("data", (chunk) => chunks.push(chunk));
-
-  if (side === "FRONT" || side === "BOTH") {
-    doc.addPage({ size: [cardWidth, cardHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
-    await renderCardSide(doc, elements, "FRONT", card.cardData, cardWidth, cardHeight);
-  }
-
-  if (side === "BACK" || side === "BOTH") {
-    doc.addPage({ size: [cardWidth, cardHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
-    await renderCardSide(doc, elements, "BACK", card.cardData, cardWidth, cardHeight);
-  }
-
-  doc.end();
-
-  return new Promise<Buffer>((resolve, reject) => {
-    doc.on("end", () => resolve(Buffer.concat(chunks)));
-    doc.on("error", reject);
-  });
+  return generateBulkCardPdf([card], options);
 }
 
 /**
@@ -342,7 +339,7 @@ export async function generateBulkCardPdf(
     throw new Error("No cards provided for bulk PDF generation");
   }
 
-  const side = options.side || "BOTH";
+  const side = options.side ?? (options.mode === "FRONT_ONLY" ? "FRONT" : options.mode === "BACK_ONLY" ? "BACK" : "BOTH");
   const doc = new PDFDocument({
     autoFirstPage: false,
     margins: { top: 0, bottom: 0, left: 0, right: 0 },
@@ -351,112 +348,81 @@ export async function generateBulkCardPdf(
   const chunks: Buffer[] = [];
   doc.on("data", (chunk) => chunks.push(chunk));
 
-  // A4 sheet dimensions in points (72 DPI)
-  const A4_WIDTH = 595.28;
-  const A4_HEIGHT = 841.89;
-  // Maximum cards per sheet:
-  // - When printing FRONT or BACK only: 10 cards per page (2 cols x 5 rows)
-  // - When printing BOTH sides: 5 cards per page (5 front on col 0, 5 back on col 1)
-  const CARDS_PER_PAGE = side === "BOTH" ? 5 : 10;
-  const numPages = Math.ceil(cards.length / CARDS_PER_PAGE);
+  const cardsPerPage = PRINT_GRID_COLUMNS * PRINT_GRID_ROWS;
+  const numPages = computePageCount(cards.length);
+  const cropMarks = options.cropMarks !== false;
+  const pageWidthPt = A4_LANDSCAPE_MM.width * MM_TO_PDF_POINT;
+  const pageHeightPt = A4_LANDSCAPE_MM.height * MM_TO_PDF_POINT;
+  const getDimensions = (card: CardPdfData) => ({
+    width: card.template.cardWidth || DEFAULT_TEMPLATE_CARD_SIZE.width,
+    height: card.template.cardHeight || DEFAULT_TEMPLATE_CARD_SIZE.height,
+  });
+  const getCardElements = (card: CardPdfData): DesignerElement[] =>
+    (card.template.elements || []).map((el, index) => ({
+      elementKey: el.elementKey,
+      elementType: el.elementType as any,
+      label: el.label ?? null,
+      config: (el.config as ElementConfig) ?? {
+        x: 20,
+        y: 20,
+        width: 100,
+        height: 30,
+        side: "FRONT",
+        rotation: 0,
+        opacity: 1,
+      },
+      sortOrder: el.sortOrder ?? index,
+    }));
 
-  for (let p = 0; p < numPages; p++) {
-    const pageCards = cards.slice(p * CARDS_PER_PAGE, (p + 1) * CARDS_PER_PAGE);
+  for (let pageIndex = 0; pageIndex < numPages; pageIndex++) {
+    const pageCards = cards.slice(pageIndex * cardsPerPage, (pageIndex + 1) * cardsPerPage);
+    const pageSlotIndexes = computePageSlotIndexes(cards.length, pageIndex);
+    const layout = computeSheetLayout(pageCards.map(getDimensions));
+    const sides: Array<"FRONT" | "BACK"> = side === "BOTH" ? ["FRONT", "BACK"] : [side];
 
-    const sampleTmpl = pageCards[0].template;
-    const cardW = sampleTmpl.cardWidth || 324;
-    const cardH = sampleTmpl.cardHeight || 204;
+    for (const pageSide of sides) {
+      doc.addPage({
+        size: [pageWidthPt, pageHeightPt],
+        margins: { top: 0, bottom: 0, left: 0, right: 0 },
+      });
 
-    // Scale slightly if needed so a 2-col x 5-row grid fits cleanly within A4
-    const scale = Math.min(1, Math.min(265 / cardW, 154 / cardH));
-    const slotW = cardW * scale;
-    const slotH = cardH * scale;
+      for (let index = 0; index < cardsPerPage; index++) {
+        const position = computeGridPositions(index, layout.columns, layout.rows, pageSide === "BACK");
+        const cellXmm = layout.marginXmm + position.column * (layout.cellWidthMm + layout.gapMm);
+        const cellYmm = layout.marginYmm + position.row * (layout.cellHeightMm + layout.gapMm);
+        const cardIndex = pageSlotIndexes[index];
+        const card = cardIndex === null ? undefined : cards[cardIndex];
 
-    const gapX = 18;
-    const gapY = 8;
-    const marginX = (A4_WIDTH - (2 * slotW + gapX)) / 2;
-    const marginY = (A4_HEIGHT - (5 * slotH + 4 * gapY)) / 2;
+        if (card) {
+          const { width, height } = getDimensions(card);
+          const cardScale = computeCardScaleInCell(width, height, layout);
+          const cardSize = computeCardSizeMm(width, height, cardScale);
+          const originX = (cellXmm + (layout.cellWidthMm - cardSize.widthMm) / 2) * MM_TO_PDF_POINT;
+          const originY = (cellYmm + (layout.cellHeightMm - cardSize.heightMm) / 2) * MM_TO_PDF_POINT;
 
-    const getCardElements = (card: CardPdfData): DesignerElement[] => {
-      return (card.template.elements || []).map((el, i) => ({
-        elementKey: el.elementKey,
-        elementType: el.elementType as any,
-        label: el.label ?? null,
-        config: (el.config as ElementConfig) ?? {
-          x: 20,
-          y: 20,
-          width: 100,
-          height: 30,
-          side: "FRONT",
-          rotation: 0,
-          opacity: 1,
-        },
-        sortOrder: el.sortOrder ?? i,
-      }));
-    };
+          await renderCardSide(
+            doc,
+            getCardElements(card),
+            pageSide,
+            card.cardData,
+            width,
+            height,
+            originX,
+            originY,
+            cardScale * 0.75,
+          );
+        }
 
-    if (side === "BOTH") {
-      // 5 cards max per page: Column 0 = Front Side, Column 1 = Back Side of the same card
-      doc.addPage({ size: "A4", margins: { top: 0, bottom: 0, left: 0, right: 0 } });
-
-      for (let r = 0; r < pageCards.length; r++) {
-        const card = pageCards[r];
-        const elements = getCardElements(card);
-
-        // Column 0: FRONT
-        const slotXFront = marginX;
-        const slotY = marginY + r * (slotH + gapY);
-        await renderCardSide(
-          doc,
-          elements,
-          "FRONT",
-          card.cardData,
-          cardW,
-          cardH,
-          slotXFront,
-          slotY,
-          scale,
-        );
-
-        // Column 1: BACK
-        const slotXBack = marginX + (slotW + gapX);
-        await renderCardSide(
-          doc,
-          elements,
-          "BACK",
-          card.cardData,
-          cardW,
-          cardH,
-          slotXBack,
-          slotY,
-          scale,
-        );
-      }
-    } else {
-      // FRONT or BACK only: 10 cards per page (2 columns x 5 rows)
-      doc.addPage({ size: "A4", margins: { top: 0, bottom: 0, left: 0, right: 0 } });
-
-      for (let r = 0; r < 5; r++) {
-        for (let c = 0; c < 2; c++) {
-          const cardIndex = 2 * r + c;
-          if (cardIndex < pageCards.length) {
-            const card = pageCards[cardIndex];
-            const elements = getCardElements(card);
-            const slotX = marginX + c * (slotW + gapX);
-            const slotY = marginY + r * (slotH + gapY);
-
-            await renderCardSide(
-              doc,
-              elements,
-              side,
-              card.cardData,
-              cardW,
-              cardH,
-              slotX,
-              slotY,
-              scale,
-            );
-          }
+        if (cropMarks) {
+          doc.save();
+          doc.lineWidth(0.25 * MM_TO_PDF_POINT).strokeColor("#b8bec5");
+          doc.rect(
+            cellXmm * MM_TO_PDF_POINT,
+            cellYmm * MM_TO_PDF_POINT,
+            layout.cellWidthMm * MM_TO_PDF_POINT,
+            layout.cellHeightMm * MM_TO_PDF_POINT,
+          ).stroke();
+          doc.restore();
         }
       }
     }

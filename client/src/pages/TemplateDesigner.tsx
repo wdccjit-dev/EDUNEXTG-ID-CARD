@@ -11,6 +11,7 @@ import { api } from "@/lib/api";
 import CardRenderer from "@/components/CardRenderer";
 import { SAMPLE_CARD_DATA } from "@shared/templateDesigner";
 import type { DesignerElement, ElementConfig } from "@shared/templateDesigner";
+import { DEFAULT_TEMPLATE_CARD_SIZE } from "@shared/printLayout";
 import { useDesignerState, type TemplateMeta } from "./designer/useDesignerState";
 import DesignerToolbar from "./designer/DesignerToolbar";
 import DesignerCanvas from "./designer/DesignerCanvas";
@@ -21,9 +22,9 @@ const DEFAULT_TEMPLATE: TemplateMeta = {
   id: 0,
   name: "New Template",
   description: null,
-  orientation: "landscape",
-  cardWidth: 324,
-  cardHeight: 204,
+  orientation: "portrait",
+  cardWidth: DEFAULT_TEMPLATE_CARD_SIZE.width,
+  cardHeight: DEFAULT_TEMPLATE_CARD_SIZE.height,
   status: "DRAFT",
   accent: "teal",
 };
@@ -56,9 +57,9 @@ export default function TemplateDesigner() {
           id: tmpl.id,
           name: tmpl.name,
           description: tmpl.description,
-          orientation: tmpl.orientation ?? "landscape",
-          cardWidth: tmpl.cardWidth ?? 324,
-          cardHeight: tmpl.cardHeight ?? 204,
+          orientation: tmpl.orientation ?? "portrait",
+          cardWidth: tmpl.cardWidth ?? DEFAULT_TEMPLATE_CARD_SIZE.width,
+          cardHeight: tmpl.cardHeight ?? DEFAULT_TEMPLATE_CARD_SIZE.height,
           status: (tmpl.status as TemplateMeta["status"]) ?? "DRAFT",
           accent: tmpl.accent ?? "teal",
         };

@@ -24,6 +24,7 @@ import { generateSingleCardPdf, generateBulkCardPdf, type CardPdfData, type Prin
 import { isValidIndianMobileNumber, INDIAN_MOBILE_ERROR_MESSAGE } from "../shared/types";
 import { generateExampleExcelBuffer, parseExcelBuffer } from "./excel";
 import { getAvailableDynamicFields } from "../shared/templateDesigner";
+import { DEFAULT_TEMPLATE_CARD_SIZE } from "../shared/printLayout";
 
 const router = Router();
 const adminRoles = new Set(["SUPER_ADMIN"]);
@@ -870,9 +871,9 @@ router.post("/templates", requireRole(adminRoles), async (req, res) => {
       description: req.body.description ?? null,
       status: req.body.status ?? "DRAFT",
       accent: req.body.accent ?? "teal",
-      orientation: req.body.orientation ?? "landscape",
-      cardWidth: req.body.cardWidth ? Number(req.body.cardWidth) : 324,
-      cardHeight: req.body.cardHeight ? Number(req.body.cardHeight) : 204,
+      orientation: req.body.orientation ?? "portrait",
+      cardWidth: req.body.cardWidth ? Number(req.body.cardWidth) : DEFAULT_TEMPLATE_CARD_SIZE.width,
+      cardHeight: req.body.cardHeight ? Number(req.body.cardHeight) : DEFAULT_TEMPLATE_CARD_SIZE.height,
       createdByUserId: currentUser(res).id,
     });
     const id = Number(r[0].insertId);
@@ -2377,7 +2378,8 @@ router.post("/id-cards/:id/print", requireRole(adminRoles), async (req, res) => 
       await db.update(idCards).set({ printedAt: new Date() }).where(eq(idCards.id, id));
     }
 
-    await audit(user, "PRINT_ID_CARD", "id_card", id, card.schoolId);
+    const mode = typeof req.body.mode === "string" ? req.body.mode : "DUPLEX";
+    await audit(user, "PRINT_ID_CARD", "id_card", id, card.schoolId, { count: 1, mode });
     res.json({ success: true, status: "PRINTED", printedAt: new Date() });
   } catch (e) {
     fail(res, e);
@@ -2424,6 +2426,7 @@ router.post("/id-cards/bulk-print", requireRole(adminRoles), async (req, res) =>
     if (!db) return res.status(503).json({ error: "Database not available" });
     const cardIds: number[] = Array.isArray(req.body.cardIds) ? req.body.cardIds.map(Number) : [];
     if (cardIds.length === 0) return res.status(400).json({ error: "cardIds array is required" });
+    const mode = typeof req.body.mode === "string" ? req.body.mode : "DUPLEX";
 
     const cards = await db.select().from(idCards).where(inArray(idCards.id, cardIds));
     for (const card of cards) {
@@ -2448,7 +2451,7 @@ router.post("/id-cards/bulk-print", requireRole(adminRoles), async (req, res) =>
       } else {
         await db.update(idCards).set({ printedAt: new Date() }).where(eq(idCards.id, card.id));
       }
-      await audit(user, "PRINT_ID_CARD", "id_card", card.id, card.schoolId);
+      await audit(user, "PRINT_ID_CARD", "id_card", card.id, card.schoolId, { count: cards.length, mode });
     }
 
     res.json({ success: true, count: cards.length });
@@ -2471,9 +2474,9 @@ async function fetchCardPdfData(db: any, cardId: number): Promise<CardPdfData | 
   return {
     cardNumber: card.cardNumber,
     template: {
-      cardWidth: template.cardWidth || 324,
-      cardHeight: template.cardHeight || 204,
-      orientation: template.orientation || "landscape",
+      cardWidth: template.cardWidth || DEFAULT_TEMPLATE_CARD_SIZE.width,
+      cardHeight: template.cardHeight || DEFAULT_TEMPLATE_CARD_SIZE.height,
+      orientation: template.orientation || "portrait",
       elements: elements.map((el: any) => ({
         elementKey: el.elementKey,
         elementType: el.elementType,
@@ -2498,9 +2501,13 @@ router.get("/id-cards/:id/pdf", requireRole(adminRoles), async (req, res) => {
     const pdfData = await fetchCardPdfData(db, id);
     if (!pdfData) return res.status(404).json({ error: "Template or card data missing for PDF" });
 
-    const side = (req.query.side as "FRONT" | "BACK" | "BOTH") || "BOTH";
-    const pdfBuffer = await generateSingleCardPdf(pdfData, { side });
-    await audit(user, "DOWNLOAD_ID_CARD_PDF", "id_card", id, card.schoolId, { side });
+    const requestedMode = req.query.mode as PrintPdfOptions["mode"] | undefined;
+    const defaultSide = requestedMode === "FRONT_ONLY" ? "FRONT" : requestedMode === "BACK_ONLY" ? "BACK" : "BOTH";
+    const side = (req.query.side as "FRONT" | "BACK" | "BOTH") || defaultSide;
+    const mode = requestedMode || (side === "BOTH" ? "DUPLEX" : side === "FRONT" ? "FRONT_ONLY" : "BACK_ONLY");
+    const cropMarks = req.query.cropMarks !== "false";
+    const pdfBuffer = await generateSingleCardPdf(pdfData, { side, mode, cropMarks });
+    await audit(user, "DOWNLOAD_ID_CARD_PDF", "id_card", id, card.schoolId, { count: 1, mode, side });
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `inline; filename="id_card_${card.cardNumber}_${side.toLowerCase()}.pdf"`);
@@ -2531,9 +2538,13 @@ router.post("/id-cards/bulk-pdf", requireRole(adminRoles), async (req, res) => {
 
     if (pdfCards.length === 0) return res.status(404).json({ error: "No valid cards found for PDF" });
 
-    const side = (req.body.side as "FRONT" | "BACK" | "BOTH") || (req.query.side as "FRONT" | "BACK" | "BOTH") || "BOTH";
-    const pdfBuffer = await generateBulkCardPdf(pdfCards, { side });
-    await audit(user, "DOWNLOAD_ID_CARD_PDF", "id_card", null, null, { count: pdfCards.length, side });
+    const requestedMode = (req.body.mode as PrintPdfOptions["mode"] | undefined) || (req.query.mode as PrintPdfOptions["mode"] | undefined);
+    const defaultSide = requestedMode === "FRONT_ONLY" ? "FRONT" : requestedMode === "BACK_ONLY" ? "BACK" : "BOTH";
+    const side = (req.body.side as "FRONT" | "BACK" | "BOTH") || (req.query.side as "FRONT" | "BACK" | "BOTH") || defaultSide;
+    const mode = requestedMode || (side === "BOTH" ? "DUPLEX" : side === "FRONT" ? "FRONT_ONLY" : "BACK_ONLY");
+    const cropMarks = req.body.cropMarks !== false && req.query.cropMarks !== "false";
+    const pdfBuffer = await generateBulkCardPdf(pdfCards, { side, mode, cropMarks });
+    await audit(user, "DOWNLOAD_ID_CARD_PDF", "id_card", null, null, { count: pdfCards.length, mode, side });
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `inline; filename="bulk_id_cards_${side.toLowerCase()}_${Date.now()}.pdf"`);

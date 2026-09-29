@@ -487,7 +487,7 @@ describe("EDUNEXTG ID Card Updates End-to-End Suite", () => {
       expect(getPdfPageCount(Buffer.from(pdfBytes))).toBe(2);
     });
 
-    it("generates bulk PDF with 10 cards per page (e.g. 25 cards produces 3 pages for FRONT and 6 for BOTH)", async () => {
+    it("generates 10-up sheets (e.g. 25 cards produces 3 pages per side and 6 duplex pages)", async () => {
       const db = await getDb();
       if (!db) throw new Error("No db");
 
@@ -532,7 +532,7 @@ describe("EDUNEXTG ID Card Updates End-to-End Suite", () => {
       const pdfBytesBack = await resBack.arrayBuffer();
       expect(getPdfPageCount(Buffer.from(pdfBytesBack))).toBe(3);
 
-      // Bulk PDF side=BOTH -> 25 cards at 5 cards per page (Front + Back side-by-side) = 5 pages
+      // Bulk PDF side=BOTH -> alternating front/back pages: 3 sheets per side = 6 pages
       const resBoth = await fetch(`${baseUrl}/api/id-cards/bulk-pdf`, {
         method: "POST",
         headers: {
@@ -543,7 +543,7 @@ describe("EDUNEXTG ID Card Updates End-to-End Suite", () => {
       });
       expect(resBoth.status).toBe(200);
       const pdfBytesBoth = await resBoth.arrayBuffer();
-      expect(getPdfPageCount(Buffer.from(pdfBytesBoth))).toBe(5);
+      expect(getPdfPageCount(Buffer.from(pdfBytesBoth))).toBe(6);
     });
   });
 

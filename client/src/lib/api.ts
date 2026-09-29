@@ -202,16 +202,23 @@ export const api = {
     submit: (id: number) => request<{ success: true; requestId?: number; status: string }>(`/api/id-cards/${id}/submit`, json({})),
     approve: (id: number) => request<{ success: true; status: string }>(`/api/id-cards/${id}/approve`, json({})),
     reject: (id: number, reason: string) => request<{ success: true; status: string }>(`/api/id-cards/${id}/reject`, json({ reason })),
-    print: (id: number) => request<{ success: true; status: string; printedAt: string }>(`/api/id-cards/${id}/print`, json({})),
-    bulkPrint: (cardIds: number[]) => request<{ success: true; count: number }>("/api/id-cards/bulk-print", json({ cardIds })),
+    print: (id: number, mode: "FRONT_ONLY" | "BACK_ONLY" | "DUPLEX" = "DUPLEX") =>
+      request<{ success: true; status: string; printedAt: string }>(`/api/id-cards/${id}/print`, json({ mode })),
+    bulkPrint: (cardIds: number[], mode: "FRONT_ONLY" | "BACK_ONLY" | "DUPLEX" = "DUPLEX") =>
+      request<{ success: true; count: number }>("/api/id-cards/bulk-print", json({ cardIds, mode })),
     pdfUrl: (id: number, side?: "FRONT" | "BACK" | "BOTH") =>
       `/api/id-cards/${id}/pdf${side ? `?side=${side}` : ""}`,
-    bulkPdf: async (cardIds: number[], side?: "FRONT" | "BACK" | "BOTH") => {
+    bulkPdf: async (
+      cardIds: number[],
+      side: "FRONT" | "BACK" | "BOTH" = "BOTH",
+      mode: "FRONT_ONLY" | "BACK_ONLY" | "DUPLEX" | "SEPARATE" = "DUPLEX",
+      cropMarks = true,
+    ) => {
       const res = await fetch("/api/id-cards/bulk-pdf", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cardIds, side: side || "BOTH" }),
+        body: JSON.stringify({ cardIds, side, mode, cropMarks }),
       });
       if (!res.ok) throw new Error("Bulk PDF generation failed");
       return res.blob();

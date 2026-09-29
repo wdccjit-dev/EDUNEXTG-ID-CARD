@@ -500,7 +500,7 @@ describe("Strict Multi-Tenant Isolation & Comprehensive RBAC Verification", () =
     expect(pdfBuffer.byteLength).toBeGreaterThan(500);
   });
 
-  it("18b. Bulk PDF layout: max 10 cards per page for single side, max 5 cards per page for both sides", async () => {
+  it("18b. Bulk PDF layout: 10 cards per sheet and alternating duplex sides", async () => {
     const dummyCard = (idx: number) => ({
       cardNumber: `CARD-${idx}`,
       template: {
@@ -526,11 +526,11 @@ describe("Strict Multi-Tenant Isolation & Comprehensive RBAC Verification", () =
     const bufBack10 = await generateBulkCardPdf(cards10, { side: "BACK" });
     expect(bufBack10.byteLength).toBeGreaterThan(1000);
 
-    // 5 cards BOTH sides: succeeds and produces valid PDF (5 front + 5 back in 1 page)
+    // 5 cards BOTH sides: succeeds and produces a front sheet plus its mirrored back sheet
     const bufBoth5 = await generateBulkCardPdf(cards5, { side: "BOTH" });
     expect(bufBoth5.byteLength).toBeGreaterThan(1000);
 
-    // 10 cards BOTH sides: produces valid PDF across 2 pages (5 cards each)
+    // 10 cards BOTH sides: produces one front sheet and one back sheet
     const bufBoth10 = await generateBulkCardPdf(cards10, { side: "BOTH" });
     expect(bufBoth10.byteLength).toBeGreaterThan(bufBoth5.byteLength);
   });

@@ -155,6 +155,12 @@ function RenderElement({
               alt={element.label ?? element.elementType}
               style={{ width: "100%", height: "100%", objectFit: c.objectFit ?? "cover", display: "block" }}
             />
+          ) : element.elementType === "PHOTO" || fieldKey?.toLowerCase().includes("photo") || (shape === "circle" && element.elementType === "IMAGE") ? (
+            <svg viewBox="0 0 24 24" aria-label="Photo placeholder" style={{ width: "100%", height: "100%", display: "block" }}>
+              <circle cx="12" cy="12" r="12" fill="#e5e7eb" />
+              <circle cx="12" cy="8.5" r="3.1" fill="#9ca3af" />
+              <path d="M5.1 20.4c.45-3.4 3.25-5.8 6.9-5.8s6.45 2.4 6.9 5.8A11.95 11.95 0 0 1 12 24a11.95 11.95 0 0 1-6.9-3.6Z" fill="#9ca3af" />
+            </svg>
           ) : (
             <div
               style={{
@@ -170,7 +176,7 @@ function RenderElement({
                 letterSpacing: "0.05em",
               }}
             >
-              {element.elementType === "PHOTO"
+              {(element.elementType as string) === "PHOTO"
                 ? "📷 Photo"
                 : element.elementType === "LOGO"
                   ? "🏫 Logo"

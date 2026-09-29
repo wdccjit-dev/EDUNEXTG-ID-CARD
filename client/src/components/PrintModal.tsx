@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import CardRenderer from "@/components/CardRenderer";
 import type { ApiIdCardDetail } from "@/lib/api";
@@ -14,6 +14,21 @@ import { Button } from "@/components/ui/button";
 import { Printer, Download, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import type { DesignerElement, ElementConfig } from "@shared/templateDesigner";
+import {
+  computeCardScaleInCell,
+  computeCardSizeMm,
+  computeGridPositions,
+  computePageCount,
+  computePageSlotIndexes,
+  computeSheetLayout,
+  DEFAULT_TEMPLATE_CARD_SIZE,
+  PRINT_GRID_COLUMNS,
+  PRINT_GRID_ROWS,
+} from "@shared/printLayout";
+
+type PrintMode = "FRONT_ONLY" | "BACK_ONLY" | "DUPLEX";
+type CardSide = "FRONT" | "BACK";
+type OutputMode = PrintMode | "SEPARATE";
 
 interface PrintModalProps {
   open: boolean;
@@ -22,108 +37,64 @@ interface PrintModalProps {
   onPrinted?: () => void;
 }
 
-export default function PrintModal({
-  open,
-  onOpenChange,
-  cards,
-  onPrinted,
-}: PrintModalProps) {
+function templateSize(card: ApiIdCardDetail) {
+  return {
+    width: card.template?.cardWidth || DEFAULT_TEMPLATE_CARD_SIZE.width,
+    height: card.template?.cardHeight || DEFAULT_TEMPLATE_CARD_SIZE.height,
+  };
+}
+
+function dataValue(card: ApiIdCardDetail, keys: string[]) {
+  const data = card.dataMap ?? {};
+  for (const key of keys) {
+    const value = data[key];
+    if (value !== undefined && value !== null && String(value).trim()) return String(value);
+  }
+  return "";
+}
+
+function fileSlug(value: string) {
+  return value
+    .normalize("NFKD")
+    .replace(/[^A-Za-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .toUpperCase() || "ID_CARDS";
+}
+
+function triggerDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
+export default function PrintModal({ open, onOpenChange, cards, onPrinted }: PrintModalProps) {
   const [printing, setPrinting] = useState(false);
   const [downloading, setDownloading] = useState(false);
-  const [previewSide, setPreviewSide] = useState<"BOTH" | "FRONT" | "BACK">("BOTH");
-  const [activePrintSide, setActivePrintSide] = useState<"BOTH" | "FRONT" | "BACK">("BOTH");
+  const [printMode, setPrintMode] = useState<PrintMode>("DUPLEX");
+  const [previewSide, setPreviewSide] = useState<CardSide>("FRONT");
+  const [separateFiles, setSeparateFiles] = useState(false);
+  const orderedCards = cards;
 
-  // Effective side for layout chunking and rendering
-  const currentSide = printing ? activePrintSide : previewSide;
-
-  // Maximum cards per sheet:
-  // - When printing FRONT or BACK only: 10 cards per sheet (2 cols x 5 rows)
-  // - When printing BOTH sides: 5 cards per sheet (5 front on col 0, 5 back on col 1)
-  const cardsPerPage = currentSide === "BOTH" ? 5 : 10;
-  const cardBatches = useMemo(() => {
-    const batches: ApiIdCardDetail[][] = [];
-    for (let i = 0; i < cards.length; i += cardsPerPage) {
-      batches.push(cards.slice(i, i + cardsPerPage));
+  const pageCount = computePageCount(orderedCards.length);
+  const batches = useMemo(() => {
+    const result: ApiIdCardDetail[][] = [];
+    for (let index = 0; index < orderedCards.length; index += PRINT_GRID_COLUMNS * PRINT_GRID_ROWS) {
+      result.push(orderedCards.slice(index, index + PRINT_GRID_COLUMNS * PRINT_GRID_ROWS));
     }
-    return batches;
-  }, [cards, cardsPerPage]);
+    return result;
+  }, [orderedCards]);
 
-  const executePrint = async (targetSide: "BOTH" | "FRONT" | "BACK") => {
-    if (cards.length === 0) return;
-    setPrinting(true);
-    setActivePrintSide(targetSide);
-
-    try {
-      if (cards.length === 1) {
-        await api.idCards.print(cards[0].id);
-      } else {
-        await api.idCards.bulkPrint(cards.map((c) => c.id));
-      }
-
-      toast.success(
-        cards.length === 1
-          ? `Card #${cards[0].cardNumber} marked as PRINTED`
-          : `${cards.length} cards marked as PRINTED`,
-      );
-      if (onPrinted) onPrinted();
-
-      // Allow React to re-render DOM and layout to settle before opening browser print dialog
-      setTimeout(() => {
-        window.print();
-        setTimeout(() => {
-          setPrinting(false);
-        }, 500);
-      }, 300);
-    } catch (err) {
-      toast.error("Failed to record print status", {
-        description: err instanceof Error ? err.message : "Print operation failed",
-      });
-      setPrinting(false);
-    }
-  };
-
-  const handleDownloadPdf = async (targetSide: "BOTH" | "FRONT" | "BACK") => {
-    if (cards.length === 0) return;
-    setDownloading(true);
-    try {
-      if (cards.length === 1) {
-        const link = document.createElement("a");
-        link.href = api.idCards.pdfUrl(cards[0].id, targetSide);
-        link.download = `id_card_${cards[0].cardNumber}_${targetSide.toLowerCase()}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      } else {
-        const blob = await api.idCards.bulkPdf(
-          cards.map((c) => c.id),
-          targetSide,
-        );
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `id_cards_${targetSide.toLowerCase()}_${Date.now()}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-      }
-      toast.success(`PDF (${targetSide.toLowerCase()}) generated successfully`);
-    } catch (err) {
-      toast.error("Failed to generate PDF", {
-        description: err instanceof Error ? err.message : "Download failed",
-      });
-    } finally {
-      setDownloading(false);
-    }
-  };
-
-  // Convert card elements for renderer
-  const getCardElements = (card: ApiIdCardDetail): DesignerElement[] => {
-    return (card.template?.elements || []).map((el, i) => ({
-      elementKey: el.elementKey,
-      elementType: el.elementType as any,
-      label: el.label ?? null,
-      config: (el.config as ElementConfig) ?? {
+  const getCardElements = (card: ApiIdCardDetail): DesignerElement[] =>
+    (card.template?.elements || []).map((element, index) => ({
+      elementKey: element.elementKey,
+      elementType: element.elementType as any,
+      label: element.label ?? null,
+      config: (element.config as ElementConfig) ?? {
         x: 20,
         y: 20,
         width: 100,
@@ -132,167 +103,150 @@ export default function PrintModal({
         rotation: 0,
         opacity: 1,
       },
-      sortOrder: el.sortOrder ?? i,
+      sortOrder: element.sortOrder ?? index,
     }));
-  };
 
-  // Render batch sheets content (shared between interactive preview and print)
-  const renderSheets = (isForPrint = false) => {
-    return cardBatches.map((batchCards, batchIdx) => {
-      const sampleCard = batchCards[0];
-      const cardW = sampleCard.template?.cardWidth || 324;
-      const cardH = sampleCard.template?.cardHeight || 204;
-      const previewScale = 0.88;
-
-      // Helper for BOTH sides (5 rows x 2 cols: Col 0 = Front, Col 1 = Back)
-      const renderBothSidesGrid = () => {
-        const slots = [];
-        for (let r = 0; r < 5; r++) {
-          const card = r < batchCards.length ? batchCards[r] : null;
-
-          // Column 0: Front
-          slots.push(
-            <div
-              key={`slot-${r}-0-front`}
-              className="print-card-slot"
-              style={{
-                width: `${cardW * previewScale}px`,
-                height: `${cardH * previewScale}px`,
-              }}
-            >
-              {card ? (
-                <div className="relative shadow-sm print:shadow-none">
-                  <CardRenderer
-                    cardWidth={cardW}
-                    cardHeight={cardH}
-                    elements={getCardElements(card)}
-                    side="FRONT"
-                    cardData={{ ...card.dataMap, cardNumber: card.cardNumber }}
-                    scale={previewScale}
-                  />
-                </div>
-              ) : (
-                <div className="w-full h-full border border-dashed border-gray-200/50 rounded-lg no-print flex items-center justify-center text-[10px] text-gray-300">
-                  Empty slot
-                </div>
-              )}
-            </div>,
-          );
-
-          // Column 1: Back
-          slots.push(
-            <div
-              key={`slot-${r}-1-back`}
-              className="print-card-slot"
-              style={{
-                width: `${cardW * previewScale}px`,
-                height: `${cardH * previewScale}px`,
-              }}
-            >
-              {card ? (
-                <div className="relative shadow-sm print:shadow-none">
-                  <CardRenderer
-                    cardWidth={cardW}
-                    cardHeight={cardH}
-                    elements={getCardElements(card)}
-                    side="BACK"
-                    cardData={{ ...card.dataMap, cardNumber: card.cardNumber }}
-                    scale={previewScale}
-                  />
-                </div>
-              ) : (
-                <div className="w-full h-full border border-dashed border-gray-200/50 rounded-lg no-print flex items-center justify-center text-[10px] text-gray-300">
-                  Empty slot
-                </div>
-              )}
-            </div>,
-          );
-        }
-        return slots;
-      };
-
-      // Helper for single side (FRONT or BACK only): 10 cards in 2 columns x 5 rows
-      const renderSingleSideGrid = (side: "FRONT" | "BACK") => {
-        const slots = [];
-        for (let r = 0; r < 5; r++) {
-          for (let c = 0; c < 2; c++) {
-            const cardIndex = 2 * r + c;
-            const card = cardIndex < batchCards.length ? batchCards[cardIndex] : null;
-
-            slots.push(
-              <div
-                key={`slot-${r}-${c}-${side}`}
-                className="print-card-slot"
-                style={{
-                  width: `${cardW * previewScale}px`,
-                  height: `${cardH * previewScale}px`,
-                }}
-              >
-                {card ? (
-                  <div className="relative shadow-sm print:shadow-none">
-                    <CardRenderer
-                      cardWidth={cardW}
-                      cardHeight={cardH}
-                      elements={getCardElements(card)}
-                      side={side}
-                      cardData={{ ...card.dataMap, cardNumber: card.cardNumber }}
-                      scale={previewScale}
-                    />
-                  </div>
-                ) : (
-                  <div className="w-full h-full border border-dashed border-gray-200/50 rounded-lg no-print flex items-center justify-center text-[10px] text-gray-300">
-                    Empty slot
-                  </div>
-                )}
-              </div>,
-            );
-          }
-        }
-        return slots;
+  const renderPage = (batch: ApiIdCardDetail[], batchIndex: number, side: CardSide, isForPrint: boolean) => {
+    const layout = computeSheetLayout(batch.map(templateSize));
+    const pageSlotIndexes = computePageSlotIndexes(orderedCards.length, batchIndex);
+    const slots = Array.from({ length: PRINT_GRID_COLUMNS * PRINT_GRID_ROWS }, (_, index) => {
+      const position = computeGridPositions(index, PRINT_GRID_COLUMNS, PRINT_GRID_ROWS, side === "BACK");
+      const cardIndex = pageSlotIndexes[index];
+      const card = cardIndex === null ? undefined : orderedCards[cardIndex];
+      const cellXmm = layout.marginXmm + position.column * (layout.cellWidthMm + layout.gapMm);
+      const cellYmm = layout.marginYmm + position.row * (layout.cellHeightMm + layout.gapMm);
+      const cardSize = card ? templateSize(card) : null;
+      const cardScale = cardSize ? computeCardScaleInCell(cardSize.width, cardSize.height, layout) : 1;
+      const physicalCard = cardSize ? computeCardSizeMm(cardSize.width, cardSize.height, cardScale) : null;
+      const cardLeftPercent = physicalCard
+        ? ((layout.cellWidthMm - physicalCard.widthMm) / 2 / layout.cellWidthMm) * 100
+        : 0;
+      const cardTopPercent = physicalCard
+        ? ((layout.cellHeightMm - physicalCard.heightMm) / 2 / layout.cellHeightMm) * 100
+        : 0;
+      const slotStyle = {
+        left: `${(cellXmm / layout.pageWidthMm) * 100}%`,
+        top: `${(cellYmm / layout.pageHeightMm) * 100}%`,
+        width: `${(layout.cellWidthMm / layout.pageWidthMm) * 100}%`,
+        height: `${(layout.cellHeightMm / layout.pageHeightMm) * 100}%`,
       };
 
       return (
-        <div key={`batch-${batchIdx}`} className={isForPrint ? "print-sheet-wrapper" : "space-y-6"}>
-          {currentSide === "BOTH" ? (
-            <div className="print-page-sheet bg-white rounded-2xl border border-gray-200 p-4 shadow-sm print:p-0 print:border-none print:shadow-none print:rounded-none">
-              {!isForPrint && (
-                <div className="col-span-2 text-xs font-bold text-[#55605d] pb-2 border-b border-gray-100 flex items-center justify-between no-print mb-2">
-                  <span>
-                    Sheet {batchIdx + 1} — Front & Back Side-by-Side (Cards {batchIdx * cardsPerPage + 1}–{Math.min((batchIdx + 1) * cardsPerPage, cards.length)})
-                  </span>
-                  <span className="text-[11px] font-mono text-gray-400">Max 5 cards (5 Front + 5 Back) / page</span>
-                </div>
-              )}
-              <div className="col-span-2 grid grid-cols-2 gap-3 justify-items-center items-center">
-                {renderBothSidesGrid()}
-              </div>
-            </div>
-          ) : (
-            <div className="print-page-sheet bg-white rounded-2xl border border-gray-200 p-4 shadow-sm print:p-0 print:border-none print:shadow-none print:rounded-none">
-              {!isForPrint && (
-                <div className="col-span-2 text-xs font-bold text-[#55605d] pb-2 border-b border-gray-100 flex items-center justify-between no-print mb-2">
-                  <span>
-                    Sheet {batchIdx + 1} — {currentSide === "FRONT" ? "Front Side Only" : "Back Side Only"} (Cards {batchIdx * cardsPerPage + 1}–{Math.min((batchIdx + 1) * cardsPerPage, cards.length)})
-                  </span>
-                  <span className="text-[11px] font-mono text-gray-400">Max 10 cards / page</span>
-                </div>
-              )}
-              <div className="col-span-2 grid grid-cols-2 gap-3 justify-items-center items-center">
-                {renderSingleSideGrid(currentSide)}
-              </div>
-            </div>
+        <div key={`slot-${index}`} className="print-card-slot" style={slotStyle}>
+          {card && cardSize && (
+            <CardRenderer
+              cardWidth={cardSize.width}
+              cardHeight={cardSize.height}
+              elements={getCardElements(card)}
+              side={side}
+              cardData={{ ...(card.dataMap ?? {}), cardNumber: card.cardNumber }}
+              scale={cardScale}
+              style={{
+                position: "absolute",
+                left: `${cardLeftPercent}%`,
+                top: `${cardTopPercent}%`,
+                boxShadow: "none",
+                borderRadius: 0,
+              }}
+            />
           )}
         </div>
       );
     });
+
+    return (
+      <div key={`${batchIndex}-${side}`} className={isForPrint ? "print-sheet-wrapper" : "space-y-3"}>
+        {!isForPrint && (
+          <div className="flex items-center justify-between gap-3 px-1 text-xs font-bold text-[#55605d]">
+            <span>Page {batchIndex + 1} of {pageCount} · {side === "FRONT" ? "Front" : "Back"}</span>
+            <span className="font-medium text-gray-500">{orderedCards.length} total cards</span>
+          </div>
+        )}
+        <div className={`print-page-sheet ${isForPrint ? "print-page-sheet-output" : ""}`}>
+          {slots}
+        </div>
+      </div>
+    );
+  };
+
+  const renderSheets = (isForPrint = false) => {
+    const sides: CardSide[] = isForPrint
+      ? printMode === "DUPLEX"
+        ? ["FRONT", "BACK"]
+        : [printMode === "FRONT_ONLY" ? "FRONT" : "BACK"]
+      : [previewSide];
+
+    return batches.flatMap((batch, batchIndex) =>
+      sides.map((side) => renderPage(batch, batchIndex, side, isForPrint)),
+    );
+  };
+
+  const executePrint = async () => {
+    if (orderedCards.length === 0) return;
+    setPrinting(true);
+    try {
+      const cardIds = orderedCards.map((card) => card.id);
+      if (cardIds.length === 1) {
+        await api.idCards.print(cardIds[0], printMode);
+      } else {
+        await api.idCards.bulkPrint(cardIds, printMode);
+      }
+
+      toast.success(
+        cardIds.length === 1
+          ? `Card #${orderedCards[0].cardNumber} marked as PRINTED`
+          : `${cardIds.length} cards marked as PRINTED`,
+      );
+      onPrinted?.();
+
+      // Let the dedicated 297 x 210 mm sheets finish layout before opening print.
+      window.setTimeout(() => {
+        window.print();
+        window.setTimeout(() => setPrinting(false), 500);
+      }, 300);
+    } catch (error) {
+      toast.error("Failed to record print status", {
+        description: error instanceof Error ? error.message : "Print operation failed",
+      });
+      setPrinting(false);
+    }
+  };
+
+  const handleDownloadPdf = async () => {
+    if (orderedCards.length === 0) return;
+    setDownloading(true);
+    const cardIds = orderedCards.map((card) => card.id);
+    const schoolName = dataValue(orderedCards[0], ["school_name", "schoolName"]);
+    const baseName = fileSlug(schoolName || "id_cards");
+
+    try {
+      if (printMode === "DUPLEX" && separateFiles) {
+        const frontPdf = await api.idCards.bulkPdf(cardIds, "FRONT", "SEPARATE", false);
+        triggerDownload(frontPdf, `${baseName}_-_Front_PDF.pdf`);
+        const backPdf = await api.idCards.bulkPdf(cardIds, "BACK", "SEPARATE", false);
+        triggerDownload(backPdf, `${baseName}_-_Back_PDF.pdf`);
+      } else {
+        const side = printMode === "FRONT_ONLY" ? "FRONT" : printMode === "BACK_ONLY" ? "BACK" : "BOTH";
+        const pdf = await api.idCards.bulkPdf(cardIds, side, printMode, false);
+        const suffix = printMode === "DUPLEX" ? "Duplex" : printMode === "FRONT_ONLY" ? "Front" : "Back";
+        triggerDownload(pdf, `${baseName}_-_${suffix}_PDF.pdf`);
+      }
+      toast.success(separateFiles ? "Front and back PDFs generated" : "PDF generated successfully");
+    } catch (error) {
+      toast.error("Failed to generate PDF", {
+        description: error instanceof Error ? error.message : "Download failed",
+      });
+    } finally {
+      setDownloading(false);
+    }
   };
 
   return (
     <>
       <style>{`
         @page {
-          size: A4 portrait;
-          margin: 8mm 6mm;
+          size: A4 landscape;
+          margin: 0;
         }
         @media screen {
           #dedicated-print-portal {
@@ -300,7 +254,10 @@ export default function PrintModal({
           }
         }
         @media print {
-          /* Hide standard DOM tree in print */
+          body > :not(#dedicated-print-portal) {
+            display: none !important;
+          }
+
           #root,
           [data-slot="dialog-portal"],
           [data-slot="dialog-overlay"],
@@ -312,65 +269,88 @@ export default function PrintModal({
           }
 
           html, body {
+            width: 297mm !important;
+            height: auto !important;
             margin: 0 !important;
             padding: 0 !important;
-            background: #ffffff !important;
-            height: auto !important;
             overflow: visible !important;
+            background: #ffffff !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }
 
-          /* Ensure dedicated print portal is the ONLY visible block */
           #dedicated-print-portal {
             display: block !important;
-            position: static !important;
-            width: 100% !important;
-            max-width: 100% !important;
+            width: 297mm !important;
             margin: 0 !important;
             padding: 0 !important;
             background: #ffffff !important;
-            visibility: visible !important;
           }
+
           #dedicated-print-portal * {
             visibility: visible !important;
           }
 
           .print-sheet-wrapper {
+            width: 297mm !important;
+            height: 210mm !important;
+            margin: 0 !important;
+            padding: 0 !important;
             page-break-after: always;
             break-after: page;
             page-break-inside: avoid;
             break-inside: avoid;
-            margin: 0 0 0 0;
-            padding: 0;
           }
+
           .print-sheet-wrapper:last-child {
             page-break-after: auto;
             break-after: auto;
           }
 
-          .print-page-sheet {
-            width: 100%;
-            max-width: 198mm;
-            margin: 0 auto;
-            padding: 0;
-            background: #ffffff !important;
-            border: none !important;
+          .print-page-sheet-output {
+            width: 297mm !important;
+            height: 210mm !important;
+            aspect-ratio: auto !important;
+            margin: 0 !important;
+            border: 0 !important;
+            border-radius: 0 !important;
             box-shadow: none !important;
           }
 
           .print-card-slot {
             page-break-inside: avoid;
             break-inside: avoid;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            box-sizing: border-box;
+          }
+        }
+
+        .print-page-sheet {
+          position: relative;
+          box-sizing: border-box;
+          width: 100%;
+          aspect-ratio: 297 / 210;
+          overflow: hidden;
+          margin: 0 auto;
+          background: #fff;
+          border-radius: 12px;
+          border: 1px solid #e0e5e2;
+          box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+        }
+
+        .print-card-slot {
+          position: absolute;
+          overflow: hidden;
+          box-sizing: border-box;
+        }
+
+        @media print {
+          .print-page-sheet {
+            border: 0 !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
           }
         }
       `}</style>
 
-      {/* Dedicated Portal Rendered Directly at Body Level for Clean, Unclipped Printing */}
       {open && typeof document !== "undefined" && createPortal(
         <div id="dedicated-print-portal" aria-hidden="true">
           {renderSheets(true)}
@@ -381,109 +361,105 @@ export default function PrintModal({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="w-[98vw] sm:max-w-5xl xl:max-w-6xl max-h-[94vh] flex flex-col p-4 sm:p-6">
           <DialogHeader>
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pr-2 sm:pr-6">
-              <div>
-                <DialogTitle className="text-lg sm:text-xl font-bold flex items-center gap-2">
-                  <span>Print Preview</span>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-[#eef7f4] text-[#0f7f79] font-semibold">
-                    {cards.length} {cards.length === 1 ? "Card" : "Cards"} · {cardBatches.length}{" "}
-                    {cardBatches.length === 1 ? "Page Sheet" : "Page Sheets"}
-                  </span>
-                </DialogTitle>
-                <div className="text-xs text-gray-500 mt-1">
-                  {currentSide === "BOTH"
-                    ? "Up to 5 cards per A4 page (5 Front + 5 Back side-by-side)."
-                    : currentSide === "FRONT"
-                      ? "Up to 10 Front cards per A4 page (2 columns x 5 rows)."
-                      : "Up to 10 Back cards per A4 page (2 columns x 5 rows)."}
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-wrap items-start justify-between gap-3 pr-2 sm:pr-6">
+                <div>
+                  <DialogTitle className="text-lg sm:text-xl font-bold flex items-center gap-2">
+                    <span>Print Preview</span>
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-[#eef7f4] text-[#0f7f79] font-semibold">
+                      {orderedCards.length} {orderedCards.length === 1 ? "Card" : "Cards"} · {pageCount}{" "}
+                      {pageCount === 1 ? "Page" : "Pages"}
+                    </span>
+                  </DialogTitle>
+                  <div className="text-xs text-gray-500 mt-1">
+                    A4 landscape · 5 columns × 2 rows · 2 mm gap · cards stay in the same slots on both sides.
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1 bg-[#f0efec] p-1 rounded-xl text-xs font-semibold shrink-0">
+                  {(["FRONT", "BACK"] as const).map((side) => (
+                    <button
+                      key={side}
+                      type="button"
+                      onClick={() => setPreviewSide(side)}
+                      className={`px-3 py-1.5 rounded-lg transition-all text-xs font-bold ${
+                        previewSide === side
+                          ? "bg-[#0f7f79] text-white shadow-xs"
+                          : "text-[#55605d] hover:text-[#203734]"
+                      }`}
+                    >
+                      {side === "FRONT" ? "Front" : "Back"}
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              {/* Preview mode switcher (modal only) */}
-              <div className="flex items-center gap-1 bg-[#f0efec] p-1 rounded-xl text-xs font-semibold shrink-0">
-                {(["BOTH", "FRONT", "BACK"] as const).map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => setPreviewSide(s)}
-                    className={`px-3 py-1.5 rounded-lg transition-all text-xs font-bold ${
-                      previewSide === s
-                        ? "bg-[#0f7f79] text-white shadow-xs"
-                        : "text-[#55605d] hover:text-[#203734]"
-                    }`}
+              <div className="flex flex-wrap items-end gap-3 text-xs">
+                <label className="flex flex-col gap-1 font-semibold text-[#45544f]">
+                  Print mode
+                  <select
+                    value={printMode}
+                    onChange={(event) => setPrintMode(event.target.value as PrintMode)}
+                    className="h-9 min-w-48 rounded-lg border border-[#dfe7e2] bg-white px-2.5 text-xs text-[#203734]"
                   >
-                    {s === "BOTH" ? "Both Sides" : s === "FRONT" ? "Front Only" : "Back Only"}
-                  </button>
-                ))}
+                    <option value="FRONT_ONLY">Front only</option>
+                    <option value="BACK_ONLY">Back only</option>
+                    <option value="DUPLEX">Front + Back (duplex)</option>
+                  </select>
+                </label>
+
+                {printMode === "DUPLEX" && (
+                  <label className="flex h-9 items-center gap-2 rounded-lg border border-[#dfe7e2] bg-white px-3 font-semibold text-[#45544f]">
+                    <input
+                      type="checkbox"
+                      checked={separateFiles}
+                      onChange={(event) => setSeparateFiles(event.target.checked)}
+                      className="accent-[#0f7f79]"
+                    />
+                    Separate files
+                  </label>
+                )}
               </div>
             </div>
           </DialogHeader>
 
-          {/* Interactive Preview in Modal */}
           <div
             id="print-area"
             className="flex-1 overflow-y-auto p-3 sm:p-5 space-y-8 bg-[#f8faf8] rounded-2xl border border-[#e2e8e3] max-h-[62vh]"
           >
-            {renderSheets(false)}
+            {batches.map((batch, index) => renderPage(batch, index, previewSide, false))}
+            {orderedCards.length === 0 && (
+              <div className="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-500">
+                No cards selected for printing.
+              </div>
+            )}
           </div>
 
           <DialogFooter className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 pt-3 border-t border-[#edf0ed]">
             <div className="text-[11px] text-gray-500">
-              Only approved cards are eligible for printing. Status will update to <strong>PRINTED</strong> upon printing.
+              Only approved cards are eligible for printing. Status updates to <strong>PRINTED</strong> when you print.
             </div>
 
             <div className="flex flex-wrap items-center justify-end gap-2">
               <Button
                 variant="outline"
                 type="button"
-                onClick={() => handleDownloadPdf(previewSide)}
-                disabled={downloading}
+                onClick={handleDownloadPdf}
+                disabled={downloading || orderedCards.length === 0}
                 className="h-10 text-xs font-bold border-[#dfe7e2] text-[#203734] hover:bg-[#edf3f0]"
               >
                 {downloading ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Download className="h-4 w-4 mr-1.5" />}
-                Download PDF
+                {downloading ? "Preparing PDF…" : separateFiles && printMode === "DUPLEX" ? "Download PDFs" : "Download PDF"}
               </Button>
 
               <Button
                 type="button"
-                onClick={() => executePrint("FRONT")}
-                disabled={printing}
+                onClick={executePrint}
+                disabled={printing || orderedCards.length === 0}
                 className="h-10 bg-[#0f7f79] hover:bg-[#096c67] text-white text-xs font-bold rounded-xl shadow-xs"
               >
-                {printing && activePrintSide === "FRONT" ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
-                ) : (
-                  <Printer className="h-4 w-4 mr-1.5" />
-                )}
-                Print Front
-              </Button>
-
-              <Button
-                type="button"
-                onClick={() => executePrint("BACK")}
-                disabled={printing}
-                className="h-10 bg-[#0f7f79] hover:bg-[#096c67] text-white text-xs font-bold rounded-xl shadow-xs"
-              >
-                {printing && activePrintSide === "BACK" ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
-                ) : (
-                  <Printer className="h-4 w-4 mr-1.5" />
-                )}
-                Print Back
-              </Button>
-
-              <Button
-                type="button"
-                onClick={() => executePrint("BOTH")}
-                disabled={printing}
-                className="h-10 bg-[#1f3733] hover:bg-[#152522] text-white text-xs font-bold rounded-xl shadow-xs"
-              >
-                {printing && activePrintSide === "BOTH" ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
-                ) : (
-                  <Printer className="h-4 w-4 mr-1.5" />
-                )}
-                Print Both
+                {printing ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Printer className="h-4 w-4 mr-1.5" />}
+                {printing ? "Preparing…" : printMode === "FRONT_ONLY" ? "Print Front" : printMode === "BACK_ONLY" ? "Print Back" : "Print Duplex"}
               </Button>
             </div>
           </DialogFooter>
