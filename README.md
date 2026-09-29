@@ -130,7 +130,7 @@ pnpm db:seed-auth
 *(Note: `seed-auth` is blocked when `NODE_ENV=production`)*
 
 
-### 5. Start Development Server
+### 4. Start Development Server
 ```bash
 pnpm dev
 ```
