@@ -3,6 +3,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Route, Switch, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
+import SchoolLoader from "./components/SchoolLoader";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { api, type ApiAuthUser } from "./lib/api";
 
@@ -40,7 +41,7 @@ function ProtectedPortal({ portal, initialNav }: { portal: "admin" | "school" | 
       .catch(() => navigate(portal === "marketing" ? "/marketing/login" : "/login"))
       .finally(() => setLoading(false));
   }, [navigate, portal]);
-  if (loading) return <main className="flex min-h-screen items-center justify-center bg-[#f7f6f2] text-sm text-[#778381]">Loading your workspace…</main>;
+  if (loading) return <SchoolLoader label="Preparing your school workspace…" />;
   return user ? <Home authenticatedUser={user} portal={portal} initialNav={initialNav} /> : null;
 }
 
@@ -62,7 +63,7 @@ function ProtectedDesigner() {
       .catch(() => navigate("/login"))
       .finally(() => setLoading(false));
   }, [navigate]);
-  if (loading) return <main className="flex min-h-screen items-center justify-center bg-[#f7f6f2] text-sm text-[#778381]">Loading designer…</main>;
+  if (loading) return <SchoolLoader label="Opening the ID card designer…" />;
   return authed ? <TemplateDesigner /> : null;
 }
 
@@ -119,9 +120,9 @@ function PortalRedirect() {
       })
       .catch(() => navigate("/login"));
   }, [navigate]);
-  return <main className="flex min-h-screen items-center justify-center bg-[#f7f6f2] text-sm text-[#778381]">Checking session…</main>;
+  return <SchoolLoader label="Checking your school session…" />;
 }
 
 export default function App() {
-  return <ErrorBoundary><ThemeProvider defaultTheme="light"><TooltipProvider><Toaster /><Suspense fallback={<main className="flex min-h-screen items-center justify-center bg-[#f7f6f2] text-sm text-[#778381]">Loading…</main>}><Router /></Suspense></TooltipProvider></ThemeProvider></ErrorBoundary>;
+  return <ErrorBoundary><ThemeProvider defaultTheme="light"><TooltipProvider><Toaster /><Suspense fallback={<SchoolLoader />}><Router /></Suspense></TooltipProvider></ThemeProvider></ErrorBoundary>;
 }

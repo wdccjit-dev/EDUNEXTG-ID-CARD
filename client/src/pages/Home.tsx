@@ -401,6 +401,7 @@ export default function Home({
   const [userPasswordInput, setUserPasswordInput] = useState("");
   const [userRoleInput, setUserRoleInput] = useState<"SUPER_ADMIN" | "SCHOOL_ADMIN" | "MARKETING_ADMIN">("SCHOOL_ADMIN");
   const [userSchoolIdInput, setUserSchoolIdInput] = useState<string>("");
+  const [userFormErrors, setUserFormErrors] = useState<Partial<Record<"name" | "email" | "password" | "schoolId", string>>>({});
 
   // ID Card form & editing
   const [idCardFormOpen, setIdCardFormOpen] = useState(false);
@@ -787,6 +788,11 @@ export default function Home({
     }
     try {
       const creds = await api.schools.generateCredentials(school.id);
+      setSchools((items) =>
+        items.map((item) =>
+          item.id === school.id ? { ...item, credentials: creds.credentials } : item,
+        ),
+      );
       setCredentialsData({
         schoolName: school.name,
         loginId: creds.credentials.loginId,
@@ -843,20 +849,33 @@ export default function Home({
     setUserPasswordInput("");
     setUserRoleInput("SCHOOL_ADMIN");
     setUserSchoolIdInput(activeSchoolId ? String(activeSchoolId) : schools[0] ? String(schools[0].id) : "");
+    setUserFormErrors({});
     setUserModalOpen(true);
   };
 
   const handleCreateUserSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!userNameInput.trim() || !userEmailInput.trim()) {
-      return toast.error("Name and email are required");
+    const errors: typeof userFormErrors = {};
+    const email = userEmailInput.trim();
+
+    if (!userNameInput.trim()) errors.name = "Full name is required.";
+    if (!email) {
+      errors.email = "Email address is required.";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      errors.email = "Enter a valid email address.";
     }
-    if (userPasswordInput.length < 8) {
-      return toast.error("Password must be at least 8 characters");
+    if (!userPasswordInput) {
+      errors.password = "Temporary password is required.";
+    } else if (userPasswordInput.length < 8) {
+      errors.password = "Password must be at least 8 characters.";
     }
     if (userRoleInput === "SCHOOL_ADMIN" && (!userSchoolIdInput || !Number(userSchoolIdInput))) {
-      return toast.error("Please select a school for the School Admin");
+      errors.schoolId = "Select a school for the School Admin.";
     }
+
+    setUserFormErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+
     try {
       const created = await api.users.create({
         name: userNameInput.trim(),
@@ -2423,7 +2442,7 @@ export default function Home({
       {/* Dialog for Creating School User */}
       <Dialog open={userModalOpen} onOpenChange={setUserModalOpen}>
         <DialogContent className="sm:max-w-md">
-          <form onSubmit={handleCreateUserSubmit}>
+          <form onSubmit={handleCreateUserSubmit} noValidate>
             <DialogHeader>
               <DialogTitle>Add New User</DialogTitle>
               <DialogDescription>
@@ -2433,39 +2452,69 @@ export default function Home({
             <div className="space-y-4 py-4">
               <div>
                 <label className="text-xs font-bold text-[#304541]">
-                  Full Name
+                  Full Name <span className="text-red-500">*</span>
                 </label>
                 <Input
-                  className="mt-1"
+                  className="mt-1 aria-invalid:border-red-500 aria-invalid:ring-red-200"
                   placeholder="e.g., Sarah Connor"
                   value={userNameInput}
-                  onChange={(e) => setUserNameInput(e.target.value)}
+                  onChange={(e) => {
+                    setUserNameInput(e.target.value);
+                    setUserFormErrors((current) => ({ ...current, name: undefined }));
+                  }}
+                  aria-invalid={Boolean(userFormErrors.name)}
+                  aria-describedby={userFormErrors.name ? "user-name-error" : undefined}
                   autoFocus
                 />
+                {userFormErrors.name && (
+                  <p id="user-name-error" className="mt-1 text-xs font-medium text-red-600">
+                    {userFormErrors.name}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="text-xs font-bold text-[#304541]">
-                  Email Address
+                  Email Address <span className="text-red-500">*</span>
                 </label>
                 <Input
                   type="email"
-                  className="mt-1"
+                  className="mt-1 aria-invalid:border-red-500 aria-invalid:ring-red-200"
                   placeholder="e.g., sarah@school.edu"
                   value={userEmailInput}
-                  onChange={(e) => setUserEmailInput(e.target.value)}
+                  onChange={(e) => {
+                    setUserEmailInput(e.target.value);
+                    setUserFormErrors((current) => ({ ...current, email: undefined }));
+                  }}
+                  aria-invalid={Boolean(userFormErrors.email)}
+                  aria-describedby={userFormErrors.email ? "user-email-error" : undefined}
                 />
+                {userFormErrors.email && (
+                  <p id="user-email-error" className="mt-1 text-xs font-medium text-red-600">
+                    {userFormErrors.email}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="text-xs font-bold text-[#304541]">
-                  Temporary Password (min 8 chars)
+                  Temporary Password (min 8 chars) <span className="text-red-500">*</span>
                 </label>
                 <Input
                   type="password"
-                  className="mt-1"
+                  className="mt-1 aria-invalid:border-red-500 aria-invalid:ring-red-200"
                   placeholder="••••••••"
                   value={userPasswordInput}
-                  onChange={(e) => setUserPasswordInput(e.target.value)}
+                  onChange={(e) => {
+                    setUserPasswordInput(e.target.value);
+                    setUserFormErrors((current) => ({ ...current, password: undefined }));
+                  }}
+                  aria-invalid={Boolean(userFormErrors.password)}
+                  aria-describedby={userFormErrors.password ? "user-password-error" : undefined}
                 />
+                {userFormErrors.password && (
+                  <p id="user-password-error" className="mt-1 text-xs font-medium text-red-600">
+                    {userFormErrors.password}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="text-xs font-bold text-[#304541]">
@@ -2473,7 +2522,12 @@ export default function Home({
                 </label>
                 <Select
                   value={userRoleInput}
-                  onValueChange={(val: any) => setUserRoleInput(val)}
+                  onValueChange={(val: any) => {
+                    setUserRoleInput(val);
+                    if (val !== "SCHOOL_ADMIN") {
+                      setUserFormErrors((current) => ({ ...current, schoolId: undefined }));
+                    }
+                  }}
                 >
                   <SelectTrigger className="mt-1 w-full">
                     <SelectValue placeholder="Select role" />
@@ -2493,9 +2547,16 @@ export default function Home({
                   </label>
                   <Select
                     value={userSchoolIdInput}
-                    onValueChange={(val: string) => setUserSchoolIdInput(val)}
+                    onValueChange={(val: string) => {
+                      setUserSchoolIdInput(val);
+                      setUserFormErrors((current) => ({ ...current, schoolId: undefined }));
+                    }}
                   >
-                    <SelectTrigger className="mt-1 w-full">
+                    <SelectTrigger
+                      className="mt-1 w-full aria-invalid:border-red-500 aria-invalid:ring-red-200"
+                      aria-invalid={Boolean(userFormErrors.schoolId)}
+                      aria-describedby={userFormErrors.schoolId ? "user-school-error" : undefined}
+                    >
                       <SelectValue placeholder="Select school for School Admin" />
                     </SelectTrigger>
                     <SelectContent>
@@ -2506,6 +2567,11 @@ export default function Home({
                       ))}
                     </SelectContent>
                   </Select>
+                  {userFormErrors.schoolId && (
+                    <p id="user-school-error" className="mt-1 text-xs font-medium text-red-600">
+                      {userFormErrors.schoolId}
+                    </p>
+                  )}
                   <p className="mt-1 text-[11px] text-[#788784]">
                     The School Admin will manage cards, orders, and approvals for this school.
                   </p>
@@ -3383,6 +3449,20 @@ function ModuleView({
   const [cardsPendingRemove, setCardsPendingRemove] = useState<number[]>([]);
   const [removingCards, setRemovingCards] = useState(false);
   const [reportsTab, setReportsTab] = useState<"general" | "removed_history">("removed_history");
+
+  const getSchoolLoginId = (school: ApiSchool) =>
+    school.credentials?.loginId ??
+    users.find((user) => user.schoolId === school.id && user.role === "SCHOOL_ADMIN")?.openId ??
+    "";
+
+  const copySchoolDetail = async (value: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      toast.success(`${label} copied`);
+    } catch {
+      toast.error(`Could not copy ${label.toLowerCase()}`);
+    }
+  };
 
   const isTemplates = label === "ID card templates";
   const isSchools = label === "Schools";
@@ -4281,11 +4361,14 @@ function ModuleView({
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs min-w-[700px]">
+            <table className="w-full text-left text-xs min-w-[1120px]">
               <thead className="bg-[#f8faf8] border-b border-[#edf0ed] text-[#84918e] uppercase tracking-wider font-semibold text-[11px]">
                 <tr>
                   <th className="px-5 py-3.5">School Name</th>
                   <th className="px-5 py-3.5">School Code / ID</th>
+                  <th className="px-5 py-3.5">Phone</th>
+                  <th className="px-5 py-3.5">School Login ID</th>
+                  <th className="px-5 py-3.5">Password / ID Pass</th>
                   <th className="px-5 py-3.5">Template</th>
                   <th className="px-5 py-3.5">Status</th>
                   <th className="px-5 py-3.5 text-right">Actions</th>
@@ -4294,7 +4377,7 @@ function ModuleView({
               <tbody className="divide-y divide-[#edf0ed]">
                 {paginatedSchools.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="p-12 text-center text-sm text-[#8d9995]">
+                    <td colSpan={8} className="p-12 text-center text-sm text-[#8d9995]">
                       <Building2 className="mx-auto mb-3 h-8 w-8 text-[#98a4a1]" />
                       <p className="font-semibold text-[#304541]">
                         {searchTerm || schoolsStatusFilter !== "All"
@@ -4334,6 +4417,74 @@ function ModuleView({
                             ID: #{school.id}
                           </span>
                         </div>
+                      </td>
+                      <td className="px-5 py-4 whitespace-nowrap">
+                        {school.phone ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-semibold text-[#304541]">{school.phone}</span>
+                            <button
+                              type="button"
+                              onClick={() => void copySchoolDetail(school.phone!, "Phone number")}
+                              className="flex h-7 w-7 items-center justify-center rounded-lg text-[#0f7f79] hover:bg-[#e8f4f0]"
+                              title="Copy phone number"
+                              aria-label={`Copy phone number for ${school.name}`}
+                            >
+                              <Copy className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-[#98a4a1]">Not added</span>
+                        )}
+                      </td>
+                      <td className="px-5 py-4 whitespace-nowrap">
+                        {getSchoolLoginId(school) ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className="rounded-md bg-[#eef7f4] px-2 py-1 font-mono font-bold text-[#0f7f79]">
+                              {getSchoolLoginId(school)}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => void copySchoolDetail(getSchoolLoginId(school), "School Login ID")}
+                              className="flex h-7 w-7 items-center justify-center rounded-lg text-[#0f7f79] hover:bg-[#e8f4f0]"
+                              title="Copy School Login ID"
+                              aria-label={`Copy School Login ID for ${school.name}`}
+                            >
+                              <Copy className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-[#98a4a1]">Not generated</span>
+                        )}
+                      </td>
+                      <td className="px-5 py-4 whitespace-nowrap">
+                        {authenticatedUser.role === "SUPER_ADMIN" && school.credentials?.password ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className="rounded-md border border-[#d8e8e4] bg-white px-2 py-1 font-mono font-bold text-[#304541]">
+                              {school.credentials.password}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => void copySchoolDetail(school.credentials!.password, "ID Pass")}
+                              className="flex h-7 w-7 items-center justify-center rounded-lg text-[#0f7f79] hover:bg-[#e8f4f0]"
+                              title="Copy ID Pass"
+                              aria-label={`Copy ID Pass for ${school.name}`}
+                            >
+                              <Copy className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ) : authenticatedUser.role === "SUPER_ADMIN" ? (
+                          <button
+                            type="button"
+                            onClick={() => onGenerateCredentials?.(school)}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-[#cfe2dc] bg-[#f5faf8] px-2.5 py-1.5 text-[11px] font-bold text-[#0f7f79] hover:bg-[#e8f4f0]"
+                            title="Generate a new ID Pass to display and copy"
+                          >
+                            <KeyRound className="h-3.5 w-3.5" />
+                            Generate to view
+                          </button>
+                        ) : (
+                          <span className="text-[#98a4a1]">Restricted</span>
+                        )}
                       </td>
                       <td className="px-5 py-4 whitespace-nowrap">
                         {school.templateSelectionStatus === "Selected" ? (
