@@ -55,6 +55,24 @@ async function purgeTestArtifacts() {
     `);
 
     await conn.execute(`
+      DELETE FROM removed_cards_history 
+      WHERE school_id IN (
+        SELECT id FROM schools WHERE email LIKE '%@test.local' OR shortCode LIKE 'ST%' OR shortCode LIKE 'SCA%' OR shortCode LIKE 'SCB%' OR shortCode LIKE 'UA%' OR shortCode LIKE 'UB%' OR name LIKE '%Test%'
+      ) OR removed_by_user_id IN (
+        SELECT id FROM users WHERE email LIKE '%@test.local' OR openId LIKE '%test%' OR openId LIKE '%mkt%'
+      )
+    `).catch(() => {});
+
+    await conn.execute(`
+      DELETE FROM orders 
+      WHERE school_id IN (
+        SELECT id FROM schools WHERE email LIKE '%@test.local' OR shortCode LIKE 'ST%' OR shortCode LIKE 'SCA%' OR shortCode LIKE 'SCB%' OR shortCode LIKE 'UA%' OR shortCode LIKE 'UB%' OR name LIKE '%Test%'
+      ) OR placed_by_user_id IN (
+        SELECT id FROM users WHERE email LIKE '%@test.local' OR openId LIKE '%test%' OR openId LIKE '%mkt%'
+      )
+    `).catch(() => {});
+
+    await conn.execute(`
       DELETE FROM idCardData WHERE idCardId IN (
         SELECT id FROM idCards WHERE schoolId IN (
           SELECT id FROM schools WHERE email LIKE '%@test.local' OR shortCode LIKE 'ST%' OR shortCode LIKE 'SCA%' OR shortCode LIKE 'SCB%' OR shortCode LIKE 'UA%' OR shortCode LIKE 'UB%' OR name LIKE '%Test%'

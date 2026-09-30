@@ -28,6 +28,8 @@ export default function Login() {
       // Automatically redirect based on user role from backend
       if (user.role === "SUPER_ADMIN") {
         navigate("/admin");
+      } else if (user.role === "MARKETING_ADMIN") {
+        navigate("/marketing");
       } else {
         navigate("/school");
       }

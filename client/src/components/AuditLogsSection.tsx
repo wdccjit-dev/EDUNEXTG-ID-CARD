@@ -43,6 +43,7 @@ export default function AuditLogsSection({
 
   // Mode: "school" or "admin". School users can ONLY view "school" logs.
   const [activeMode, setActiveMode] = useState<"school" | "admin">("school");
+  const [marketingOnly, setMarketingOnly] = useState(false);
 
   // Search and filter states
   const [searchQuery, setSearchQuery] = useState("");
@@ -191,6 +192,16 @@ export default function AuditLogsSection({
       });
     }
 
+    if (isAdmin && marketingOnly) {
+      result = result.filter(
+        (i) =>
+          i.actorRole === "MARKETING_ADMIN" ||
+          i.userRole === "MARKETING_ADMIN" ||
+          Boolean((i.newValues as any)?.placedByRole === "MARKETING_ADMIN") ||
+          Boolean((i as any).isMarketing)
+      );
+    }
+
     return result;
   }, [
     currentDataset,
@@ -200,6 +211,7 @@ export default function AuditLogsSection({
     schoolActionFilter,
     adminActionFilter,
     searchQuery,
+    marketingOnly,
   ]);
 
   // Paginated items
@@ -318,8 +330,32 @@ export default function AuditLogsSection({
               </button>
             </div>
 
-            {/* Top Action Buttons: Export CSV & Clear logs */}
+            {/* Top Action Buttons: Marketing toggle, Export CSV & Clear logs */}
             <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+              {isAdmin && (
+                <div className="flex items-center gap-2 rounded-xl border border-[#dfe7e2] bg-[#f8faf9] px-3 py-1.5 shadow-2xs">
+                  <span className="text-xs font-bold text-[#344441]">Marketing logs</span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={marketingOnly}
+                    onClick={() => {
+                      setMarketingOnly(!marketingOnly);
+                      setPage(1);
+                    }}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      marketingOnly ? "bg-[#0f7f79]" : "bg-gray-200"
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        marketingOnly ? "translate-x-4" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                </div>
+              )}
+
               <button
                 type="button"
                 onClick={handleExportCSV}
@@ -506,7 +542,14 @@ export default function AuditLogsSection({
 
                   {/* Right: Clean Timestamp & Badges */}
                   <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-1.5 shrink-0 pt-2 sm:pt-0 border-t sm:border-0 border-[#f2f4f2]">
-                    <RenderActionBadge action={log.action} />
+                    <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                      {(log.isMarketing || log.actorRole === "MARKETING_ADMIN" || log.userRole === "MARKETING_ADMIN" || Boolean((log.newValues as any)?.placedByRole === "MARKETING_ADMIN")) && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#e6f4f2] text-[#0f7f79] border border-[#b8dfda]">
+                          Marketing
+                        </span>
+                      )}
+                      <RenderActionBadge action={log.action} />
+                    </div>
                     <span className="text-[11px] text-[#849490] font-medium whitespace-nowrap">
                       {formatDistanceToNow(new Date(log.createdAt), { addSuffix: true })}
                     </span>
@@ -646,6 +689,34 @@ function RenderActionBadge({ action }: { action: string }) {
       return (
         <span className="inline-flex items-center gap-1 rounded-md bg-[#fef9c3] border border-[#fde047] px-2 py-0.5 text-xs font-bold text-[#854d0e]">
           Credentials Issued
+        </span>
+      );
+    case "PLACE_ORDER":
+      return (
+        <span className="inline-flex items-center gap-1 rounded-md bg-[#e0e7ff] border border-[#a5b4fc] px-2 py-0.5 text-xs font-bold text-[#4338ca]">
+          <FileText className="h-3 w-3" />
+          Order Placed
+        </span>
+      );
+    case "UPDATE_ORDER_STATUS":
+      return (
+        <span className="inline-flex items-center gap-1 rounded-md bg-[#dcfce7] border border-[#86efac] px-2 py-0.5 text-xs font-bold text-[#15803d]">
+          <RefreshCw className="h-3 w-3" />
+          Order Status
+        </span>
+      );
+    case "CANCEL_ORDER":
+      return (
+        <span className="inline-flex items-center gap-1 rounded-md bg-[#fee2e2] border border-[#fca5a5] px-2 py-0.5 text-xs font-bold text-[#b91c1c]">
+          <XCircle className="h-3 w-3" />
+          Order Cancelled
+        </span>
+      );
+    case "REMOVE_APPROVED_CARDS":
+      return (
+        <span className="inline-flex items-center gap-1 rounded-md bg-[#ffedd5] border border-[#fdba74] px-2 py-0.5 text-xs font-bold text-[#c2410c]">
+          <Trash2 className="h-3 w-3" />
+          Approved Cards Removed
         </span>
       );
     default:

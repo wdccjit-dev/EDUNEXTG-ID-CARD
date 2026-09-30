@@ -13,7 +13,18 @@ import {
 } from "drizzle-orm/mysql-core";
 import { relations } from "drizzle-orm";
 
-export const userRoleValues = ["SUPER_ADMIN", "SCHOOL_ADMIN", "SCHOOL_OPERATOR", "VIEWER"] as const;
+export const userRoleValues = ["SUPER_ADMIN", "SCHOOL_ADMIN", "SCHOOL_OPERATOR", "VIEWER", "MARKETING_ADMIN"] as const;
+export const orderTypeValues = ["STUDENT", "STAFF"] as const;
+export const printSideValues = ["SINGLE", "DOUBLE"] as const;
+export const cardMaterialValues = ["PVC_STANDARD", "PVC_PREMIUM"] as const;
+export const orderStatusValues = [
+  "PLACED",
+  "CONFIRMED",
+  "IN_PRODUCTION",
+  "DISPATCHED",
+  "DELIVERED",
+  "CANCELLED",
+] as const;
 export const idCardStatusValues = [
   "DRAFT",
   "SUBMITTED",
@@ -166,6 +177,8 @@ export const idCards = mysqlTable(
     submittedByUserId: int("submitted_by_user_id").references(() => users.id, { onDelete: "set null", onUpdate: "cascade" }),
     approvedByUserId: int("approved_by_user_id").references(() => users.id, { onDelete: "set null", onUpdate: "cascade" }),
     printedAt: timestamp("printed_at"),
+    removedAt: timestamp("removed_at"),
+    removedByUserId: int("removed_by_user_id").references(() => users.id, { onDelete: "set null", onUpdate: "cascade" }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
   },
@@ -243,6 +256,7 @@ export const auditLogs = mysqlTable(
     userId: int("user_id").references(() => users.id, { onDelete: "set null", onUpdate: "cascade" }),
     schoolId: int("school_id").references(() => schools.id, { onDelete: "set null", onUpdate: "cascade" }),
     action: varchar("action", { length: 128 }).notNull(),
+    actorRole: varchar("actor_role", { length: 64 }),
     entityType: varchar("entity_type", { length: 64 }).notNull(),
     entityId: int("entity_id"),
     oldValues: json("old_values"),
@@ -268,10 +282,72 @@ export const passwordResets = mysqlTable(
   (table) => [index("password_resets_user_idx").on(table.userId), index("password_resets_expires_idx").on(table.expiresAt), index("password_resets_prefix_idx").on(table.tokenPrefix)],
 );
 
+export const orders = mysqlTable(
+  "orders",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    orderNumber: varchar("order_number", { length: 64 }).notNull().unique(),
+    placedByUserId: int("placed_by_user_id").references(() => users.id, { onDelete: "set null", onUpdate: "cascade" }),
+    placedByRole: varchar("placed_by_role", { length: 64 }).notNull(),
+    placedByName: varchar("placed_by_name", { length: 191 }).notNull(),
+    schoolId: int("school_id").notNull().references(() => schools.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    orderType: mysqlEnum("order_type", orderTypeValues).notNull(),
+    hookType: varchar("hook_type", { length: 64 }),
+    clip: boolean("clip").default(false).notNull(),
+    className: varchar("class_name", { length: 64 }),
+    section: varchar("section", { length: 64 }),
+    quantity: int("quantity").notNull(),
+    printSides: mysqlEnum("print_sides", printSideValues).notNull(),
+    cardMaterial: mysqlEnum("card_material", cardMaterialValues).notNull(),
+    lanyardIncluded: boolean("lanyard_included").default(false).notNull(),
+    lanyardColor: varchar("lanyard_color", { length: 64 }),
+    neededByDate: varchar("needed_by_date", { length: 32 }),
+    deliveryAddress: text("delivery_address"),
+    contactPerson: varchar("contact_person", { length: 191 }),
+    contactPhone: varchar("contact_phone", { length: 32 }),
+    notes: text("notes"),
+    status: mysqlEnum("status", orderStatusValues).default("PLACED").notNull(),
+    statusNote: text("status_note"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    index("orders_school_idx").on(table.schoolId),
+    index("orders_placed_by_idx").on(table.placedByUserId),
+    index("orders_status_idx").on(table.status),
+    index("orders_created_at_idx").on(table.createdAt),
+  ],
+);
+
+export const removedCardsHistory = mysqlTable(
+  "removed_cards_history",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    idCardId: int("id_card_id").notNull().references(() => idCards.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    schoolId: int("school_id").notNull().references(() => schools.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    cardNumber: varchar("card_number", { length: 64 }).notNull(),
+    studentName: varchar("student_name", { length: 191 }),
+    className: varchar("class_name", { length: 64 }),
+    section: varchar("section", { length: 64 }),
+    templateName: varchar("template_name", { length: 191 }),
+    previousStatus: varchar("previous_status", { length: 64 }).notNull(),
+    removedByUserId: int("removed_by_user_id").references(() => users.id, { onDelete: "set null", onUpdate: "cascade" }),
+    removedByName: varchar("removed_by_name", { length: 191 }),
+    removedByRole: varchar("removed_by_role", { length: 64 }),
+    removedAt: timestamp("removed_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("removed_cards_history_school_class_section_idx").on(table.schoolId, table.className, table.section),
+    index("removed_cards_history_removed_at_idx").on(table.removedAt),
+  ],
+);
+
 export const usersRelations = relations(users, ({ one, many }) => ({ school: one(schools, { fields: [users.schoolId], references: [schools.id] }), permissions: many(schoolPermissions) }));
-export const schoolsRelations = relations(schools, ({ many }) => ({ users: many(users), permissions: many(schoolPermissions), templates: many(schoolTemplates), cards: many(idCards), requests: many(idCardRequests) }));
+export const schoolsRelations = relations(schools, ({ many }) => ({ users: many(users), permissions: many(schoolPermissions), templates: many(schoolTemplates), cards: many(idCards), requests: many(idCardRequests), orders: many(orders), removedCards: many(removedCardsHistory) }));
 export const idCardTemplatesRelations = relations(idCardTemplates, ({ many }) => ({ elements: many(templateElements), schools: many(schoolTemplates), cards: many(idCards) }));
 export const idCardsRelations = relations(idCards, ({ one, many }) => ({ school: one(schools, { fields: [idCards.schoolId], references: [schools.id] }), template: one(idCardTemplates, { fields: [idCards.templateId], references: [idCardTemplates.id] }), data: many(idCardData), files: many(idCardFiles), approvals: many(approvalHistory) }));
+export const ordersRelations = relations(orders, ({ one }) => ({ school: one(schools, { fields: [orders.schoolId], references: [schools.id] }), placedByUser: one(users, { fields: [orders.placedByUserId], references: [users.id] }) }));
+export const removedCardsHistoryRelations = relations(removedCardsHistory, ({ one }) => ({ school: one(schools, { fields: [removedCardsHistory.schoolId], references: [schools.id] }), idCard: one(idCards, { fields: [removedCardsHistory.idCardId], references: [idCards.id] }), removedByUser: one(users, { fields: [removedCardsHistory.removedByUserId], references: [users.id] }) }));
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
@@ -283,3 +359,7 @@ export type IdCardRequest = typeof idCardRequests.$inferSelect;
 export type InsertIdCardRequest = typeof idCardRequests.$inferInsert;
 export type IdCard = typeof idCards.$inferSelect;
 export type InsertIdCard = typeof idCards.$inferInsert;
+export type Order = typeof orders.$inferSelect;
+export type InsertOrder = typeof orders.$inferInsert;
+export type RemovedCardHistory = typeof removedCardsHistory.$inferSelect;
+export type InsertRemovedCardHistory = typeof removedCardsHistory.$inferInsert;

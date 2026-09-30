@@ -103,11 +103,12 @@ export default function DeleteSchoolDialog({ school, onClose, onConfirm }: Delet
               )}
 
               {summary && (
-                <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="grid grid-cols-4 gap-2 text-center">
                   {[
                     ["ID cards", summary.cards],
                     ["Users", summary.users],
                     ["Requests", summary.requests],
+                    ["Orders", summary.orders ?? 0],
                   ].map(([label, value]) => (
                     <div key={String(label)} className="rounded-xl border border-red-100 bg-red-50 px-2 py-2">
                       <div className="text-lg font-extrabold text-red-600">{value}</div>

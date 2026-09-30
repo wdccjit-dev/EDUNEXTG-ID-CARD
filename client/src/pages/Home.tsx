@@ -51,10 +51,28 @@ import {
   Users,
   X,
   XCircle,
+  ShoppingCart,
+  Bell,
+  Package,
 } from "lucide-react";
 import SuperAdminProfileDialog from "@/components/SuperAdminProfileDialog";
 import AboutUsSection from "@/components/AboutUsSection";
 import AuditLogsSection from "@/components/AuditLogsSection";
+import MarketingOverview from "@/components/MarketingOverview";
+import CreateOrderView from "@/components/CreateOrderView";
+import OrderListView from "@/components/OrderListView";
+import RemovedCardsHistorySection from "@/components/RemovedCardsHistorySection";
+import NotificationsView from "@/components/NotificationsView";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -107,6 +125,7 @@ const navItems = [
   { label: "ID card templates", icon: Palette },
   { label: "ID card requests", icon: ClipboardCheck },
   { label: "Approved cards", icon: FileCheck2 },
+  { label: "Orders", icon: ShoppingCart },
   { label: "Reports", icon: Grid2X2 },
   { label: "Users", icon: Users },
   { label: "Audit logs", icon: BookOpenCheck },
@@ -134,7 +153,11 @@ type NavLabel =
   | "Reports"
   | "Users"
   | "Audit logs"
-  | "About Us";
+  | "About Us"
+  | "Orders"
+  | "Create Order"
+  | "Order List"
+  | "Notifications";
 
 type Tone = "teal" | "coral" | "indigo" | "yellow";
 
@@ -255,13 +278,14 @@ export default function Home({
   initialNav = "Overview",
 }: {
   authenticatedUser: ApiAuthUser;
-  portal: "admin" | "school";
+  portal: "admin" | "school" | "marketing";
   initialNav?: string;
 }) {
   const [authenticatedUser, setAuthenticatedUser] = useState<ApiAuthUser>(initialAuthenticatedUser);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
+  const [orderMenuOpen, setOrderMenuOpen] = useState(true);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -280,17 +304,36 @@ export default function Home({
   const [activeNav, setActiveNav] = useState<NavLabel>(
     (initialNav as NavLabel) || "Overview",
   );
+
+  // Guard for marketing admin: prevent viewing templates, requests, schools, etc.
+  useEffect(() => {
+    if (portal === "marketing") {
+      const allowed = ["Overview", "Orders", "Create Order", "Order List", "Notifications"];
+      if (!allowed.includes(activeNav)) {
+        setActiveNav("Overview");
+      }
+    }
+  }, [portal, activeNav]);
+
   const visibleNavItems =
-    portal === "admin"
+    portal === "marketing"
+      ? [
+          { label: "Overview", icon: LayoutDashboard },
+          { label: "Orders", icon: ShoppingCart },
+          { label: "Notifications", icon: Bell },
+        ]
+      : portal === "admin"
       ? navItems
       : navItems.filter(({ label }) =>
-        [
-          "Overview",
-          "ID card templates",
-          "ID card requests",
-          "Approved cards",
-        ].includes(label),
-      );
+          [
+            "Overview",
+            "ID card templates",
+            "ID card requests",
+            "Approved cards",
+            "Orders",
+            "Reports",
+          ].includes(label),
+        );
   const [query, setQuery] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [filter, setFilter] = useState<"All" | "Pending" | "Changes required" | "Rejected">(
@@ -356,8 +399,8 @@ export default function Home({
   const [userNameInput, setUserNameInput] = useState("");
   const [userEmailInput, setUserEmailInput] = useState("");
   const [userPasswordInput, setUserPasswordInput] = useState("");
-  const [userRoleInput, setUserRoleInput] = useState<"SCHOOL_ADMIN" | "SCHOOL_OPERATOR" | "VIEWER">("SCHOOL_OPERATOR");
-  const [userSchoolIdInput, setUserSchoolIdInput] = useState<number | null>(null);
+  const [userRoleInput, setUserRoleInput] = useState<"SUPER_ADMIN" | "SCHOOL_ADMIN" | "MARKETING_ADMIN">("SCHOOL_ADMIN");
+  const [userSchoolIdInput, setUserSchoolIdInput] = useState<string>("");
 
   // ID Card form & editing
   const [idCardFormOpen, setIdCardFormOpen] = useState(false);
@@ -792,14 +835,14 @@ export default function Home({
   };
 
   const openCreateUser = () => {
-    if (authenticatedUser.role === "VIEWER") {
-      return toast.error("Viewer accounts cannot create users");
+    if (authenticatedUser.role !== "SUPER_ADMIN") {
+      return toast.error("Only administrators can create users");
     }
     setUserNameInput("");
     setUserEmailInput("");
     setUserPasswordInput("");
-    setUserRoleInput("SCHOOL_OPERATOR");
-    setUserSchoolIdInput(activeSchoolId ?? schools[0]?.id ?? null);
+    setUserRoleInput("SCHOOL_ADMIN");
+    setUserSchoolIdInput(activeSchoolId ? String(activeSchoolId) : schools[0] ? String(schools[0].id) : "");
     setUserModalOpen(true);
   };
 
@@ -811,9 +854,8 @@ export default function Home({
     if (userPasswordInput.length < 8) {
       return toast.error("Password must be at least 8 characters");
     }
-    const targetSchoolId = authenticatedUser.role === "SUPER_ADMIN" ? userSchoolIdInput : activeSchoolId;
-    if (!targetSchoolId) {
-      return toast.error("Please select a school for this user");
+    if (userRoleInput === "SCHOOL_ADMIN" && (!userSchoolIdInput || !Number(userSchoolIdInput))) {
+      return toast.error("Please select a school for the School Admin");
     }
     try {
       const created = await api.users.create({
@@ -821,7 +863,7 @@ export default function Home({
         email: userEmailInput.trim().toLowerCase(),
         password: userPasswordInput,
         role: userRoleInput,
-        schoolId: targetSchoolId,
+        schoolId: userRoleInput === "SCHOOL_ADMIN" ? Number(userSchoolIdInput) : undefined,
       });
       setUsers((prev) => [created, ...prev]);
       setUserModalOpen(false);
@@ -1011,6 +1053,13 @@ export default function Home({
     setSelectedApprovedCardIds((prev) =>
       prev.length === allIds.length ? [] : [...allIds],
     );
+  };
+
+  const handleRemoveApprovedCards = async (cardIds: number[]) => {
+    const res = await api.idCards.bulkRemoveApproved(cardIds);
+    setIdCards((prev) => prev.filter((c) => !cardIds.includes(c.id)));
+    setSelectedApprovedCardIds((prev) => prev.filter((id) => !cardIds.includes(id)));
+    toast.success(`Removed ${res.removedCount} card(s) from Approved cards. Moved to Reports history.`);
   };
 
   const handleToggleSelectRequest = (cardId: number) => {
@@ -1242,7 +1291,7 @@ export default function Home({
                 </span>
               </div>
               <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#7fa09c] mt-0.5">
-                {portal === "admin" ? "admin console" : "school portal"}
+                {portal === "admin" ? "admin console" : portal === "marketing" ? "marketing portal" : "school portal"}
               </div>
             </div>
           </div>
@@ -1260,6 +1309,68 @@ export default function Home({
           </div>
           <nav className="space-y-1">
             {visibleNavItems.map(({ label, icon: Icon }) => {
+              if (label === "Orders") {
+                const isOrderActive = activeNav === "Create Order" || activeNav === "Order List";
+                return (
+                  <div key="Orders" className="space-y-1">
+                    <button
+                      type="button"
+                      onClick={() => setOrderMenuOpen((prev) => !prev)}
+                      className={`group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-[12px] font-semibold transition-colors ${
+                        isOrderActive
+                          ? "bg-[#1b3a3a] text-white"
+                          : "text-[#99b6b2] hover:bg-[#1b3a3a] hover:text-white"
+                      }`}
+                    >
+                      <ShoppingCart
+                        className={`h-[17px] w-[17px] ${isOrderActive ? "text-[#0f7f79]" : "text-[#779b96]"}`}
+                        strokeWidth={isOrderActive ? 2.3 : 1.8}
+                      />
+                      <span className="flex-1">Order</span>
+                      <ChevronDown
+                        className={`h-4 w-4 transition-transform text-[#779b96] ${orderMenuOpen ? "rotate-180" : ""}`}
+                      />
+                    </button>
+                    {orderMenuOpen && (
+                      <div className="pl-6 space-y-1">
+                        <button
+                          type="button"
+                          onClick={() => goTo("Create Order")}
+                          className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[11px] font-semibold transition-colors ${
+                            activeNav === "Create Order"
+                              ? "bg-[#dff3ee] text-[#123b3b]"
+                              : "text-[#8ea9a5] hover:bg-[#183434] hover:text-white"
+                          }`}
+                        >
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full ${
+                              activeNav === "Create Order" ? "bg-[#0f7f79]" : "bg-[#597874]"
+                            }`}
+                          />
+                          <span>Create Order</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => goTo("Order List")}
+                          className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[11px] font-semibold transition-colors ${
+                            activeNav === "Order List"
+                              ? "bg-[#dff3ee] text-[#123b3b]"
+                              : "text-[#8ea9a5] hover:bg-[#183434] hover:text-white"
+                          }`}
+                        >
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full ${
+                              activeNav === "Order List" ? "bg-[#0f7f79]" : "bg-[#597874]"
+                            }`}
+                          />
+                          <span>Order List</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
               const active = activeNav === label;
               const displayLabel =
                 authenticatedUser.role !== "SUPER_ADMIN"
@@ -1444,7 +1555,7 @@ export default function Home({
                     type="button"
                     onClick={() => {
                       setProfileMenuOpen(false);
-                      if (authenticatedUser.role === "SUPER_ADMIN") {
+                      if (authenticatedUser.role === "SUPER_ADMIN" || authenticatedUser.role === "MARKETING_ADMIN") {
                         setProfileModalOpen(true);
                       } else {
                         toast.info("Profile details are managed by your administrator.");
@@ -1475,6 +1586,13 @@ export default function Home({
 
         <div className="mx-auto max-w-[1440px] px-4 pb-12 pt-6 sm:px-6 lg:px-9">
           {activeNav === "Overview" ? (
+            portal === "marketing" ? (
+              <MarketingOverview
+                user={authenticatedUser}
+                onNavigate={(tab) => goTo(tab)}
+                onViewOrder={() => goTo("Order List")}
+              />
+            ) : (
             <>
               <section className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
                 <div>
@@ -2053,8 +2171,25 @@ export default function Home({
                 )}
               </section>
             </>
+            )
           ) : activeNav === "About Us" ? (
             <AboutUsSection />
+          ) : activeNav === "Create Order" ? (
+            <CreateOrderView
+              user={authenticatedUser}
+              schools={schools}
+              activeSchool={currentActiveSchool}
+              onSuccess={() => goTo("Order List")}
+              onCancel={() => goTo(portal === "marketing" ? "Overview" : "Order List")}
+            />
+          ) : activeNav === "Order List" ? (
+            <OrderListView
+              user={authenticatedUser}
+              schools={schools}
+              onCreateNew={() => goTo("Create Order")}
+            />
+          ) : activeNav === "Notifications" ? (
+            <NotificationsView />
           ) : (
             <ModuleView
               label={activeNav}
@@ -2109,13 +2244,14 @@ export default function Home({
               onRejectCardDirect={(id: number) => handleOpenReview(id)}
               onOpenExcelUpload={() => setExcelUploadOpen(true)}
               onDownloadExampleExcel={handleDownloadExampleExcel}
+              onRemoveApproved={handleRemoveApprovedCards}
             />
           )}
         </div>
       </main>
 
-      {/* Super Admin Profile Management Dialog */}
-      {authenticatedUser.role === "SUPER_ADMIN" && (
+      {/* Super Admin & Marketing Admin Profile Management Dialog */}
+      {(authenticatedUser.role === "SUPER_ADMIN" || authenticatedUser.role === "MARKETING_ADMIN") && (
         <SuperAdminProfileDialog
           open={profileModalOpen}
           onOpenChange={setProfileModalOpen}
@@ -2343,23 +2479,24 @@ export default function Home({
                     <SelectValue placeholder="Select role" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="SCHOOL_OPERATOR">School Operator (Create & Submit cards)</SelectItem>
-                    <SelectItem value="SCHOOL_ADMIN">School Admin (Manage templates & users)</SelectItem>
-                    <SelectItem value="VIEWER">Viewer (Read-only)</SelectItem>
+                    <SelectItem value="SUPER_ADMIN">Admin (SUPER_ADMIN)</SelectItem>
+                    <SelectItem value="SCHOOL_ADMIN">School Admin (SCHOOL_ADMIN)</SelectItem>
+                    <SelectItem value="MARKETING_ADMIN">Marketing Admin (MARKETING_ADMIN)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              {authenticatedUser.role === "SUPER_ADMIN" ? (
+
+              {userRoleInput === "SCHOOL_ADMIN" && (
                 <div>
                   <label className="text-xs font-bold text-[#304541]">
-                    Assign School
+                    Assign School <span className="text-red-500">*</span>
                   </label>
                   <Select
-                    value={userSchoolIdInput ? String(userSchoolIdInput) : ""}
-                    onValueChange={(val) => setUserSchoolIdInput(Number(val))}
+                    value={userSchoolIdInput}
+                    onValueChange={(val: string) => setUserSchoolIdInput(val)}
                   >
                     <SelectTrigger className="mt-1 w-full">
-                      <SelectValue placeholder="Select school" />
+                      <SelectValue placeholder="Select school for School Admin" />
                     </SelectTrigger>
                     <SelectContent>
                       {schools.map((s) => (
@@ -2369,10 +2506,9 @@ export default function Home({
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
-              ) : (
-                <div className="rounded-xl bg-[#eef7f3] p-3 text-xs text-[#0f7f79]">
-                  <strong>School:</strong> {authenticatedUser.schoolName ?? `School #${authenticatedUser.schoolId}`}
+                  <p className="mt-1 text-[11px] text-[#788784]">
+                    The School Admin will manage cards, orders, and approvals for this school.
+                  </p>
                 </div>
               )}
             </div>
@@ -3194,6 +3330,7 @@ function ModuleView({
   onRejectCardDirect,
   onOpenExcelUpload,
   onDownloadExampleExcel,
+  onRemoveApproved,
 }: {
   label: NavLabel;
   onBack: () => void;
@@ -3237,10 +3374,15 @@ function ModuleView({
   onRejectCardDirect?: (cardId: number) => void;
   onOpenExcelUpload?: () => void;
   onDownloadExampleExcel?: (templateId?: number) => void;
+  onRemoveApproved?: (cardIds: number[]) => Promise<void>;
 }) {
   const [, navigate] = useLocation();
   const [cardStatusFilter, setCardStatusFilter] = useState<string>("All");
   const [searchTerm, setSearchTerm] = useState("");
+  const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false);
+  const [cardsPendingRemove, setCardsPendingRemove] = useState<number[]>([]);
+  const [removingCards, setRemovingCards] = useState(false);
+  const [reportsTab, setReportsTab] = useState<"general" | "removed_history">("removed_history");
 
   const isTemplates = label === "ID card templates";
   const isSchools = label === "Schools";
@@ -3886,46 +4028,69 @@ function ModuleView({
               />
             </div>
 
-            {/* Bulk Actions Toolbar (Admin only) */}
-            {authenticatedUser.role === "SUPER_ADMIN" && (
-              <div className="flex flex-wrap items-center gap-2">
+            {/* Bulk Actions Toolbar */}
+            <div className="flex flex-wrap items-center gap-2">
+              {selectedApprovedCardIds.length > 0 && (
                 <span className="text-xs font-semibold text-[#84918e] mr-1">
-                  {selectedApprovedCardIds.length} of {approvedCards.length} selected
+                  {selectedApprovedCardIds.length} card(s) selected
                 </span>
+              )}
+              {selectedApprovedCardIds.length > 0 && (
                 <Button
                   variant="outline"
-                  onClick={onBulkPrint}
-                  disabled={selectedApprovedCardIds.length === 0}
-                  className="h-9 sm:h-10 rounded-xl text-xs font-bold border-[#e2e8e3]"
+                  onClick={() => {
+                    setCardsPendingRemove(selectedApprovedCardIds);
+                    setRemoveConfirmOpen(true);
+                  }}
+                  className="h-9 sm:h-10 rounded-xl text-xs font-bold border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
                 >
-                  <Printer className="w-4 h-4 mr-1.5 text-[#0f7f79]" /> Bulk Print
+                  <Trash2 className="w-4 h-4 mr-1.5" /> Remove ({selectedApprovedCardIds.length})
                 </Button>
-                <Button
-                  onClick={onBulkPdf}
-                  disabled={selectedApprovedCardIds.length === 0}
-                  className="h-9 sm:h-10 rounded-xl bg-[#0f7f79] hover:bg-[#096c67] text-xs font-bold text-white"
-                >
-                  <Download className="w-4 h-4 mr-1.5" /> Download PDF
-                </Button>
-              </div>
-            )}
+              )}
+              {authenticatedUser.role === "SUPER_ADMIN" && (
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={onBulkPrint}
+                    disabled={selectedApprovedCardIds.length === 0}
+                    className="h-9 sm:h-10 rounded-xl text-xs font-bold border-[#e2e8e3]"
+                  >
+                    <Printer className="w-4 h-4 mr-1.5 text-[#0f7f79]" /> Bulk Print
+                  </Button>
+                  <Button
+                    onClick={onBulkPdf}
+                    disabled={selectedApprovedCardIds.length === 0}
+                    className="h-9 sm:h-10 rounded-xl bg-[#0f7f79] hover:bg-[#096c67] text-xs font-bold text-white"
+                  >
+                    <Download className="w-4 h-4 mr-1.5" /> Download PDF
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
 
           <div className="overflow-x-auto [scrollbar-width:thin] max-w-full">
             <table className="w-full text-left text-xs min-w-[640px]">
               <thead className="bg-[#f8faf8] border-b border-[#edf0ed] text-[#84918e] uppercase tracking-wider font-semibold">
                 <tr>
-                  {authenticatedUser.role === "SUPER_ADMIN" && (
-                    <th className="px-5 py-3.5 w-12 text-center">
-                      <Checkbox
-                        checked={
-                          allApprovedCardIds.length > 0 &&
-                          selectedApprovedCardIds.length === allApprovedCardIds.length
+                  <th className="px-5 py-3.5 w-12 text-center">
+                    <Checkbox
+                      checked={
+                        paginatedApprovedCards.length > 0 &&
+                        paginatedApprovedCards.every((c) => selectedApprovedCardIds.includes(c.id))
+                      }
+                      onCheckedChange={() => {
+                        const pageIds = paginatedApprovedCards.map((c) => c.id);
+                        const allSelected = pageIds.length > 0 && pageIds.every((id) => selectedApprovedCardIds.includes(id));
+                        if (allSelected) {
+                          onSelectAllApproved(selectedApprovedCardIds.filter((id) => !pageIds.includes(id)));
+                        } else {
+                          const union = Array.from(new Set([...selectedApprovedCardIds, ...pageIds]));
+                          onSelectAllApproved(union);
                         }
-                        onCheckedChange={() => onSelectAllApproved(allApprovedCardIds)}
-                      />
-                    </th>
-                  )}
+                      }}
+                    />
+                  </th>
                   <th className="px-5 py-3.5">Card Number</th>
                   <th className="px-5 py-3.5">School</th>
                   <th className="px-5 py-3.5">Template</th>
@@ -3936,21 +4101,19 @@ function ModuleView({
               <tbody className="divide-y divide-[#edf0ed]">
                 {paginatedApprovedCards.length === 0 ? (
                   <tr>
-                    <td colSpan={authenticatedUser.role === "SUPER_ADMIN" ? 6 : 5} className="px-5 py-10 text-center text-[#98a4a1]">
+                    <td colSpan={6} className="px-5 py-10 text-center text-[#98a4a1]">
                       No approved cards found. Submit cards and approve them to view here.
                     </td>
                   </tr>
                 ) : (
                   paginatedApprovedCards.map((card) => (
                     <tr key={card.id} className="hover:bg-[#fbfdfb] transition-colors">
-                      {authenticatedUser.role === "SUPER_ADMIN" && (
-                        <td className="px-5 py-4 text-center">
-                          <Checkbox
-                            checked={selectedApprovedCardIds.includes(card.id)}
-                            onCheckedChange={() => onToggleSelectApproved(card.id)}
-                          />
-                        </td>
-                      )}
+                      <td className="px-5 py-4 text-center">
+                        <Checkbox
+                          checked={selectedApprovedCardIds.includes(card.id)}
+                          onCheckedChange={() => onToggleSelectApproved(card.id)}
+                        />
+                      </td>
                       <td className="px-5 py-4 font-mono font-bold text-[#203734]">
                         {card.cardNumber}
                       </td>
@@ -3981,6 +4144,16 @@ function ModuleView({
                           >
                             <Eye className="inline w-3 h-3 mr-1" /> View
                           </button>
+                          <button
+                            onClick={() => {
+                              setCardsPendingRemove([card.id]);
+                              setRemoveConfirmOpen(true);
+                            }}
+                            className="rounded-lg bg-red-50 px-2.5 py-1.5 text-[11px] font-bold text-red-600 hover:bg-red-100"
+                            title="Remove from approved cards"
+                          >
+                            <Trash2 className="inline w-3 h-3 mr-1" /> Remove
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -3989,6 +4162,42 @@ function ModuleView({
               </tbody>
             </table>
           </div>
+
+          {/* Plain confirmation dialog for card removal */}
+          <AlertDialog open={removeConfirmOpen} onOpenChange={setRemoveConfirmOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>
+                  Remove {cardsPendingRemove.length} card{cardsPendingRemove.length === 1 ? "" : "s"} from Approved cards?
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  They will be moved to Reports as history.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={removingCards}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={async () => {
+                    try {
+                      setRemovingCards(true);
+                      await onRemoveApproved?.(cardsPendingRemove);
+                      setRemoveConfirmOpen(false);
+                    } catch (err) {
+                      toast.error("Failed to remove cards", {
+                        description: err instanceof Error ? err.message : "Error",
+                      });
+                    } finally {
+                      setRemovingCards(false);
+                    }
+                  }}
+                  disabled={removingCards}
+                  className="bg-red-600 hover:bg-red-700 text-white font-bold"
+                >
+                  {removingCards ? "Removing..." : "Remove"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
           {totalApprovedPages > 1 && (
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-t border-[#edf0ed] bg-[#fbfdfb]">
@@ -4238,8 +4447,44 @@ function ModuleView({
         </Card>
       )}
 
-      {/* 7. Users & Reports Standard Tables */}
-      {(isUsers || label === "Reports") && (
+      {/* 7. Reports module */}
+      {label === "Reports" && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 border-b border-[#edf0ed] pb-3">
+            <button
+              onClick={() => setReportsTab("removed_history")}
+              className={`rounded-xl px-4 py-2 text-xs font-bold transition-all ${
+                reportsTab === "removed_history"
+                  ? "bg-[#0f7f79] text-white shadow-2xs"
+                  : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
+              }`}
+            >
+              Removed Cards History
+            </button>
+            <button
+              onClick={() => setReportsTab("general")}
+              className={`rounded-xl px-4 py-2 text-xs font-bold transition-all ${
+                reportsTab === "general"
+                  ? "bg-[#0f7f79] text-white shadow-2xs"
+                  : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
+              }`}
+            >
+              General Reports
+            </button>
+          </div>
+
+          {reportsTab === "removed_history" ? (
+            <RemovedCardsHistorySection user={authenticatedUser} schools={schools} />
+          ) : (
+            <Card className="rounded-2xl border-[#e2e8e3] bg-white p-8 text-center text-xs text-gray-500 shadow-2xs">
+              System analytics and card generation summary reports.
+            </Card>
+          )}
+        </div>
+      )}
+
+      {/* 8. Users Standard Table */}
+      {isUsers && (
         <Card className="rounded-2xl border-[#e2e8e3] bg-[#fffefa] shadow-[0_12px_35px_rgba(38,71,65,0.05)]">
           <div className="flex flex-col gap-3 border-b border-[#edf0ed] p-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="relative w-full max-w-sm">
@@ -4253,101 +4498,101 @@ function ModuleView({
             </div>
           </div>
           <div className="divide-y divide-[#edf0ed]">
-            {isUsers ? (
-              <>
-                <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-[#fbfdfb] border-b border-[#edf0ed]">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-bold text-[#4e5c59] mr-1">Role:</span>
-                    {["All", "SUPER_ADMIN", "SCHOOL_ADMIN", "VIEWER"].map((role) => (
-                      <button
-                        key={role}
-                        onClick={() => {
-                          setUserRoleFilter(role);
-                          setUsersPage(1);
-                        }}
-                        className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${userRoleFilter === role
-                          ? "bg-[#0f7f79] text-white shadow-sm"
-                          : "bg-[#edf3f0] text-[#55605d] hover:bg-[#e2ebe6]"
-                          }`}
-                      >
-                        {role === "All" ? "All Roles" : role.replace(/_/g, " ")}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="text-xs text-[#788784]">
-                    Showing <b>{filteredUsers.length}</b> {filteredUsers.length === 1 ? "user" : "users"}
-                  </div>
-                </div>
+            <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-[#fbfdfb] border-b border-[#edf0ed]">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-[#4e5c59] mr-1">Role:</span>
+                {["All", "SUPER_ADMIN", "SCHOOL_ADMIN", "MARKETING_ADMIN", "VIEWER"].map((role) => (
+                  <button
+                    key={role}
+                    onClick={() => {
+                      setUserRoleFilter(role);
+                      setUsersPage(1);
+                    }}
+                    className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${userRoleFilter === role
+                      ? "bg-[#0f7f79] text-white shadow-sm"
+                      : "bg-[#edf3f0] text-[#55605d] hover:bg-[#e2ebe6]"
+                      }`}
+                  >
+                    {role === "All" ? "All Roles" : role === "MARKETING_ADMIN" ? "Marketing Admin" : role.replace(/_/g, " ")}
+                  </button>
+                ))}
+              </div>
+              <div className="text-xs text-[#788784]">
+                Showing <b>{filteredUsers.length}</b> {filteredUsers.length === 1 ? "user" : "users"}
+              </div>
+            </div>
 
-                {paginatedUsers.length === 0 ? (
-                  <div className="p-8 text-center text-xs text-[#98a4a1]">
-                    No users matching the selected filter or search term.
-                  </div>
-                ) : (
-                  paginatedUsers.map((user) => (
-                    <div key={user.id} className="flex items-center justify-between p-4 hover:bg-[#fbfdfb] transition-colors">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#e9ebfa] text-[#5c64b7] font-bold text-xs shrink-0">
-                          {user.name ? user.name[0]?.toUpperCase() : "U"}
-                        </div>
-                        <div>
-                          <div className="text-sm font-extrabold text-[#304541] flex items-center gap-2">
-                            {user.name || user.email || user.openId}
-                            {user.schoolId && (
-                              <span className="text-[10px] font-semibold text-[#0f7f79] bg-[#eef7f4] px-2 py-0.5 rounded-full">
-                                School #{user.schoolId}
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-[11px] text-[#8d9995] flex flex-wrap items-center gap-2">
-                            <span>Login ID: <b className="font-mono text-[#4e5c59]">{user.openId}</b></span>
-                            {user.email ? (
-                              <>
-                                <span>·</span>
-                                <span>{user.email}</span>
-                              </>
-                            ) : null}
-                          </div>
-                        </div>
-                      </div>
-                      <StatusPill tone={user.role === "SUPER_ADMIN" ? "indigo" : "teal"}>
-                        {user.role.replace(/_/g, " ")}
-                      </StatusPill>
-                    </div>
-                  ))
-                )}
-
-                {totalUserPages > 1 && (
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-t border-[#edf0ed] bg-[#fbfdfb]">
-                    <div className="text-xs text-[#788784]">
-                      Page {usersPage} of {totalUserPages}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={usersPage <= 1}
-                        onClick={() => setUsersPage((p) => Math.max(1, p - 1))}
-                        className="h-8 rounded-lg text-xs font-bold"
-                      >
-                        Previous
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={usersPage >= totalUserPages}
-                        onClick={() => setUsersPage((p) => Math.min(totalUserPages, p + 1))}
-                        className="h-8 rounded-lg text-xs font-bold"
-                      >
-                        Next
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </>
+            {paginatedUsers.length === 0 ? (
+              <div className="p-8 text-center text-xs text-[#98a4a1]">
+                No users matching the selected filter or search term.
+              </div>
             ) : (
-              <div className="px-5 py-10 text-center text-[#98a4a1] text-xs">
-                Analytics and summary export reports module.
+              paginatedUsers.map((user) => (
+                <div key={user.id} className="flex items-center justify-between p-4 hover:bg-[#fbfdfb] transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#e9ebfa] text-[#5c64b7] font-bold text-xs shrink-0">
+                      {user.name ? user.name[0]?.toUpperCase() : "U"}
+                    </div>
+                    <div>
+                      <div className="text-sm font-extrabold text-[#304541] flex items-center gap-2">
+                        {user.name || user.email || user.openId}
+                        {user.schoolId && (
+                          <span className="text-[10px] font-semibold text-[#0f7f79] bg-[#eef7f4] px-2 py-0.5 rounded-full">
+                            School #{user.schoolId}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-[#8d9995] flex flex-wrap items-center gap-2">
+                        <span>Login ID: <b className="font-mono text-[#4e5c59]">{user.openId}</b></span>
+                        {user.email ? (
+                          <>
+                            <span>·</span>
+                            <span>{user.email}</span>
+                          </>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                  <StatusPill
+                    tone={
+                      user.role === "SUPER_ADMIN"
+                        ? "indigo"
+                        : user.role === "MARKETING_ADMIN"
+                        ? "yellow"
+                        : "teal"
+                    }
+                  >
+                    {user.role === "MARKETING_ADMIN" ? "Marketing Admin" : user.role.replace(/_/g, " ")}
+                  </StatusPill>
+                </div>
+              ))
+            )}
+
+            {totalUserPages > 1 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-t border-[#edf0ed] bg-[#fbfdfb]">
+                <div className="text-xs text-[#788784]">
+                  Page {usersPage} of {totalUserPages}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={usersPage <= 1}
+                    onClick={() => setUsersPage((p) => Math.max(1, p - 1))}
+                    className="h-8 rounded-lg text-xs font-bold"
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={usersPage >= totalUserPages}
+                    onClick={() => setUsersPage((p) => Math.min(totalUserPages, p + 1))}
+                    className="h-8 rounded-lg text-xs font-bold"
+                  >
+                    Next
+                  </Button>
+                </div>
               </div>
             )}
           </div>

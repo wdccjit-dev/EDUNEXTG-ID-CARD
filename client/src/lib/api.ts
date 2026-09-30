@@ -4,6 +4,8 @@ export type ApiSchoolDeletionSummary = {
   cards: number;
   users: number;
   requests: number;
+  orders?: number;
+  removedCards?: number;
 };
 
 export type ApiSchool = {
@@ -50,6 +52,8 @@ export type ApiIdCard = {
   createdAt: string;
   updatedAt: string;
   printedAt?: string | null;
+  removedAt?: string | null;
+  removedByUserId?: number | null;
   studentName?: string;
   schoolName?: string;
   templateName?: string;
@@ -115,6 +119,8 @@ export type ApiActivity = {
   userName?: string | null;
   userEmail?: string | null;
   userRole?: string | null;
+  actorRole?: string | null;
+  isMarketing?: boolean;
   schoolId: number | null;
   schoolName?: string | null;
   schoolCode?: string | null;
@@ -134,10 +140,56 @@ export type ApiAuthUser = {
   email: string | null;
   phone?: string | null;
   avatarUrl?: string | null;
-  role: "SUPER_ADMIN" | "SCHOOL_ADMIN" | "SCHOOL_OPERATOR" | "VIEWER";
+  role: "SUPER_ADMIN" | "SCHOOL_ADMIN" | "SCHOOL_OPERATOR" | "VIEWER" | "MARKETING_ADMIN";
   schoolId: number | null;
   schoolName?: string | null;
   isActive: boolean;
+};
+
+export type ApiOrder = {
+  id: number;
+  orderNumber: string;
+  placedByUserId: number | null;
+  placedByRole: string;
+  placedByName: string;
+  schoolId: number;
+  schoolName?: string | null;
+  orderType: "STUDENT" | "STAFF";
+  hookType?: string | null;
+  clip: boolean;
+  className?: string | null;
+  section?: string | null;
+  quantity: number;
+  printSides: "SINGLE" | "DOUBLE";
+  cardMaterial: "PVC_STANDARD" | "PVC_PREMIUM";
+  lanyardIncluded: boolean;
+  lanyardColor?: string | null;
+  neededByDate?: string | null;
+  deliveryAddress?: string | null;
+  contactPerson?: string | null;
+  contactPhone?: string | null;
+  notes?: string | null;
+  status: "PLACED" | "CONFIRMED" | "IN_PRODUCTION" | "DISPATCHED" | "DELIVERED" | "CANCELLED";
+  statusNote?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ApiRemovedCard = {
+  id: number;
+  idCardId: number;
+  schoolId: number;
+  schoolName?: string | null;
+  cardNumber: string;
+  studentName?: string | null;
+  className?: string | null;
+  section?: string | null;
+  templateName?: string | null;
+  previousStatus: string;
+  removedByUserId: number | null;
+  removedByName?: string | null;
+  removedByRole?: string | null;
+  removedAt: string;
 };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -212,6 +264,11 @@ export const api = {
     submit: (id: number) => request<{ success: true; requestId?: number; status: string }>(`/api/id-cards/${id}/submit`, json({})),
     approve: (id: number) => request<{ success: true; status: string }>(`/api/id-cards/${id}/approve`, json({})),
     reject: (id: number, reason: string) => request<{ success: true; status: string }>(`/api/id-cards/${id}/reject`, json({ reason })),
+    bulkRemoveApproved: (cardIds: number[]) =>
+      request<{ success: true; removedCount: number; skippedCount: number; removedCardIds: number[] }>(
+        "/api/id-cards/bulk-remove-approved",
+        json({ cardIds }),
+      ),
     print: (id: number, mode: "FRONT_ONLY" | "BACK_ONLY" | "DUPLEX" = "DUPLEX") =>
       request<{ success: true; status: string; printedAt: string }>(`/api/id-cards/${id}/print`, json({ mode })),
     bulkPrint: (cardIds: number[], mode: "FRONT_ONLY" | "BACK_ONLY" | "DUPLEX" = "DUPLEX") =>
@@ -274,11 +331,108 @@ export const api = {
     clear: () => request<{ success: true; message: string }>("/api/notifications", { method: "DELETE" }),
   },
   auditLogs: {
-    list: () => request<ApiActivity[]>("/api/audit-logs"),
+    list: (params?: { schoolId?: number; marketing?: boolean | number }) => {
+      const qs = new URLSearchParams();
+      if (params?.schoolId) qs.set("schoolId", String(params.schoolId));
+      if (params?.marketing) qs.set("marketing", "1");
+      const q = qs.toString();
+      return request<ApiActivity[]>(`/api/audit-logs${q ? `?${q}` : ""}`);
+    },
     clear: () => request<{ success: true; message: string }>("/api/audit-logs", { method: "DELETE" }),
   },
-  upload: (filename: string, contentType: string, dataBase64: string) =>
-    request<{ url: string }>("/api/upload", json({ filename, contentType, dataBase64 })),
+  orders: {
+    list: (params?: {
+      page?: number;
+      pageSize?: number;
+      status?: string;
+      orderType?: string;
+      schoolId?: number;
+      placedByRole?: string;
+      from?: string;
+      to?: string;
+      search?: string;
+    }) => {
+      const qs = new URLSearchParams();
+      if (params?.page) qs.set("page", String(params.page));
+      if (params?.pageSize) qs.set("pageSize", String(params.pageSize));
+      if (params?.status && params.status !== "ALL") qs.set("status", params.status);
+      if (params?.orderType && params.orderType !== "ALL") qs.set("orderType", params.orderType);
+      if (params?.schoolId) qs.set("schoolId", String(params.schoolId));
+      if (params?.placedByRole && params.placedByRole !== "ALL") qs.set("placedByRole", params.placedByRole);
+      if (params?.from) qs.set("from", params.from);
+      if (params?.to) qs.set("to", params.to);
+      if (params?.search) qs.set("search", params.search);
+      const q = qs.toString();
+      return request<{ items: ApiOrder[]; total: number; page: number; pageSize: number; totalPages: number }>(
+        `/api/orders${q ? `?${q}` : ""}`,
+      );
+    },
+    create: (body: Partial<ApiOrder>) => request<ApiOrder>("/api/orders", json(body)),
+    get: (id: number) => request<ApiOrder>(`/api/orders/${id}`),
+    updateStatus: (id: number, payload: { status: string; statusNote?: string } | string, note?: string) => {
+      const body = typeof payload === "string" ? { status: payload, statusNote: note } : payload;
+      return request<ApiOrder>(`/api/orders/${id}/status`, patch(body));
+    },
+    cancel: (id: number, payload?: { reason?: string; statusNote?: string } | string) => {
+      const note = typeof payload === "string" ? payload : (payload?.reason || payload?.statusNote);
+      return request<ApiOrder>(`/api/orders/${id}/cancel`, patch({ statusNote: note }));
+    },
+    schools: () => request<Array<{ id: number; name: string; shortCode: string }>>("/api/orders/schools"),
+    activeSchools: () => request<Array<{ id: number; name: string; shortCode: string }>>("/api/orders/schools"),
+  },
+  reports: {
+    removedCards: (params?: {
+      page?: number;
+      pageSize?: number;
+      schoolId?: number;
+      className?: string;
+      section?: string;
+      search?: string;
+      from?: string;
+      to?: string;
+    }) => {
+      const qs = new URLSearchParams();
+      if (params?.page) qs.set("page", String(params.page));
+      if (params?.pageSize) qs.set("pageSize", String(params.pageSize));
+      if (params?.schoolId) qs.set("schoolId", String(params.schoolId));
+      if (params?.className && params.className !== "ALL") qs.set("className", params.className);
+      if (params?.section && params.section !== "ALL") qs.set("section", params.section);
+      if (params?.search) qs.set("search", params.search);
+      if (params?.from) qs.set("from", params.from);
+      if (params?.to) qs.set("to", params.to);
+      const q = qs.toString();
+      return request<{
+        items: ApiRemovedCard[];
+        total: number;
+        page: number;
+        pageSize: number;
+        totalPages: number;
+        classCounts: Record<string, number>;
+        sectionCounts: Record<string, number>;
+      }>(`/api/reports/removed-cards${q ? `?${q}` : ""}`);
+    },
+    exportRemovedCardsCsv: (params?: {
+      schoolId?: number;
+      className?: string;
+      section?: string;
+      search?: string;
+      from?: string;
+      to?: string;
+    }) => {
+      const qs = new URLSearchParams();
+      if (params?.schoolId) qs.set("schoolId", String(params.schoolId));
+      if (params?.className && params.className !== "ALL") qs.set("className", params.className);
+      if (params?.section && params.section !== "ALL") qs.set("section", params.section);
+      if (params?.search) qs.set("search", params.search);
+      if (params?.from) qs.set("from", params.from);
+      if (params?.to) qs.set("to", params.to);
+      qs.set("format", "csv");
+      const url = `/api/reports/removed-cards?${qs.toString()}`;
+      window.open(url, "_blank");
+    },
+  },
+  upload: (filename: string, contentType: string, dataBase64: string, opts?: { kind?: string; isCardPhoto?: boolean }) =>
+    request<{ url: string }>("/api/upload", json({ filename, contentType, dataBase64, ...opts })),
   profile: {
     get: () => request<ApiAuthUser>("/api/profile"),
     update: (data: { name?: string; email?: string; phone?: string }) =>

@@ -36,6 +36,8 @@ import {
   ZoomOut,
 } from "lucide-react";
 
+import { compressImage } from "@/lib/imageCompress";
+
 interface IdCardFormModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -71,6 +73,10 @@ export default function IdCardFormModal({
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [uploadingSig, setUploadingSig] = useState(false);
+  const [photoOptNote, setPhotoOptNote] = useState<string | null>(null);
+  const [sigOptNote, setSigOptNote] = useState<string | null>(null);
+  const [customOptNotes, setCustomOptNotes] = useState<Record<string, string>>({});
+  const [customOptimizing, setCustomOptimizing] = useState<Record<string, boolean>>({});
 
   const [activeSide, setActiveSide] = useState<"FRONT" | "BACK">("FRONT");
   const [zoomScale, setZoomScale] = useState(1);
@@ -275,47 +281,80 @@ export default function IdCardFormModal({
     setFormData((prev) => ({ ...prev, [key]: value }));
   };
 
-  // Upload file helper
+  // Upload file helper with browser-side resize & compression
   const handleFileUpload = async (
     file: File,
-    type: "photo" | "signature",
+    type: "photo" | "signature" | string,
   ) => {
-    if (!file.type.startsWith("image/")) {
-      return toast.error("Only image files (PNG, JPG, WebP) are allowed");
+    if (file.size > 15 * 1024 * 1024) {
+      return toast.error("File is too large (> 15MB). Please select an image under 15MB.");
     }
-    if (file.size > 5 * 1024 * 1024) {
-      return toast.error("Image file size must be less than 5MB");
+    const isSig = type === "signature";
+
+    if (type === "photo") {
+      setUploadingPhoto(true);
+      setPhotoOptNote(null);
+    } else if (isSig) {
+      setUploadingSig(true);
+      setSigOptNote(null);
+    } else {
+      setCustomOptimizing((p) => ({ ...p, [type]: true }));
+      setCustomOptNotes((p) => ({ ...p, [type]: "" }));
     }
 
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const dataUrl = reader.result as string;
-      const base64 = dataUrl.split(",")[1];
-      try {
-        if (type === "photo") setUploadingPhoto(true);
-        else setUploadingSig(true);
+    try {
+      const compressed = await compressImage(file, {
+        maxLongSide: isSig ? 400 : 640,
+        targetMaxBytes: 100 * 1024,
+        targetMinBytes: 25 * 1024,
+      });
 
-        const res = await api.upload(file.name, file.type, base64);
-        const uploadedUrl = res.url || dataUrl;
+      const origStr =
+        compressed.originalBytes >= 1024 * 1024
+          ? `${(compressed.originalBytes / (1024 * 1024)).toFixed(1)} MB`
+          : `${Math.round(compressed.originalBytes / 1024)} KB`;
+      const finalStr = `${Math.round(compressed.finalBytes / 1024)} KB`;
+      const optMessage = `Optimized ${origStr} to ${finalStr}`;
 
-        if (type === "photo") {
-          setPhotoUrl(uploadedUrl);
-          setFormData((prev) => ({ ...prev, photo: uploadedUrl, student_photo: uploadedUrl }));
-        } else {
-          setSignatureUrl(uploadedUrl);
-          setFormData((prev) => ({ ...prev, signature: uploadedUrl }));
-        }
-        toast.success(`${type === "photo" ? "Student photo" : "Signature"} uploaded successfully`);
-      } catch (err) {
-        toast.error("Upload failed", {
-          description: err instanceof Error ? err.message : "Network error",
-        });
-      } finally {
-        if (type === "photo") setUploadingPhoto(false);
-        else setUploadingSig(false);
+      if (type === "photo") {
+        setPhotoOptNote(optMessage);
+      } else if (isSig) {
+        setSigOptNote(optMessage);
+      } else {
+        setCustomOptNotes((p) => ({ ...p, [type]: optMessage }));
       }
-    };
-    reader.readAsDataURL(file);
+
+      const base64 = compressed.dataUrl.split(",")[1];
+      const uploadName = file.name.replace(/\.[^.]+$/, ".jpg");
+      const res = await api.upload(uploadName, "image/jpeg", base64);
+      const uploadedUrl = res.url || compressed.dataUrl;
+
+      if (type === "photo") {
+        setPhotoUrl(uploadedUrl);
+        setFormData((prev) => ({ ...prev, photo: uploadedUrl, student_photo: uploadedUrl }));
+      } else if (isSig) {
+        setSignatureUrl(uploadedUrl);
+        setFormData((prev) => ({ ...prev, signature: uploadedUrl }));
+      } else {
+        setFormData((prev) => ({ ...prev, [type]: uploadedUrl }));
+      }
+      toast.success(`${type === "photo" ? "Student photo" : isSig ? "Signature" : "Photo"} uploaded successfully`, {
+        description: optMessage,
+      });
+    } catch (err: any) {
+      const nameLower = file.name.toLowerCase();
+      if (nameLower.endsWith(".heic") || nameLower.endsWith(".heif") || (err?.message && err.message.toLowerCase().includes("heic"))) {
+        toast.error("HEIC format not supported by browser. Please choose JPEG or PNG.");
+      } else {
+        toast.error("Upload failed", {
+          description: err instanceof Error ? err.message : "Image processing error",
+        });
+      }
+    } finally {
+      if (type === "photo") setUploadingPhoto(false);
+      else if (isSig) setUploadingSig(false);
+      else setCustomOptimizing((p) => ({ ...p, [type]: false }));
+    }
   };
 
   // Save card (either as draft or save & submit)
@@ -529,23 +568,33 @@ export default function IdCardFormModal({
                           <span className="text-[10px] text-gray-400 font-medium">Photo</span>
                         )}
                         {uploadingPhoto && (
-                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                            <Loader2 className="h-4 w-4 animate-spin text-white" />
+                          <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center p-1 text-center">
+                            <Loader2 className="h-4 w-4 animate-spin text-white mb-0.5" />
+                            <span className="text-[8px] text-white font-medium leading-tight">Optimizing...</span>
                           </div>
                         )}
                       </div>
-                      <label className="cursor-pointer inline-flex items-center rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 shadow-2xs">
-                        Upload
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => {
-                            const f = e.target.files?.[0];
-                            if (f) handleFileUpload(f, "photo");
-                          }}
-                        />
-                      </label>
+                      <div className="flex flex-col gap-1">
+                        <label className="cursor-pointer inline-flex items-center rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 shadow-2xs w-fit">
+                          Upload
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              if (f) handleFileUpload(f, "photo");
+                            }}
+                          />
+                        </label>
+                        {uploadingPhoto ? (
+                          <span className="flex items-center gap-1 text-[11px] font-medium text-teal-700">
+                            <Loader2 className="h-3 w-3 animate-spin" /> Optimizing photo...
+                          </span>
+                        ) : photoOptNote ? (
+                          <span className="text-[11px] font-medium text-emerald-700">{photoOptNote}</span>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
 
@@ -563,23 +612,33 @@ export default function IdCardFormModal({
                           <span className="text-[10px] text-gray-400 font-medium">Signature</span>
                         )}
                         {uploadingSig && (
-                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                            <Loader2 className="h-4 w-4 animate-spin text-white" />
+                          <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center p-1 text-center">
+                            <Loader2 className="h-4 w-4 animate-spin text-white mb-0.5" />
+                            <span className="text-[8px] text-white font-medium leading-tight">Optimizing...</span>
                           </div>
                         )}
                       </div>
-                      <label className="cursor-pointer inline-flex items-center rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 shadow-2xs">
-                        Upload
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => {
-                            const f = e.target.files?.[0];
-                            if (f) handleFileUpload(f, "signature");
-                          }}
-                        />
-                      </label>
+                      <div className="flex flex-col gap-1">
+                        <label className="cursor-pointer inline-flex items-center rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 shadow-2xs w-fit">
+                          Upload
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              if (f) handleFileUpload(f, "signature");
+                            }}
+                          />
+                        </label>
+                        {uploadingSig ? (
+                          <span className="flex items-center gap-1 text-[11px] font-medium text-teal-700">
+                            <Loader2 className="h-3 w-3 animate-spin" /> Optimizing signature...
+                          </span>
+                        ) : sigOptNote ? (
+                          <span className="text-[11px] font-medium text-emerald-700">{sigOptNote}</span>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -840,6 +899,10 @@ export default function IdCardFormModal({
                           const isPhoneField =
                             customField.toLowerCase().includes("phone") ||
                             customField.toLowerCase().includes("mobile");
+                          const isPhotoField =
+                            customField.toLowerCase().includes("photo") ||
+                            customField.toLowerCase().includes("image") ||
+                            customField.toLowerCase().includes("pic");
                           const currentVal = formData[customField] ?? "";
 
                           return (
@@ -877,6 +940,43 @@ export default function IdCardFormModal({
                                       Phone number must be 10 digits ({currentVal.length}/10)
                                     </p>
                                   )}
+                                </div>
+                              ) : isPhotoField ? (
+                                <div className="flex items-center gap-3">
+                                  <div className="relative h-14 w-14 rounded-lg border border-gray-300 bg-white overflow-hidden flex items-center justify-center shadow-2xs">
+                                    {currentVal ? (
+                                      <img src={currentVal} alt={customField} className="h-full w-full object-cover" />
+                                    ) : (
+                                      <span className="text-[10px] text-gray-400 font-medium">Image</span>
+                                    )}
+                                    {customOptimizing[customField] && (
+                                      <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center p-1 text-center">
+                                        <Loader2 className="h-4 w-4 animate-spin text-white mb-0.5" />
+                                        <span className="text-[8px] text-white font-medium leading-tight">Optimizing...</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="flex flex-col gap-1">
+                                    <label className="cursor-pointer inline-flex items-center rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 shadow-2xs w-fit">
+                                      Upload
+                                      <input
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
+                                        onChange={(e) => {
+                                          const f = e.target.files?.[0];
+                                          if (f) handleFileUpload(f, customField);
+                                        }}
+                                      />
+                                    </label>
+                                    {customOptimizing[customField] ? (
+                                      <span className="flex items-center gap-1 text-[11px] font-medium text-teal-700">
+                                        <Loader2 className="h-3 w-3 animate-spin" /> Optimizing photo...
+                                      </span>
+                                    ) : customOptNotes[customField] ? (
+                                      <span className="text-[11px] font-medium text-emerald-700">{customOptNotes[customField]}</span>
+                                    ) : null}
+                                  </div>
                                 </div>
                               ) : (
                                 <Input

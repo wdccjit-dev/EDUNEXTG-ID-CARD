@@ -71,6 +71,20 @@
       "when": 1790239303658,
       "tag": "0009_fix_case_sensitive_table_names",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1790300000000,
+      "tag": "0010_order_and_marketing_admin",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "5",
+      "when": 1790750780820,
+      "tag": "0011_harsh_wraith",
+      "breakpoints": true
     }
   ]
 }

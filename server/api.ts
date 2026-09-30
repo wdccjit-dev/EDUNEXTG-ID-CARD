@@ -1,6 +1,6 @@
 import path from "node:path";
 import { Router, type NextFunction, type Request, type Response } from "express";
-import { and, desc, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, like, lte, ne, or, sql } from "drizzle-orm";
 import {
   approvalHistory,
   auditLogs,
@@ -15,7 +15,11 @@ import {
   templateElements,
   schools,
   users,
+  orders,
+  removedCardsHistory,
   type User,
+  type Order,
+  type RemovedCardHistory,
 } from "../drizzle/schema";
 import { getDb } from "./db";
 import { ENV } from "./_core/env";
@@ -25,11 +29,15 @@ import { isValidIndianMobileNumber, INDIAN_MOBILE_ERROR_MESSAGE } from "../share
 import { generateExampleExcelBuffer, parseExcelBuffer } from "./excel";
 import { getAvailableDynamicFields } from "../shared/templateDesigner";
 import { DEFAULT_TEMPLATE_CARD_SIZE } from "../shared/printLayout";
+import { HOOK_TYPES, CARD_MATERIALS, ORDER_TYPES, PRINT_SIDES, ORDER_STATUSES, type OrderStatus } from "../shared/orders";
 
 const router = Router();
 const adminRoles = new Set(["SUPER_ADMIN"]);
 const schoolManagerRoles = new Set(["SUPER_ADMIN", "SCHOOL_ADMIN"]);
 const schoolWriteRoles = new Set(["SUPER_ADMIN", "SCHOOL_ADMIN", "SCHOOL_OPERATOR"]);
+const marketingRoles = new Set(["MARKETING_ADMIN"]);
+const orderRoles = new Set(["SUPER_ADMIN", "SCHOOL_ADMIN", "MARKETING_ADMIN"]);
+const profileRoles = new Set(["SUPER_ADMIN", "MARKETING_ADMIN"]);
 
 function detectImageMimeType(buffer: Buffer): "image/png" | "image/jpeg" | "image/webp" | "image/gif" | null {
   if (buffer.length < 12) return null;
@@ -128,6 +136,7 @@ async function audit(user: User, action: string, entityType: string, entityId: n
       userId: user.id > 0 ? user.id : null,
       schoolId: validSchoolId,
       action,
+      actorRole: user.role,
       entityType,
       entityId,
       newValues: newValues as never,
@@ -218,6 +227,27 @@ router.post("/auth/reset-password", async (req, res) => { try { const token = St
 
 router.use(auth);
 
+// Restrict MARKETING_ADMIN to auth, profile, notifications, orders, and about
+router.use((req, res, next) => {
+  const user = currentUser(res);
+  if (user && marketingRoles.has(user.role)) {
+    const p = req.path;
+    const isAllowed =
+      p === "/profile" ||
+      p.startsWith("/profile/") ||
+      p === "/notifications" ||
+      p.startsWith("/notifications/") ||
+      p === "/orders" ||
+      p.startsWith("/orders/") ||
+      p === "/about";
+
+    if (!isAllowed) {
+      return res.status(403).json({ error: "Insufficient permissions for marketing admin" });
+    }
+  }
+  next();
+});
+
 // --- About Us ---------------------------------------------------------------
 router.get("/about", async (_req, res) => {
   res.json({
@@ -227,8 +257,8 @@ router.get("/about", async (_req, res) => {
   });
 });
 
-// --- SUPER_ADMIN Profile Management -----------------------------------------
-router.get("/profile", requireRole(adminRoles), async (_req, res) => {
+// --- Profile Management (Super Admin, Marketing Admin) ---------------------
+router.get("/profile", requireRole(profileRoles), async (_req, res) => {
   try {
     const user = currentUser(res);
     const db = await getDb();
@@ -242,7 +272,7 @@ router.get("/profile", requireRole(adminRoles), async (_req, res) => {
   }
 });
 
-router.put("/profile", requireRole(adminRoles), async (req, res) => {
+router.put("/profile", requireRole(profileRoles), async (req, res) => {
   try {
     const user = currentUser(res);
     const db = await getDb();
@@ -296,7 +326,7 @@ router.put("/profile", requireRole(adminRoles), async (req, res) => {
   }
 });
 
-router.post("/profile/picture", requireRole(adminRoles), async (req, res) => {
+router.post("/profile/picture", requireRole(profileRoles), async (req, res) => {
   try {
     const user = currentUser(res);
     const db = await getDb();
@@ -321,7 +351,7 @@ router.post("/profile/picture", requireRole(adminRoles), async (req, res) => {
   }
 });
 
-router.delete("/profile/picture", requireRole(adminRoles), async (_req, res) => {
+router.delete("/profile/picture", requireRole(profileRoles), async (_req, res) => {
   try {
     const user = currentUser(res);
     const db = await getDb();
@@ -341,7 +371,7 @@ router.delete("/profile/picture", requireRole(adminRoles), async (_req, res) => 
   }
 });
 
-router.post("/profile/password", requireRole(adminRoles), async (req, res) => {
+router.post("/profile/password", requireRole(profileRoles), async (req, res) => {
   try {
     const user = currentUser(res);
     const db = await getDb();
@@ -702,6 +732,8 @@ async function getSchoolDeletionSummary(db: NonNullable<Awaited<ReturnType<typeo
   const [cardCount] = await db.select({ total: sql<number>`count(*)` }).from(idCards).where(eq(idCards.schoolId, schoolId));
   const [userCount] = await db.select({ total: sql<number>`count(*)` }).from(users).where(eq(users.schoolId, schoolId));
   const [requestCount] = await db.select({ total: sql<number>`count(*)` }).from(idCardRequests).where(eq(idCardRequests.schoolId, schoolId));
+  const [orderCount] = await db.select({ total: sql<number>`count(*)` }).from(orders).where(eq(orders.schoolId, schoolId));
+  const [removedCount] = await db.select({ total: sql<number>`count(*)` }).from(removedCardsHistory).where(eq(removedCardsHistory.schoolId, schoolId));
 
   return {
     schoolName: school.name,
@@ -709,6 +741,8 @@ async function getSchoolDeletionSummary(db: NonNullable<Awaited<ReturnType<typeo
     cards: Number(cardCount?.total ?? 0),
     users: Number(userCount?.total ?? 0),
     requests: Number(requestCount?.total ?? 0),
+    orders: Number(orderCount?.total ?? 0),
+    removedCards: Number(removedCount?.total ?? 0),
   };
 }
 
@@ -756,6 +790,8 @@ router.delete("/schools/:id", requireRole(adminRoles), async (req, res) => {
       await tx.delete(schoolTemplates).where(eq(schoolTemplates.schoolId, id));
       await tx.delete(notifications).where(eq(notifications.schoolId, id));
       await tx.delete(auditLogs).where(eq(auditLogs.schoolId, id));
+      await tx.delete(removedCardsHistory).where(eq(removedCardsHistory.schoolId, id));
+      await tx.delete(orders).where(eq(orders.schoolId, id));
 
       // Delete all associated users for this school
       const schoolUsers = await tx.select({ id: users.id }).from(users).where(eq(users.schoolId, id));
@@ -777,6 +813,8 @@ router.delete("/schools/:id", requireRole(adminRoles), async (req, res) => {
       cards: summary.cards,
       users: summary.users,
       requests: summary.requests,
+      orders: summary.orders,
+      removedCards: summary.removedCards,
     });
     res.status(200).json({ success: true, deleted: summary });
   } catch (e) {
@@ -800,9 +838,16 @@ router.get("/users", requireRole(adminRoles), async (_req, res) => {
 router.post("/users", requireRole(adminRoles), async (req, res) => {
   try {
     const actor = currentUser(res);
-    const schoolId = Number(req.body.schoolId);
-    if (!schoolId) return res.status(400).json({ error: "schoolId is required" });
-    if (String(req.body.password ?? "").length < 8) return res.status(400).json({ error: "A password of at least 8 characters is required" });
+    const role = req.body.role;
+    const allowedRoles = ["SUPER_ADMIN", "SCHOOL_ADMIN", "MARKETING_ADMIN"];
+    if (!role || !allowedRoles.includes(role)) {
+      return res.status(400).json({
+        error: "Only Admin (SUPER_ADMIN), School Admin (SCHOOL_ADMIN), and Marketing Admin (MARKETING_ADMIN) can be created.",
+      });
+    }
+    if (String(req.body.password ?? "").length < 8) {
+      return res.status(400).json({ error: "A password of at least 8 characters is required" });
+    }
     const db = await getDb();
     if (!db) return res.status(503).json({ error: "Database not available" });
 
@@ -813,17 +858,25 @@ router.post("/users", requireRole(adminRoles), async (req, res) => {
       return res.status(409).json({ error: `Login ID "${openId}" is already in use. Please choose a different one.` });
     }
 
+    let targetSchoolId: number | null = null;
+    if (role === "SCHOOL_ADMIN" && req.body.schoolId) {
+      targetSchoolId = Number(req.body.schoolId);
+      if (!Number.isInteger(targetSchoolId) || targetSchoolId <= 0) {
+        targetSchoolId = null;
+      }
+    }
+
     const result = await db.insert(users).values({
       openId,
       name: req.body.name ?? null,
       email: req.body.email ?? null,
       loginMethod: "local",
       passwordHash: req.body.password ? await hashPassword(String(req.body.password)) : null,
-      role: req.body.role ?? "VIEWER",
-      schoolId,
+      role,
+      schoolId: targetSchoolId,
     });
     const id = Number(result[0].insertId);
-    await audit(actor, "CREATE_USER", "user", id, schoolId, req.body);
+    await audit(actor, "CREATE_USER", "user", id, targetSchoolId, { ...req.body, role, schoolId: targetSchoolId });
     res.status(201).json(safeUser((await db.select().from(users).where(eq(users.id, id)))[0]));
   } catch (e) { fail(res, e); }
 });
@@ -1106,7 +1159,7 @@ router.post("/upload", async (req, res) => {
       }
     }
 
-    const { filename, contentType, dataBase64 } = req.body || {};
+    const { filename, contentType, dataBase64, kind } = req.body || {};
     if (!dataBase64 || typeof dataBase64 !== "string") {
       return res.status(400).json({ error: "dataBase64 is required" });
     }
@@ -1130,6 +1183,15 @@ router.post("/upload", async (req, res) => {
     const MAX_SIZE = 5 * 1024 * 1024; // 5MB
     if (buffer.length > MAX_SIZE) {
       return res.status(400).json({ error: "File exceeds 5MB size limit" });
+    }
+
+    const isCardPhoto =
+      kind === "card photo" ||
+      kind === "card_photo" ||
+      kind === "PHOTO" ||
+      (typeof kind === "string" && kind.toLowerCase().includes("card") && kind.toLowerCase().includes("photo"));
+    if (isCardPhoto && buffer.length > 300 * 1024) {
+      return res.status(400).json({ error: "Card photo exceeds 300KB size limit" });
     }
 
     // Safe MIME type detection via magic numbers - do not rely solely on client MIME
@@ -1342,15 +1404,16 @@ router.get("/id-cards", async (req, res) => {
       .leftJoin(idCardTemplates, eq(idCards.templateId, idCardTemplates.id));
 
     let cardsList: any[];
+    const notRemoved = isNull(idCards.removedAt);
     if (adminRoles.has(user.role)) {
       if (req.query.schoolId) {
-        cardsList = await query.where(eq(idCards.schoolId, Number(req.query.schoolId))).orderBy(desc(idCards.createdAt));
+        cardsList = await query.where(and(notRemoved, eq(idCards.schoolId, Number(req.query.schoolId)))).orderBy(desc(idCards.createdAt));
       } else {
-        cardsList = await query.orderBy(desc(idCards.createdAt));
+        cardsList = await query.where(notRemoved).orderBy(desc(idCards.createdAt));
       }
     } else {
       if (!user.schoolId) return res.json([]);
-      cardsList = await query.where(eq(idCards.schoolId, user.schoolId)).orderBy(desc(idCards.createdAt));
+      cardsList = await query.where(and(notRemoved, eq(idCards.schoolId, user.schoolId))).orderBy(desc(idCards.createdAt));
     }
 
     // Attach studentName from id_card_data if available
@@ -1485,6 +1548,13 @@ router.post("/id-cards", requireRole(adminRoles), async (req, res) => {
     // Save photo file metadata if provided
     const photoUrl = req.body.data?.photo || req.body.photoUrl;
     if (photoUrl) {
+      if (typeof photoUrl === "string" && photoUrl.startsWith("data:")) {
+        const b64 = photoUrl.includes(",") ? photoUrl.split(",")[1] : photoUrl;
+        const approxBytes = Math.floor((b64.length * 3) / 4);
+        if (approxBytes > 300 * 1024) {
+          return res.status(400).json({ error: "Card photo exceeds 300KB size limit" });
+        }
+      }
       await db.insert(idCardFiles).values({
         idCardId: id,
         fileType: "PHOTO",
@@ -1693,6 +1763,13 @@ router.put("/id-cards/:id", requireRole(adminRoles), async (req, res) => {
     // Update photo/signature files if provided
     if (req.body.data?.photo || req.body.photoUrl) {
       const pUrl = req.body.data?.photo || req.body.photoUrl;
+      if (typeof pUrl === "string" && pUrl.startsWith("data:")) {
+        const b64 = pUrl.includes(",") ? pUrl.split(",")[1] : pUrl;
+        const approxBytes = Math.floor((b64.length * 3) / 4);
+        if (approxBytes > 300 * 1024) {
+          return res.status(400).json({ error: "Card photo exceeds 300KB size limit" });
+        }
+      }
       const existingPhoto = (await db.select().from(idCardFiles).where(and(eq(idCardFiles.idCardId, id), eq(idCardFiles.fileType, "PHOTO"))))[0];
       if (existingPhoto) {
         await db.update(idCardFiles).set({ fileUrl: pUrl }).where(eq(idCardFiles.id, existingPhoto.id));
@@ -2397,6 +2474,128 @@ router.post("/id-cards/bulk-reject", requireRole(schoolManagerRoles), async (req
   await handleBulkApprovalTransition(req, res, "REJECTED", "REJECT_ID_CARD", req.body.reason || req.body.comment || "Rejected via bulk action");
 });
 
+router.post("/id-cards/bulk-remove-approved", requireRole(schoolManagerRoles), async (req, res) => {
+  try {
+    const user = currentUser(res);
+    const db = await getDb();
+    if (!db) return res.status(503).json({ error: "Database not available" });
+
+    const rawIds = req.body?.cardIds;
+    if (!Array.isArray(rawIds) || rawIds.length === 0) {
+      return res.status(400).json({ error: "cardIds must be a non-empty array of numbers" });
+    }
+    const cardIds = rawIds.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0);
+    if (cardIds.length === 0) {
+      return res.status(400).json({ error: "No valid card IDs provided" });
+    }
+
+    // Fetch candidate cards with template names
+    const candidateCards = await db
+      .select({
+        id: idCards.id,
+        schoolId: idCards.schoolId,
+        cardNumber: idCards.cardNumber,
+        status: idCards.status,
+        templateId: idCards.templateId,
+        templateName: idCardTemplates.name,
+      })
+      .from(idCards)
+      .leftJoin(idCardTemplates, eq(idCards.templateId, idCardTemplates.id))
+      .where(and(inArray(idCards.id, cardIds), isNull(idCards.removedAt)));
+
+    // School admin can only remove cards for their own school. Cross-school yields 403 for the whole request.
+    if (user.role === "SCHOOL_ADMIN") {
+      for (const card of candidateCards) {
+        if (card.schoolId !== user.schoolId) {
+          return res.status(403).json({ error: "Cross-school card removal is forbidden" });
+        }
+      }
+    }
+
+    // Only cards with status APPROVED or PRINTED are removable
+    const removableCards = candidateCards.filter((c) => c.status === "APPROVED" || c.status === "PRINTED");
+    const removableIds = removableCards.map((c) => c.id);
+    const skippedCount = cardIds.length - removableIds.length;
+
+    if (removableCards.length === 0) {
+      return res.json({
+        success: true,
+        removedCount: 0,
+        skippedCount,
+        removedIds: [],
+        message: "No eligible approved or printed cards found to remove",
+      });
+    }
+
+    // Fetch id_card_data for these cards to snapshot text fields (studentName, className, section)
+    const cardDataRows = await db
+      .select({
+        idCardId: idCardData.idCardId,
+        fieldKey: idCardData.fieldKey,
+        fieldValue: idCardData.fieldValue,
+      })
+      .from(idCardData)
+      .where(inArray(idCardData.idCardId, removableIds));
+
+    const dataByCardId = new Map<number, Record<string, string>>();
+    for (const row of cardDataRows) {
+      const map = dataByCardId.get(row.idCardId) || {};
+      map[row.fieldKey.toLowerCase()] = row.fieldValue || "";
+      dataByCardId.set(row.idCardId, map);
+    }
+
+    const now = new Date();
+    await db.transaction(async (tx) => {
+      // Soft-remove in id_cards
+      await tx
+        .update(idCards)
+        .set({
+          removedAt: now,
+          removedByUserId: user.id,
+        })
+        .where(inArray(idCards.id, removableIds));
+
+      // Insert snapshots into removed_cards_history
+      for (const card of removableCards) {
+        const cData = dataByCardId.get(card.id) || {};
+        const studentName = cData["studentname"] || cData["student_name"] || cData["name"] || "";
+        const className = cData["classname"] || cData["class_name"] || cData["class"] || "";
+        const section = cData["section"] || "";
+
+        await tx.insert(removedCardsHistory).values({
+          idCardId: card.id,
+          schoolId: card.schoolId,
+          cardNumber: card.cardNumber,
+          studentName,
+          className,
+          section,
+          templateName: card.templateName || "Unknown Template",
+          previousStatus: card.status,
+          removedByUserId: user.id,
+          removedByName: user.name,
+          removedByRole: user.role,
+          removedAt: now,
+        });
+      }
+    });
+
+    await audit(user, "REMOVE_APPROVED_CARDS", "id_card", null, user.schoolId || null, {
+      count: removableIds.length,
+      cardIds: removableIds,
+      skippedCount,
+    });
+
+    res.json({
+      success: true,
+      removedCount: removableIds.length,
+      skippedCount,
+      removedIds: removableIds,
+    });
+  } catch (e) {
+    fail(res, e);
+  }
+});
+
 // ─── PRINTING ─────────────────────────────────────────────────────────────
 router.post("/id-cards/:id/print", requireRole(adminRoles), async (req, res) => {
   try {
@@ -2404,7 +2603,7 @@ router.post("/id-cards/:id/print", requireRole(adminRoles), async (req, res) => 
     const db = await getDb();
     if (!db) return res.status(503).json({ error: "Database not available" });
     const id = Number(req.params.id);
-    const card = (await db.select().from(idCards).where(eq(idCards.id, id)))[0];
+    const card = (await db.select().from(idCards).where(and(eq(idCards.id, id), isNull(idCards.removedAt))))[0];
     if (!card || !canReadSchool(user, card.schoolId)) return res.status(403).json({ error: "ID card access denied" });
 
     // Strict rule: Only APPROVED cards may normally be printed
@@ -2439,7 +2638,7 @@ router.post("/id-cards/:id/mark-printed", requireRole(adminRoles), async (req, r
     const db = await getDb();
     if (!db) return res.status(503).json({ error: "Database not available" });
     const id = Number(req.params.id);
-    const card = (await db.select().from(idCards).where(eq(idCards.id, id)))[0];
+    const card = (await db.select().from(idCards).where(and(eq(idCards.id, id), isNull(idCards.removedAt))))[0];
     if (!card || !canReadSchool(user, card.schoolId)) return res.status(403).json({ error: "ID card access denied" });
 
     if (card.status !== "APPROVED" && card.status !== "PRINTED") {
@@ -2475,7 +2674,7 @@ router.post("/id-cards/bulk-print", requireRole(adminRoles), async (req, res) =>
     if (cardIds.length === 0) return res.status(400).json({ error: "cardIds array is required" });
     const mode = typeof req.body.mode === "string" ? req.body.mode : "DUPLEX";
 
-    const cards = await db.select().from(idCards).where(inArray(idCards.id, cardIds));
+    const cards = await db.select().from(idCards).where(and(inArray(idCards.id, cardIds), isNull(idCards.removedAt)));
     for (const card of cards) {
       if (!canReadSchool(user, card.schoolId)) {
         return res.status(403).json({ error: `Access denied to card #${card.id}` });
@@ -2509,7 +2708,7 @@ router.post("/id-cards/bulk-print", requireRole(adminRoles), async (req, res) =>
 
 // ─── PDF GENERATION ───────────────────────────────────────────────────────
 async function fetchCardPdfData(db: any, cardId: number): Promise<CardPdfData | null> {
-  const card = (await db.select().from(idCards).where(eq(idCards.id, cardId)))[0];
+  const card = (await db.select().from(idCards).where(and(eq(idCards.id, cardId), isNull(idCards.removedAt))))[0];
   if (!card) return null;
   const template = (await db.select().from(idCardTemplates).where(eq(idCardTemplates.id, card.templateId)))[0];
   if (!template) return null;
@@ -2542,7 +2741,7 @@ router.get("/id-cards/:id/pdf", requireRole(adminRoles), async (req, res) => {
     const db = await getDb();
     if (!db) return res.status(503).json({ error: "Database not available" });
     const id = Number(req.params.id);
-    const card = (await db.select().from(idCards).where(eq(idCards.id, id)))[0];
+    const card = (await db.select().from(idCards).where(and(eq(idCards.id, id), isNull(idCards.removedAt))))[0];
     if (!card || !canReadSchool(user, card.schoolId)) return res.status(404).json({ error: "ID card not found" });
 
     const pdfData = await fetchCardPdfData(db, id);
@@ -2575,7 +2774,7 @@ router.post("/id-cards/bulk-pdf", requireRole(adminRoles), async (req, res) => {
 
     const pdfCards: CardPdfData[] = [];
     for (const cardId of cardIds) {
-      const card = (await db.select().from(idCards).where(eq(idCards.id, cardId)))[0];
+      const card = (await db.select().from(idCards).where(and(eq(idCards.id, cardId), isNull(idCards.removedAt))))[0];
       if (!card || !canReadSchool(user, card.schoolId)) {
         return res.status(403).json({ error: `Access denied to card #${cardId}` });
       }
@@ -2615,6 +2814,19 @@ router.post("/id-cards/:id/files", requireRole(adminRoles), async (req, res) => 
     const { fileType, fileName, fileUrl, mimeType, fileSize } = req.body;
     if (!fileType || !fileName || !fileUrl) {
       return res.status(400).json({ error: "fileType, fileName, and fileUrl are required" });
+    }
+
+    if (String(fileType) === "PHOTO") {
+      if (fileSize && Number(fileSize) > 300 * 1024) {
+        return res.status(400).json({ error: "Card photo exceeds 300KB size limit" });
+      }
+      if (typeof fileUrl === "string" && fileUrl.startsWith("data:")) {
+        const b64 = fileUrl.includes(",") ? fileUrl.split(",")[1] : fileUrl;
+        const approxBytes = Math.floor((b64.length * 3) / 4);
+        if (approxBytes > 300 * 1024) {
+          return res.status(400).json({ error: "Card photo exceeds 300KB size limit" });
+        }
+      }
     }
 
     const r = await db.insert(idCardFiles).values({
@@ -2760,6 +2972,7 @@ router.get("/audit-logs", async (req, res) => {
         userName: u?.name ?? null,
         userEmail: u?.email ?? null,
         userRole: u?.role ?? null,
+        actorRole: l.actorRole || u?.role || null,
         schoolId: l.schoolId,
         schoolName: s?.name ?? null,
         schoolCode: s?.shortCode ?? null,
@@ -2840,13 +3053,39 @@ router.get("/audit-logs", async (req, res) => {
           if (!nv.studentName && detail.studentName) nv.studentName = detail.studentName;
         }
       }
+      const isMarketing =
+        row.actorRole === "MARKETING_ADMIN" ||
+        row.userRole === "MARKETING_ADMIN" ||
+        (nv && typeof nv === "object" && nv.placedByRole === "MARKETING_ADMIN");
       return {
         ...row,
+        isMarketing,
         newValues: nv,
       };
     });
 
-    res.json(enrichedRows);
+    const isMarketingFilter = req.query.marketing === "1" || req.query.marketing === "true";
+    const filteredRows = isMarketingFilter ? enrichedRows.filter((r) => r.isMarketing) : enrichedRows;
+
+    if (req.query.export === "csv" || req.query.format === "csv") {
+      const headers = ["Timestamp", "User", "Role", "Actor Role", "Action", "School", "Entity", "Details"];
+      const csvRows = filteredRows.map((r) => [
+        `"${r.createdAt ? new Date(r.createdAt).toISOString() : ""}"`,
+        `"${(r.userName || r.userEmail || "").replace(/"/g, '""')}"`,
+        `"${(r.userRole || "").replace(/"/g, '""')}"`,
+        `"${(r.actorRole || "").replace(/"/g, '""')}"`,
+        `"${(r.action || "").replace(/"/g, '""')}"`,
+        `"${(r.schoolName || "").replace(/"/g, '""')}"`,
+        `"${(r.entityType || "")} #${r.entityId || ""}"`,
+        `"${JSON.stringify(r.newValues || {}).replace(/"/g, '""')}"`,
+      ].join(","));
+      const csvContent = [headers.join(","), ...csvRows].join("\n");
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename="audit_logs_${Date.now()}.csv"`);
+      return res.send(csvContent);
+    }
+
+    res.json(filteredRows);
   } catch (e) {
     fail(res, e);
   }
@@ -2869,6 +3108,166 @@ router.delete("/audit-logs", async (req, res) => {
       await db.delete(auditLogs);
     }
     return res.json({ success: true, message: "Audit logs cleared" });
+  } catch (e) {
+    fail(res, e);
+  }
+});
+
+// ─── REPORTS: REMOVED CARDS HISTORY ───────────────────────────────────────
+router.get("/reports/removed-cards", requireRole(schoolManagerRoles), async (req, res) => {
+  try {
+    const db = await getDb();
+    if (!db) return res.status(503).json({ error: "Database not available" });
+    const user = currentUser(res);
+
+    const conditions: any[] = [];
+
+    // School scoping: SUPER_ADMIN can filter by schoolId; SCHOOL_ADMIN is locked to own school
+    if (adminRoles.has(user.role)) {
+      if (req.query.schoolId) {
+        conditions.push(eq(removedCardsHistory.schoolId, Number(req.query.schoolId)));
+      }
+    } else {
+      if (!user.schoolId) return res.json({ items: [], total: 0, page: 1, pageSize: 10, classes: [], sections: [], classCounts: [], sectionCounts: [] });
+      conditions.push(eq(removedCardsHistory.schoolId, user.schoolId));
+    }
+
+    if (req.query.className) {
+      conditions.push(eq(removedCardsHistory.className, String(req.query.className).trim()));
+    }
+    if (req.query.section) {
+      conditions.push(eq(removedCardsHistory.section, String(req.query.section).trim()));
+    }
+    if (req.query.search) {
+      const q = `%${String(req.query.search).trim()}%`;
+      conditions.push(
+        or(
+          like(removedCardsHistory.cardNumber, q),
+          like(removedCardsHistory.studentName, q),
+          like(removedCardsHistory.removedByName, q)
+        )
+      );
+    }
+    if (req.query.from) {
+      const fromDate = new Date(String(req.query.from));
+      if (!isNaN(fromDate.getTime())) {
+        conditions.push(gte(removedCardsHistory.removedAt, fromDate));
+      }
+    }
+    if (req.query.to) {
+      const toDate = new Date(String(req.query.to));
+      if (!isNaN(toDate.getTime())) {
+        toDate.setHours(23, 59, 59, 999);
+        conditions.push(lte(removedCardsHistory.removedAt, toDate));
+      }
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    // Total count for current filter
+    const [countResult] = await db
+      .select({ total: sql<number>`count(*)` })
+      .from(removedCardsHistory)
+      .where(whereClause);
+    const total = Number(countResult?.total ?? 0);
+
+    const baseQuery = db
+      .select({
+        id: removedCardsHistory.id,
+        idCardId: removedCardsHistory.idCardId,
+        schoolId: removedCardsHistory.schoolId,
+        schoolName: schools.name,
+        cardNumber: removedCardsHistory.cardNumber,
+        studentName: removedCardsHistory.studentName,
+        className: removedCardsHistory.className,
+        section: removedCardsHistory.section,
+        templateName: removedCardsHistory.templateName,
+        previousStatus: removedCardsHistory.previousStatus,
+        removedByUserId: removedCardsHistory.removedByUserId,
+        removedByName: removedCardsHistory.removedByName,
+        removedByRole: removedCardsHistory.removedByRole,
+        removedAt: removedCardsHistory.removedAt,
+      })
+      .from(removedCardsHistory)
+      .leftJoin(schools, eq(removedCardsHistory.schoolId, schools.id))
+      .where(whereClause)
+      .orderBy(desc(removedCardsHistory.removedAt));
+
+    // CSV export
+    if (req.query.export === "csv" || req.query.format === "csv") {
+      const allRows = await baseQuery;
+      const headers = ["#", "Card No", "Student Name", "Class", "Section", "School", "Template", "Previous Status", "Removed By", "Removed On"];
+      const csvRows = allRows.map((r, i) => [
+        i + 1,
+        `"${(r.cardNumber || "").replace(/"/g, '""')}"`,
+        `"${(r.studentName || "").replace(/"/g, '""')}"`,
+        `"${(r.className || "").replace(/"/g, '""')}"`,
+        `"${(r.section || "").replace(/"/g, '""')}"`,
+        `"${(r.schoolName || "").replace(/"/g, '""')}"`,
+        `"${(r.templateName || "").replace(/"/g, '""')}"`,
+        `"${(r.previousStatus || "").replace(/"/g, '""')}"`,
+        `"${(r.removedByName || "").replace(/"/g, '""')}"`,
+        `"${r.removedAt ? new Date(r.removedAt).toISOString() : ""}"`,
+      ].join(","));
+      const csvContent = [headers.join(","), ...csvRows].join("\n");
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename="removed_cards_history_${Date.now()}.csv"`);
+      return res.send(csvContent);
+    }
+
+    const page = Math.max(1, parseInt(String(req.query.page || "1"), 10) || 1);
+    const rawPageSize = parseInt(String(req.query.pageSize || "10"), 10);
+    const pageSize = rawPageSize > 0 && rawPageSize <= 100 ? rawPageSize : 10;
+    const offset = (page - 1) * pageSize;
+
+    const items = await baseQuery.limit(pageSize).offset(offset);
+
+    // Summary strip counts
+    const summaryScope = adminRoles.has(user.role) && req.query.schoolId
+      ? eq(removedCardsHistory.schoolId, Number(req.query.schoolId))
+      : user.schoolId
+      ? eq(removedCardsHistory.schoolId, user.schoolId)
+      : undefined;
+
+    const summaryRows = await db
+      .select({
+        className: removedCardsHistory.className,
+        section: removedCardsHistory.section,
+      })
+      .from(removedCardsHistory)
+      .where(summaryScope);
+
+    const classSet = new Set<string>();
+    const sectionSet = new Set<string>();
+    const classCountMap: Record<string, number> = {};
+    const sectionCountMap: Record<string, number> = {};
+
+    for (const r of summaryRows) {
+      if (r.className && r.className.trim()) {
+        const c = r.className.trim();
+        classSet.add(c);
+        classCountMap[c] = (classCountMap[c] || 0) + 1;
+      }
+      if (r.section && r.section.trim()) {
+        const s = r.section.trim();
+        sectionSet.add(s);
+        sectionCountMap[s] = (sectionCountMap[s] || 0) + 1;
+      }
+    }
+
+    const classCounts = Object.entries(classCountMap).map(([className, count]) => ({ className, count }));
+    const sectionCounts = Object.entries(sectionCountMap).map(([section, count]) => ({ section, count }));
+
+    res.json({
+      items,
+      total,
+      page,
+      pageSize,
+      classes: Array.from(classSet).sort(),
+      sections: Array.from(sectionSet).sort(),
+      classCounts,
+      sectionCounts,
+    });
   } catch (e) {
     fail(res, e);
   }
@@ -2898,11 +3297,14 @@ router.get("/approvals", async (req, res) => {
       .innerJoin(schools, eq(idCardRequests.schoolId, schools.id))
       .leftJoin(
         idCards,
-        or(
-          eq(idCards.requestId, idCardRequests.id),
-          and(
-            eq(idCards.schoolId, idCardRequests.schoolId),
-            eq(idCards.cardNumber, idCardRequests.admissionCode),
+        and(
+          isNull(idCards.removedAt),
+          or(
+            eq(idCards.requestId, idCardRequests.id),
+            and(
+              eq(idCards.schoolId, idCardRequests.schoolId),
+              eq(idCards.cardNumber, idCardRequests.admissionCode),
+            ),
           ),
         ),
       );
@@ -3189,6 +3591,512 @@ router.post("/id-card-requests/upload-excel", requireRole(schoolWriteRoles), asy
       total: parseResult.rows.length,
       errors: failedRows.length > 0 ? failedRows : undefined,
     });
+  } catch (e) {
+    fail(res, e);
+  }
+});
+
+// ─── ORDERS MODULE ────────────────────────────────────────────────────────
+router.get("/orders/schools", requireRole(orderRoles), async (_req, res) => {
+  try {
+    const db = await getDb();
+    if (!db) return res.status(503).json({ error: "Database not available" });
+    const activeSchools = await db
+      .select({
+        id: schools.id,
+        name: schools.name,
+        shortCode: schools.shortCode,
+        isActive: schools.isActive,
+      })
+      .from(schools)
+      .where(eq(schools.isActive, true))
+      .orderBy(schools.name);
+    res.json(activeSchools);
+  } catch (e) {
+    fail(res, e);
+  }
+});
+
+router.post("/orders", requireRole(orderRoles), async (req, res) => {
+  try {
+    const user = currentUser(res);
+    const db = await getDb();
+    if (!db) return res.status(503).json({ error: "Database not available" });
+
+    const {
+      orderType,
+      hookType,
+      clip,
+      className,
+      section,
+      quantity,
+      printSides,
+      cardMaterial,
+      lanyardIncluded,
+      lanyardColor,
+      neededByDate,
+      deliveryAddress,
+      contactPerson,
+      contactPhone,
+      notes,
+    } = req.body || {};
+
+    if (!orderType || (orderType !== "STUDENT" && orderType !== "STAFF")) {
+      return res.status(400).json({ error: "orderType must be 'STUDENT' or 'STAFF'" });
+    }
+
+    let targetSchoolId: number;
+    if (user.role === "SCHOOL_ADMIN") {
+      if (!user.schoolId) {
+        return res.status(403).json({ error: "School admin must belong to a school" });
+      }
+      targetSchoolId = user.schoolId;
+    } else {
+      if (!req.body?.schoolId) {
+        return res.status(400).json({ error: "schoolId is required" });
+      }
+      targetSchoolId = Number(req.body.schoolId);
+      if (!Number.isInteger(targetSchoolId) || targetSchoolId <= 0) {
+        return res.status(400).json({ error: "Valid schoolId is required" });
+      }
+      const [school] = await db
+        .select()
+        .from(schools)
+        .where(and(eq(schools.id, targetSchoolId), eq(schools.isActive, true)));
+      if (!school) {
+        return res.status(400).json({ error: "Selected school does not exist or is not active" });
+      }
+    }
+
+    // Validation for STUDENT vs STAFF
+    if (orderType === "STUDENT") {
+      if (!className || typeof className !== "string" || !className.trim()) {
+        return res.status(400).json({ error: "className is required for STUDENT orders" });
+      }
+      if (!section || typeof section !== "string" || !section.trim()) {
+        return res.status(400).json({ error: "section is required for STUDENT orders" });
+      }
+    }
+
+    const qty = Number(quantity);
+    if (!Number.isInteger(qty) || qty < 1 || qty > 10000) {
+      return res.status(400).json({ error: "quantity must be an integer between 1 and 10,000" });
+    }
+
+    if (!hookType || !HOOK_TYPES.includes(hookType as any)) {
+      return res.status(400).json({ error: `hookType must be one of: ${HOOK_TYPES.join(", ")}` });
+    }
+
+    const validPrintSides = PRINT_SIDES.map((s) => s.value);
+    if (!printSides || !validPrintSides.includes(printSides as any)) {
+      return res.status(400).json({ error: `printSides must be one of: ${validPrintSides.join(", ")}` });
+    }
+
+    const validMaterials = CARD_MATERIALS.map((m) => m.value);
+    if (!cardMaterial || !validMaterials.includes(cardMaterial as any)) {
+      return res.status(400).json({ error: `cardMaterial must be one of: ${validMaterials.join(", ")}` });
+    }
+
+    if (!deliveryAddress || typeof deliveryAddress !== "string" || deliveryAddress.trim().length < 3) {
+      return res.status(400).json({ error: "deliveryAddress must be at least 3 characters" });
+    }
+
+    if (!contactPerson || typeof contactPerson !== "string" || contactPerson.trim().length < 2) {
+      return res.status(400).json({ error: "contactPerson must be at least 2 characters" });
+    }
+
+    if (!isValidIndianMobileNumber(contactPhone, false)) {
+      return res.status(400).json({ error: INDIAN_MOBILE_ERROR_MESSAGE });
+    }
+
+    let parsedNeededByDate: Date | null = null;
+    if (neededByDate) {
+      const d = new Date(String(neededByDate));
+      if (!isNaN(d.getTime())) {
+        parsedNeededByDate = d;
+      }
+    }
+
+    let createdOrder: Order;
+    await db.transaction(async (tx) => {
+      const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+      const prefix = `ORD-${todayStr}-`;
+      const todaysOrders = await tx
+        .select({ orderNumber: orders.orderNumber })
+        .from(orders)
+        .where(like(orders.orderNumber, `${prefix}%`));
+
+      let maxSeq = 0;
+      for (const ord of todaysOrders) {
+        const parts = ord.orderNumber.split("-");
+        const seq = parseInt(parts[2], 10);
+        if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
+      }
+      const orderNumber = `${prefix}${String(maxSeq + 1).padStart(4, "0")}`;
+
+      const [insertResult] = await tx.insert(orders).values({
+        orderNumber,
+        placedByUserId: user.id,
+        placedByRole: user.role,
+        placedByName: user.name || "User",
+        schoolId: targetSchoolId,
+        orderType,
+        className: orderType === "STUDENT" ? String(className).trim() : null,
+        section: orderType === "STUDENT" ? String(section).trim() : null,
+        quantity: qty,
+        hookType: String(hookType),
+        clip: Boolean(clip),
+        printSides,
+        cardMaterial,
+        lanyardIncluded: Boolean(lanyardIncluded),
+        lanyardColor: lanyardColor ? String(lanyardColor).trim() : null,
+        neededByDate: neededByDate ? String(neededByDate).trim() : null,
+        deliveryAddress: String(deliveryAddress).trim(),
+        contactPerson: String(contactPerson).trim(),
+        contactPhone: String(contactPhone).trim(),
+        notes: notes ? String(notes).trim() : null,
+        status: "PLACED",
+      });
+
+      const orderId = Number(insertResult.insertId);
+      const [ord] = await tx.select().from(orders).where(eq(orders.id, orderId));
+      createdOrder = ord;
+
+      // School info for notification
+      const [school] = await tx.select().from(schools).where(eq(schools.id, targetSchoolId));
+      const schoolName = school?.name || `School #${targetSchoolId}`;
+
+      // Notify all active super admins
+      const superAdmins = await tx
+        .select({ id: users.id })
+        .from(users)
+        .where(and(eq(users.role, "SUPER_ADMIN"), eq(users.isActive, true)));
+
+      for (const sa of superAdmins) {
+        await tx.insert(notifications).values({
+          userId: sa.id,
+          schoolId: targetSchoolId,
+          title: "New ID Card Order Placed",
+          message: `New order ${orderNumber} from ${user.name} (${user.role}) for ${schoolName}: ${qty} cards`,
+          type: "INFO",
+        });
+      }
+    });
+
+    await audit(user, "PLACE_ORDER", "order", createdOrder!.id, targetSchoolId, {
+      orderNumber: createdOrder!.orderNumber,
+      quantity: createdOrder!.quantity,
+      orderType: createdOrder!.orderType,
+      placedByRole: user.role,
+    });
+
+    res.status(201).json(createdOrder!);
+  } catch (e) {
+    fail(res, e);
+  }
+});
+
+router.get("/orders", requireRole(orderRoles), async (req, res) => {
+  try {
+    const user = currentUser(res);
+    const db = await getDb();
+    if (!db) return res.status(503).json({ error: "Database not available" });
+
+    const conditions: any[] = [];
+
+    // Role-based visibility
+    if (user.role === "SUPER_ADMIN") {
+      if (req.query.schoolId) {
+        conditions.push(eq(orders.schoolId, Number(req.query.schoolId)));
+      }
+    } else if (user.role === "SCHOOL_ADMIN") {
+      if (!user.schoolId) return res.json({ items: [], total: 0, page: 1, pageSize: 10 });
+      conditions.push(eq(orders.schoolId, user.schoolId));
+    } else if (user.role === "MARKETING_ADMIN") {
+      conditions.push(eq(orders.placedByUserId, user.id));
+    }
+
+    if (req.query.status && ORDER_STATUSES.some((s) => s.value === req.query.status)) {
+      conditions.push(eq(orders.status, req.query.status as any));
+    }
+
+    if (req.query.orderType && ORDER_TYPES.some((t) => t.value === req.query.orderType)) {
+      conditions.push(eq(orders.orderType, req.query.orderType as any));
+    }
+
+    if (req.query.placedByRole) {
+      conditions.push(eq(orders.placedByRole, String(req.query.placedByRole)));
+    }
+
+    if (req.query.from) {
+      const fromDate = new Date(String(req.query.from));
+      if (!isNaN(fromDate.getTime())) {
+        conditions.push(gte(orders.createdAt, fromDate));
+      }
+    }
+    if (req.query.to) {
+      const toDate = new Date(String(req.query.to));
+      if (!isNaN(toDate.getTime())) {
+        toDate.setHours(23, 59, 59, 999);
+        conditions.push(lte(orders.createdAt, toDate));
+      }
+    }
+
+    if (req.query.search) {
+      const q = `%${String(req.query.search).trim()}%`;
+      conditions.push(
+        or(
+          like(orders.orderNumber, q),
+          like(schools.name, q),
+          like(orders.placedByName, q)
+        )
+      );
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const [countResult] = await db
+      .select({ total: sql<number>`count(*)` })
+      .from(orders)
+      .leftJoin(schools, eq(orders.schoolId, schools.id))
+      .where(whereClause);
+    const total = Number(countResult?.total ?? 0);
+
+    const page = Math.max(1, parseInt(String(req.query.page || "1"), 10) || 1);
+    const rawPageSize = parseInt(String(req.query.pageSize || "10"), 10);
+    const pageSize = [10, 25, 50, 100].includes(rawPageSize) ? rawPageSize : 10;
+    const offset = (page - 1) * pageSize;
+
+    const items = await db
+      .select({
+        id: orders.id,
+        orderNumber: orders.orderNumber,
+        placedByUserId: orders.placedByUserId,
+        placedByRole: orders.placedByRole,
+        placedByName: orders.placedByName,
+        schoolId: orders.schoolId,
+        schoolName: schools.name,
+        orderType: orders.orderType,
+        hookType: orders.hookType,
+        clip: orders.clip,
+        className: orders.className,
+        section: orders.section,
+        quantity: orders.quantity,
+        printSides: orders.printSides,
+        cardMaterial: orders.cardMaterial,
+        lanyardIncluded: orders.lanyardIncluded,
+        lanyardColor: orders.lanyardColor,
+        neededByDate: orders.neededByDate,
+        deliveryAddress: orders.deliveryAddress,
+        contactPerson: orders.contactPerson,
+        contactPhone: orders.contactPhone,
+        notes: orders.notes,
+        status: orders.status,
+        statusNote: orders.statusNote,
+        createdAt: orders.createdAt,
+        updatedAt: orders.updatedAt,
+      })
+      .from(orders)
+      .leftJoin(schools, eq(orders.schoolId, schools.id))
+      .where(whereClause)
+      .orderBy(desc(orders.createdAt))
+      .limit(pageSize)
+      .offset(offset);
+
+    res.json({ items, total, page, pageSize });
+  } catch (e) {
+    fail(res, e);
+  }
+});
+
+router.get("/orders/:id", requireRole(orderRoles), async (req, res) => {
+  try {
+    const user = currentUser(res);
+    const db = await getDb();
+    if (!db) return res.status(503).json({ error: "Database not available" });
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) return res.status(404).json({ error: "Order not found" });
+
+    const [order] = await db
+      .select({
+        id: orders.id,
+        orderNumber: orders.orderNumber,
+        placedByUserId: orders.placedByUserId,
+        placedByRole: orders.placedByRole,
+        placedByName: orders.placedByName,
+        schoolId: orders.schoolId,
+        schoolName: schools.name,
+        orderType: orders.orderType,
+        hookType: orders.hookType,
+        clip: orders.clip,
+        className: orders.className,
+        section: orders.section,
+        quantity: orders.quantity,
+        printSides: orders.printSides,
+        cardMaterial: orders.cardMaterial,
+        lanyardIncluded: orders.lanyardIncluded,
+        lanyardColor: orders.lanyardColor,
+        neededByDate: orders.neededByDate,
+        deliveryAddress: orders.deliveryAddress,
+        contactPerson: orders.contactPerson,
+        contactPhone: orders.contactPhone,
+        notes: orders.notes,
+        status: orders.status,
+        statusNote: orders.statusNote,
+        createdAt: orders.createdAt,
+        updatedAt: orders.updatedAt,
+      })
+      .from(orders)
+      .leftJoin(schools, eq(orders.schoolId, schools.id))
+      .where(eq(orders.id, id));
+
+    if (!order) return res.status(404).json({ error: "Order not found" });
+
+    // Check visibility
+    if (user.role === "SUPER_ADMIN") {
+      return res.json(order);
+    }
+    if (user.role === "SCHOOL_ADMIN" && order.schoolId === user.schoolId) {
+      return res.json(order);
+    }
+    if (user.role === "MARKETING_ADMIN" && order.placedByUserId === user.id) {
+      return res.json(order);
+    }
+
+    return res.status(404).json({ error: "Order not found" });
+  } catch (e) {
+    fail(res, e);
+  }
+});
+
+router.patch("/orders/:id/status", requireRole(adminRoles), async (req, res) => {
+  try {
+    const user = currentUser(res);
+    const db = await getDb();
+    if (!db) return res.status(503).json({ error: "Database not available" });
+    const id = Number(req.params.id);
+    const { status, statusNote } = req.body || {};
+
+    const validStatuses = ORDER_STATUSES.map((s) => s.value);
+    if (!status || !validStatuses.includes(status as any)) {
+      return res.status(400).json({ error: `Valid status required: ${validStatuses.join(", ")}` });
+    }
+
+    const [order] = await db.select().from(orders).where(eq(orders.id, id));
+    if (!order) return res.status(404).json({ error: "Order not found" });
+
+    const cleanNote = statusNote ? String(statusNote).trim() : null;
+    await db
+      .update(orders)
+      .set({
+        status,
+        statusNote: cleanNote,
+        updatedAt: new Date(),
+      })
+      .where(eq(orders.id, id));
+
+    // Notify order placer if exists
+    if (order.placedByUserId) {
+      await db.insert(notifications).values({
+        userId: order.placedByUserId,
+        schoolId: order.schoolId,
+        title: "Order Status Updated",
+        message: `Order ${order.orderNumber} status updated to ${status}${cleanNote ? ": " + cleanNote : ""}`,
+        type: "INFO",
+      });
+    }
+
+    await audit(user, "UPDATE_ORDER_STATUS", "order", id, order.schoolId, {
+      orderNumber: order.orderNumber,
+      fromStatus: order.status,
+      toStatus: status,
+      statusNote: cleanNote,
+    });
+
+    const [updated] = await db.select().from(orders).where(eq(orders.id, id));
+    res.json(updated);
+  } catch (e) {
+    fail(res, e);
+  }
+});
+
+router.patch("/orders/:id/cancel", requireRole(orderRoles), async (req, res) => {
+  try {
+    const user = currentUser(res);
+    const db = await getDb();
+    if (!db) return res.status(503).json({ error: "Database not available" });
+    const id = Number(req.params.id);
+
+    const [order] = await db.select().from(orders).where(eq(orders.id, id));
+    if (!order) return res.status(404).json({ error: "Order not found" });
+
+    // Authorization: SUPER_ADMIN any time; placer only while PLACED
+    const isSuperAdmin = user.role === "SUPER_ADMIN";
+    const isPlacer = order.placedByUserId === user.id;
+
+    if (!isSuperAdmin && !isPlacer) {
+      return res.status(403).json({ error: "You do not have permission to cancel this order" });
+    }
+
+    if (!isSuperAdmin && order.status !== "PLACED") {
+      return res.status(400).json({ error: "Orders can only be cancelled while status is PLACED" });
+    }
+
+    if (order.status === "CANCELLED") {
+      return res.status(400).json({ error: "Order is already cancelled" });
+    }
+    if (order.status === "DELIVERED") {
+      return res.status(400).json({ error: "Delivered orders cannot be cancelled" });
+    }
+
+    const cancelNote = req.body?.statusNote
+      ? String(req.body.statusNote).trim()
+      : isSuperAdmin
+      ? "Cancelled by Admin"
+      : `Cancelled by placer ${user.name}`;
+
+    await db
+      .update(orders)
+      .set({
+        status: "CANCELLED",
+        statusNote: cancelNote,
+        updatedAt: new Date(),
+      })
+      .where(eq(orders.id, id));
+
+    // Notify: if super admin cancelled, notify placer; if placer cancelled, notify super admins
+    if (isSuperAdmin && order.placedByUserId) {
+      await db.insert(notifications).values({
+        userId: order.placedByUserId,
+        schoolId: order.schoolId,
+        title: "Order Cancelled",
+        message: `Your order ${order.orderNumber} was cancelled by Admin. Note: ${cancelNote}`,
+        type: "WARNING",
+      });
+    } else if (isPlacer) {
+      const superAdmins = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(and(eq(users.role, "SUPER_ADMIN"), eq(users.isActive, true)));
+      for (const sa of superAdmins) {
+        await db.insert(notifications).values({
+          userId: sa.id,
+          schoolId: order.schoolId,
+          title: "Order Cancelled by Placer",
+          message: `Order ${order.orderNumber} was cancelled by ${user.name} (${user.role})`,
+          type: "INFO",
+        });
+      }
+    }
+
+    await audit(user, "CANCEL_ORDER", "order", id, order.schoolId, {
+      orderNumber: order.orderNumber,
+      previousStatus: order.status,
+      statusNote: cancelNote,
+    });
+
+    const [updated] = await db.select().from(orders).where(eq(orders.id, id));
+    res.json(updated);
   } catch (e) {
     fail(res, e);
   }
