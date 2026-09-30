@@ -899,9 +899,22 @@ router.put("/users/:id", requireRole(adminRoles), async (req, res) => {
     const id = Number(req.params.id);
     const target = (await db.select().from(users).where(eq(users.id, id)))[0];
     if (!target) return res.status(404).json({ error: "User not found" });
+
     const nextSchoolId = req.body.schoolId !== undefined ? (req.body.schoolId ? Number(req.body.schoolId) : null) : target.schoolId;
-    await db.update(users).set({ name: req.body.name, email: req.body.email, role: req.body.role, schoolId: nextSchoolId }).where(eq(users.id, id));
-    await audit(actor, "UPDATE_USER", "user", id, target.schoolId, req.body);
+    const updateData: Record<string, any> = {
+      name: req.body.name,
+      email: req.body.email,
+      role: req.body.role,
+      schoolId: nextSchoolId,
+      updatedAt: new Date(),
+    };
+
+    if (req.body.password && String(req.body.password).trim().length >= 8) {
+      updateData.passwordHash = await hashPassword(String(req.body.password).trim());
+    }
+
+    await db.update(users).set(updateData).where(eq(users.id, id));
+    await audit(actor, "UPDATE_USER", "user", id, target.schoolId, { ...req.body, password: req.body.password ? "[REDACTED]" : undefined });
     res.json(safeUser((await db.select().from(users).where(eq(users.id, id)))[0]));
   } catch (e) { fail(res, e); }
 });
@@ -926,10 +939,19 @@ router.delete("/users/:id", requireRole(adminRoles), async (req, res) => {
     const db = await getDb();
     if (!db) return res.status(503).json({ error: "Database not available" });
     const id = Number(req.params.id);
+
+    if (actor.id === id) {
+      return res.status(400).json({ error: "You cannot delete your own account." });
+    }
+
     const target = (await db.select().from(users).where(eq(users.id, id)))[0];
     if (!target) return res.status(404).json({ error: "User not found" });
+
+    // Clean up dependent records referencing this user before deleting
+    await db.delete(notifications).where(eq(notifications.userId, id));
+    await db.delete(auditLogs).where(eq(auditLogs.userId, id));
     await db.delete(users).where(eq(users.id, id));
-    await audit(actor, "DELETE_USER", "user", id, target.schoolId);
+    await audit(actor, "DELETE_USER", "user", id, target.schoolId, { openId: target.openId, name: target.name, role: target.role });
     res.status(204).end();
   } catch (e) { fail(res, e); }
 });

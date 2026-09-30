@@ -227,7 +227,7 @@ export const api = {
     list: () => request<ApiUser[]>("/api/users"),
     create: (body: Partial<ApiUser> & { openId?: string; password?: string }) => request<ApiUser>("/api/users", json(body)),
     update: (id: number, body: Partial<ApiUser>) => request<ApiUser>(`/api/users/${id}`, put(body)),
-    setStatus: (id: number, isActive: boolean) => request<void>(`/api/users/${id}/status`, json({ isActive })),
+    delete: (id: number) => request<void>(`/api/users/${id}`, { method: "DELETE" }),
   },
   templates: {
     list: () => request<ApiTemplate[]>("/api/templates"),

@@ -394,14 +394,19 @@ export default function Home({
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
   const [templateNameInput, setTemplateNameInput] = useState("");
 
-  // User modal
+  // User modal (Create / Edit)
   const [userModalOpen, setUserModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<ApiUser | null>(null);
   const [userNameInput, setUserNameInput] = useState("");
   const [userEmailInput, setUserEmailInput] = useState("");
   const [userPasswordInput, setUserPasswordInput] = useState("");
   const [userRoleInput, setUserRoleInput] = useState<"SUPER_ADMIN" | "SCHOOL_ADMIN" | "MARKETING_ADMIN">("SCHOOL_ADMIN");
   const [userSchoolIdInput, setUserSchoolIdInput] = useState<string>("");
   const [userFormErrors, setUserFormErrors] = useState<Partial<Record<"name" | "email" | "password" | "schoolId", string>>>({});
+
+  // Delete User Confirmation
+  const [userPendingDelete, setUserPendingDelete] = useState<ApiUser | null>(null);
+  const [deletingUser, setDeletingUser] = useState(false);
 
   // ID Card form & editing
   const [idCardFormOpen, setIdCardFormOpen] = useState(false);
@@ -844,6 +849,7 @@ export default function Home({
     if (authenticatedUser.role !== "SUPER_ADMIN") {
       return toast.error("Only administrators can create users");
     }
+    setEditingUser(null);
     setUserNameInput("");
     setUserEmailInput("");
     setUserPasswordInput("");
@@ -853,7 +859,25 @@ export default function Home({
     setUserModalOpen(true);
   };
 
-  const handleCreateUserSubmit = async (e: React.FormEvent) => {
+  const openEditUser = (user: ApiUser) => {
+    if (authenticatedUser.role !== "SUPER_ADMIN") {
+      return toast.error("Only administrators can edit users");
+    }
+    setEditingUser(user);
+    setUserNameInput(user.name || "");
+    setUserEmailInput(user.email || "");
+    setUserPasswordInput(""); // Blank = keep existing password
+    setUserRoleInput(
+      user.role === "SUPER_ADMIN" || user.role === "SCHOOL_ADMIN" || user.role === "MARKETING_ADMIN"
+        ? user.role
+        : "SCHOOL_ADMIN"
+    );
+    setUserSchoolIdInput(user.schoolId ? String(user.schoolId) : schools[0] ? String(schools[0].id) : "");
+    setUserFormErrors({});
+    setUserModalOpen(true);
+  };
+
+  const handleUserSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const errors: typeof userFormErrors = {};
     const email = userEmailInput.trim();
@@ -864,9 +888,13 @@ export default function Home({
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       errors.email = "Enter a valid email address.";
     }
-    if (!userPasswordInput) {
-      errors.password = "Temporary password is required.";
-    } else if (userPasswordInput.length < 8) {
+    if (!editingUser) {
+      if (!userPasswordInput) {
+        errors.password = "Temporary password is required.";
+      } else if (userPasswordInput.length < 8) {
+        errors.password = "Password must be at least 8 characters.";
+      }
+    } else if (userPasswordInput && userPasswordInput.length < 8) {
       errors.password = "Password must be at least 8 characters.";
     }
     if (userRoleInput === "SCHOOL_ADMIN" && (!userSchoolIdInput || !Number(userSchoolIdInput))) {
@@ -877,20 +905,64 @@ export default function Home({
     if (Object.keys(errors).length > 0) return;
 
     try {
-      const created = await api.users.create({
-        name: userNameInput.trim(),
-        email: userEmailInput.trim().toLowerCase(),
-        password: userPasswordInput,
-        role: userRoleInput,
-        schoolId: userRoleInput === "SCHOOL_ADMIN" ? Number(userSchoolIdInput) : undefined,
-      });
-      setUsers((prev) => [created, ...prev]);
-      setUserModalOpen(false);
-      toast.success(`User ${created.name || created.email} created successfully`);
+      if (editingUser) {
+        const payload: any = {
+          name: userNameInput.trim(),
+          email: userEmailInput.trim().toLowerCase(),
+          role: userRoleInput,
+          schoolId: userRoleInput === "SCHOOL_ADMIN" ? Number(userSchoolIdInput) : null,
+        };
+        if (userPasswordInput) {
+          payload.password = userPasswordInput;
+        }
+        const updated = await api.users.update(editingUser.id, payload);
+        setUsers((prev) => prev.map((u) => (u.id === editingUser.id ? { ...u, ...updated } : u)));
+        setUserModalOpen(false);
+        setEditingUser(null);
+        toast.success(`User ${updated.name || updated.email} updated successfully`);
+      } else {
+        const created = await api.users.create({
+          name: userNameInput.trim(),
+          email: userEmailInput.trim().toLowerCase(),
+          password: userPasswordInput,
+          role: userRoleInput,
+          schoolId: userRoleInput === "SCHOOL_ADMIN" ? Number(userSchoolIdInput) : undefined,
+        });
+        setUsers((prev) => [created, ...prev]);
+        setUserModalOpen(false);
+        toast.success(`User ${created.name || created.email} created successfully`);
+      }
     } catch (error) {
-      toast.error("Could not create user", {
+      toast.error(editingUser ? "Could not update user" : "Could not create user", {
         description: error instanceof Error ? error.message : "Request failed",
       });
+    }
+  };
+
+  const handleDeleteUser = (user: ApiUser) => {
+    if (authenticatedUser.role !== "SUPER_ADMIN") {
+      return toast.error("Only administrators can delete users");
+    }
+    if (authenticatedUser.id === user.id) {
+      return toast.error("You cannot delete your own account");
+    }
+    setUserPendingDelete(user);
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!userPendingDelete) return;
+    try {
+      setDeletingUser(true);
+      await api.users.delete(userPendingDelete.id);
+      setUsers((prev) => prev.filter((u) => u.id !== userPendingDelete.id));
+      toast.success(`User ${userPendingDelete.name || userPendingDelete.openId} deleted successfully`);
+      setUserPendingDelete(null);
+    } catch (error) {
+      toast.error("Could not delete user", {
+        description: error instanceof Error ? error.message : "Request failed",
+      });
+    } finally {
+      setDeletingUser(false);
     }
   };
 
@@ -2239,6 +2311,8 @@ export default function Home({
               onClearAuditLogs={handleClearAuditLogs}
               onEditSchool={handleEditSchool}
               onDeleteSchool={handleDeleteSchool}
+              onEditUser={openEditUser}
+              onDeleteUser={handleDeleteUser}
               onToggleSchoolStatus={handleToggleSchoolStatus}
               onDeleteTemplate={handleDeleteTemplate}
               activeSchool={currentActiveSchool}
@@ -2439,14 +2513,19 @@ export default function Home({
         </DialogContent>
       </Dialog>
 
-      {/* Dialog for Creating School User */}
-      <Dialog open={userModalOpen} onOpenChange={setUserModalOpen}>
+      {/* Dialog for Creating / Editing User */}
+      <Dialog open={userModalOpen} onOpenChange={(open) => {
+        setUserModalOpen(open);
+        if (!open) setEditingUser(null);
+      }}>
         <DialogContent className="sm:max-w-md">
-          <form onSubmit={handleCreateUserSubmit} noValidate>
+          <form onSubmit={handleUserSubmit} noValidate>
             <DialogHeader>
-              <DialogTitle>Add New User</DialogTitle>
+              <DialogTitle>{editingUser ? `Edit User: ${editingUser.name || editingUser.email || "User"}` : "Add New User"}</DialogTitle>
               <DialogDescription>
-                Create a school administrator, operator, or viewer account.
+                {editingUser
+                  ? "Update user details, role assignment, or change password."
+                  : "Create an administrator, school administrator, or marketing admin account."}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
@@ -2496,12 +2575,12 @@ export default function Home({
               </div>
               <div>
                 <label className="text-xs font-bold text-[#304541]">
-                  Temporary Password (min 8 chars) <span className="text-red-500">*</span>
+                  {editingUser ? "New Password (leave blank to keep current)" : "Temporary Password (min 8 chars)"} {!editingUser && <span className="text-red-500">*</span>}
                 </label>
                 <Input
                   type="password"
                   className="mt-1 aria-invalid:border-red-500 aria-invalid:ring-red-200"
-                  placeholder="••••••••"
+                  placeholder={editingUser ? "Leave blank to keep unchanged" : "••••••••"}
                   value={userPasswordInput}
                   onChange={(e) => {
                     setUserPasswordInput(e.target.value);
@@ -2582,17 +2661,59 @@ export default function Home({
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setUserModalOpen(false)}
+                onClick={() => {
+                  setUserModalOpen(false);
+                  setEditingUser(null);
+                }}
               >
                 Cancel
               </Button>
               <Button type="submit" className="bg-[#0f7f79] hover:bg-[#096c67]">
-                Create User
+                {editingUser ? "Save Changes" : "Create User"}
               </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Delete User Confirmation Dialog */}
+      <AlertDialog
+        open={Boolean(userPendingDelete)}
+        onOpenChange={(open) => {
+          if (!open) setUserPendingDelete(null);
+        }}
+      >
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-red-600 flex items-center gap-2">
+              <Trash2 className="h-5 w-5" />
+              Delete User
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2 text-sm text-gray-600">
+              <p>
+                Are you sure you want to permanently delete user{" "}
+                <b className="text-gray-900">{userPendingDelete?.name || userPendingDelete?.openId}</b> ({userPendingDelete?.role})?
+              </p>
+              <p className="text-xs text-red-500 font-medium">
+                This action cannot be undone. All audit log assignments and notifications for this account will be cleaned up.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingUser}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                confirmDeleteUser();
+              }}
+              disabled={deletingUser}
+              className="bg-red-600 hover:bg-red-700 text-white font-bold"
+            >
+              {deletingUser ? "Deleting..." : "Delete User"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* School Credentials & ID Pass Modal */}
       <Dialog open={credentialsModalOpen} onOpenChange={setCredentialsModalOpen}>
@@ -3388,6 +3509,8 @@ function ModuleView({
   onClearAuditLogs,
   onEditSchool,
   onDeleteSchool,
+  onEditUser,
+  onDeleteUser,
   onToggleSchoolStatus,
   onDeleteTemplate,
   activeSchool,
@@ -3432,6 +3555,8 @@ function ModuleView({
   onClearAuditLogs?: () => void;
   onEditSchool?: (school: ApiSchool) => void;
   onDeleteSchool?: (schoolId: number, schoolName: string) => void;
+  onEditUser?: (user: ApiUser) => void;
+  onDeleteUser?: (user: ApiUser) => void;
   onToggleSchoolStatus?: (school: ApiSchool) => void;
   onDeleteTemplate?: (templateId: number, templateName: string) => void;
   activeSchool?: ApiSchool;
@@ -4686,35 +4811,65 @@ function ModuleView({
                     </div>
                     <div>
                       <div className="text-sm font-extrabold text-[#304541] flex items-center gap-2">
-                        {user.name || user.email || user.openId}
+                        {user.name || user.email || "User"}
                         {user.schoolId && (
                           <span className="text-[10px] font-semibold text-[#0f7f79] bg-[#eef7f4] px-2 py-0.5 rounded-full">
                             School #{user.schoolId}
                           </span>
                         )}
                       </div>
-                      <div className="text-[11px] text-[#8d9995] flex flex-wrap items-center gap-2">
-                        <span>Login ID: <b className="font-mono text-[#4e5c59]">{user.openId}</b></span>
-                        {user.email ? (
-                          <>
-                            <span>·</span>
-                            <span>{user.email}</span>
-                          </>
-                        ) : null}
-                      </div>
+                      {user.email && (
+                        <div className="text-[11px] text-[#8d9995]">
+                          {user.email}
+                        </div>
+                      )}
                     </div>
                   </div>
-                  <StatusPill
-                    tone={
-                      user.role === "SUPER_ADMIN"
-                        ? "indigo"
-                        : user.role === "MARKETING_ADMIN"
-                        ? "yellow"
-                        : "teal"
-                    }
-                  >
-                    {user.role === "MARKETING_ADMIN" ? "Marketing Admin" : user.role.replace(/_/g, " ")}
-                  </StatusPill>
+                  <div className="flex items-center gap-2">
+                    <StatusPill
+                      tone={
+                        user.role === "SUPER_ADMIN"
+                          ? "indigo"
+                          : user.role === "MARKETING_ADMIN"
+                          ? "yellow"
+                          : "teal"
+                      }
+                    >
+                      {user.role === "MARKETING_ADMIN" ? "Marketing Admin" : user.role.replace(/_/g, " ")}
+                    </StatusPill>
+
+                    {authenticatedUser.role === "SUPER_ADMIN" && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#d3ded8] bg-white text-[#556561] shadow-2xs hover:border-[#0f7f79] hover:bg-[#f2f7f4] hover:text-[#0f7f79] focus:outline-none"
+                            title="Actions"
+                            aria-label={`Actions for user ${user.name || user.openId}`}
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-36 bg-white p-1 rounded-xl shadow-lg border border-[#e2e8e3]">
+                          <DropdownMenuItem
+                            onClick={() => onEditUser?.(user)}
+                            className="flex items-center gap-2 px-2.5 py-2 text-xs font-semibold text-[#304541] hover:bg-[#f2f7f4] rounded-lg cursor-pointer"
+                          >
+                            <FileEdit className="h-3.5 w-3.5" />
+                            Edit
+                          </DropdownMenuItem>
+                          {user.id !== authenticatedUser.id && (
+                            <DropdownMenuItem
+                              onClick={() => onDeleteUser?.(user)}
+                              className="flex items-center gap-2 px-2.5 py-2 text-xs font-semibold text-[#dc2626] hover:bg-[#fef2f2] rounded-lg cursor-pointer"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              Delete
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                  </div>
                 </div>
               ))
             )}
