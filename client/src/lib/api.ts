@@ -35,6 +35,7 @@ export type ApiTemplate = {
   status: string;
   accent: "teal" | "coral" | "indigo" | "yellow";
   orientation?: "portrait" | "landscape";
+  cardType?: "student" | "staff";
   cardWidth?: number;
   cardHeight?: number;
   elements?: ApiTemplateElement[];
