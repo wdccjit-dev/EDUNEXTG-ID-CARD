@@ -59,10 +59,9 @@ async function startServer() {
   });
   app.use(express.json({ limit: "8mb" }));
   app.use(express.urlencoded({ limit: "8mb", extended: true }));
-  const authRateLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 20 });
-  app.use("/api/auth/login", authRateLimiter);
-  app.use("/api/auth/forgot-password", authRateLimiter);
-  app.use("/api/auth/reset-password", authRateLimiter);
+  app.use("/api/auth/login", createRateLimiter({ windowMs: 15 * 60 * 1000, max: 50 }));
+  app.use("/api/auth/forgot-password", createRateLimiter({ windowMs: 60 * 60 * 1000, max: 5 }));
+  app.use("/api/auth/reset-password", createRateLimiter({ windowMs: 60 * 60 * 1000, max: 10 }));
   registerStorageProxy(app);
   registerOAuthRoutes(app);
   app.use("/api", apiRouter);

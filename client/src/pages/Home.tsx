@@ -442,23 +442,25 @@ export default function Home({
   // Excel upload modal
   const [excelUploadOpen, setExcelUploadOpen] = useState(false);
 
-  const handleDownloadExampleExcel = async (templateId?: number) => {
+  const handleDownloadExampleExcel = async (templateId?: number, cardType?: string) => {
     try {
       const targetTemplateId = templateId || currentActiveSchool?.selectedTemplateId || undefined;
       const targetSchoolId = currentActiveSchool?.id || authenticatedUser.schoolId || undefined;
       const blob = await api.requests.downloadExampleExcel({
         templateId: targetTemplateId,
         schoolId: targetSchoolId,
+        cardType,
       });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `ID_Card_Requests_Template_${targetTemplateId || "Standard"}.xlsx`;
+      const label = cardType === "staff" ? "Staff" : "Student";
+      a.download = `ID_Card_${label}_Template_${targetTemplateId || "Standard"}.xlsx`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      toast.success("Example Excel file downloaded successfully");
+      toast.success(`${label} example Excel file downloaded successfully`);
     } catch (err: any) {
       toast.error("Download failed", {
         description: err instanceof Error ? err.message : "Failed to download example Excel",
@@ -3564,7 +3566,7 @@ function ModuleView({
   onApproveCardDirect?: (cardId: number, num: string) => void;
   onRejectCardDirect?: (cardId: number) => void;
   onOpenExcelUpload?: () => void;
-  onDownloadExampleExcel?: (templateId?: number) => void;
+  onDownloadExampleExcel?: (templateId?: number, cardType?: string) => void;
   onRemoveApproved?: (cardIds: number[]) => Promise<void>;
 }) {
   const [, navigate] = useLocation();
@@ -3795,10 +3797,17 @@ function ModuleView({
             <>
               <Button
                 variant="outline"
-                onClick={() => onDownloadExampleExcel?.(activeSchool?.selectedTemplateId ?? undefined)}
+                onClick={() => onDownloadExampleExcel?.(activeSchool?.selectedTemplateId ?? undefined, "student")}
                 className="h-10 rounded-xl border-[#d1ded9] text-[#0f7f79] hover:bg-[#eef7f4] text-xs font-bold shadow-sm"
               >
-                <Download className="mr-2 h-4 w-4" /> Download Example Excel
+                <Download className="mr-2 h-4 w-4" /> Student Excel
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => onDownloadExampleExcel?.(activeSchool?.selectedTemplateId ?? undefined, "staff")}
+                className="h-10 rounded-xl border-[#d1ded9] text-[#6d28d9] hover:bg-[#f3f0ff] text-xs font-bold shadow-sm"
+              >
+                <Download className="mr-2 h-4 w-4" /> Staff Excel
               </Button>
               <Button
                 variant="outline"

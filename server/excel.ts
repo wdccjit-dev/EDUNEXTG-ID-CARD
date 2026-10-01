@@ -33,6 +33,7 @@ export function generateExampleExcelBuffer(
 
   // Example row matching the header columns (for visual guidance only)
   const sampleRow: Record<string, string> = {
+    // Student fields
     "Student Name": "Rahul Kumar",
     "Class": "10",
     "Section": "A",
@@ -47,6 +48,14 @@ export function generateExampleExcelBuffer(
     "Phone": "9876543210",
     "Address": "42 Park Avenue, New Delhi",
     "School Name": "Sample Public School",
+    // Staff fields
+    "Staff Name": "Dr. Priya Sharma",
+    "Employee ID": "EMP-2026-042",
+    "Department": "Mathematics",
+    "Designation": "Senior Teacher",
+    "Qualification": "M.Sc., B.Ed.",
+    "Experience": "12 Years",
+    "Joining Date": "2014-04-01",
   };
 
   const rowValues = fields.map((f) => sampleRow[f.label] || "");
@@ -165,9 +174,9 @@ export function parseExcelBuffer(
       }
     }
 
-    // Resolve studentName and admissionCode
-    const studentName = data["student_name"] || data["name"] || undefined;
-    const admissionCode = data["admission_number"] || data["admission_code"] || data["roll_number"] || undefined;
+    // Resolve student/staff name and admission/employee code
+    const studentName = data["student_name"] || data["staff_name"] || data["name"] || undefined;
+    const admissionCode = data["admission_number"] || data["employee_id"] || data["admission_code"] || data["roll_number"] || undefined;
 
     if (!studentName && !admissionCode && Object.keys(data).length === 0) {
       // Blank or useless row
@@ -177,7 +186,7 @@ export function parseExcelBuffer(
     if (!studentName && !admissionCode) {
       errors.push({
         rowNumber,
-        reason: "Row is missing both Student Name and Admission/Roll Number",
+        reason: "Row is missing Name and Identifier (Admission Number, Roll Number, or Employee ID)",
       });
       continue;
     }

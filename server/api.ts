@@ -1,6 +1,6 @@
 import path from "node:path";
 import { Router, type NextFunction, type Request, type Response } from "express";
-import { and, desc, eq, gte, inArray, isNull, like, lte, ne, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, like, lte, ne, or, sql } from "drizzle-orm";
 import {
   approvalHistory,
   auditLogs,
@@ -23,6 +23,7 @@ import {
 } from "../drizzle/schema";
 import { getDb } from "./db";
 import { ENV } from "./_core/env";
+import { checkAccountLockout, recordAccountLoginFailure, resetAccountLoginFailure } from "./_core/rateLimit";
 import { authenticateApplicationRequest, clearApplicationSession, createPasswordReset, hashPassword, loginUser, resetPassword, setApplicationSession, signApplicationSession, verifyPassword } from "./appAuth";
 import { generateSingleCardPdf, generateBulkCardPdf, type CardPdfData, type PrintPdfOptions } from "./pdf";
 import { isValidIndianMobileNumber, INDIAN_MOBILE_ERROR_MESSAGE } from "../shared/types";
@@ -195,8 +196,19 @@ router.post("/auth/login", async (req, res) => {
     const identifier = String(req.body.username ?? req.body.email ?? "").trim();
     const password = String(req.body.password ?? "");
     if (!identifier || password.length < 8) return res.status(400).json({ error: "Valid username/email and password are required" });
+
+    const lockout = checkAccountLockout(identifier);
+    if (lockout.locked) {
+      res.setHeader("Retry-After", lockout.retryAfterSeconds);
+      return res.status(429).json({ error: "Too many requests. Please try again later." });
+    }
+
     const result = await loginUser(identifier, password);
-    if (!result) return res.status(401).json({ error: "Invalid username or password" });
+    if (!result) {
+      recordAccountLoginFailure(identifier);
+      return res.status(401).json({ error: "Invalid username or password" });
+    }
+    resetAccountLoginFailure(identifier);
     setApplicationSession(res, result.token);
     const { passwordHash: _passwordHash, ...safeUser } = result.user;
     const db = await getDb();
@@ -994,6 +1006,7 @@ router.post("/templates", requireRole(adminRoles), async (req, res) => {
       status: req.body.status ?? "DRAFT",
       accent: req.body.accent ?? "teal",
       orientation: req.body.orientation ?? "portrait",
+      cardType: req.body.cardType ?? "student",
       cardWidth: req.body.cardWidth ? Number(req.body.cardWidth) : DEFAULT_TEMPLATE_CARD_SIZE.width,
       cardHeight: req.body.cardHeight ? Number(req.body.cardHeight) : DEFAULT_TEMPLATE_CARD_SIZE.height,
       createdByUserId: currentUser(res).id,
@@ -1066,6 +1079,7 @@ router.put("/templates/:id", requireRole(adminRoles), async (req, res) => {
     if (req.body.accent !== undefined) updateSet.accent = req.body.accent;
     if (req.body.status !== undefined) updateSet.status = req.body.status;
     if (req.body.orientation !== undefined) updateSet.orientation = req.body.orientation;
+    if (req.body.cardType !== undefined) updateSet.cardType = req.body.cardType;
     if (req.body.cardWidth !== undefined) updateSet.cardWidth = Number(req.body.cardWidth);
     if (req.body.cardHeight !== undefined) updateSet.cardHeight = Number(req.body.cardHeight);
     if (Object.keys(updateSet).length) await db.update(idCardTemplates).set(updateSet).where(eq(idCardTemplates.id, id));
@@ -1681,7 +1695,7 @@ router.get("/id-cards/:id", async (req, res) => {
         .from(approvalHistory)
         .leftJoin(users, eq(approvalHistory.actedByUserId, users.id))
         .where(eq(approvalHistory.idCardId, card.id))
-        .orderBy(desc(approvalHistory.createdAt));
+        .orderBy(asc(approvalHistory.id));
     }
 
     const dataMap: Record<string, string> = {};
@@ -3409,12 +3423,20 @@ router.get("/id-card-requests/example-excel", async (req, res) => {
       }
     }
 
+    // Determine cardType: from query param, template, or default
+    let cardType: "student" | "staff" = (req.query.cardType as string) === "staff" ? "staff" : "student";
+    if (!req.query.cardType && templateId) {
+      const tmplRow = (await db.select().from(idCardTemplates).where(eq(idCardTemplates.id, templateId)))[0] as any;
+      if (tmplRow?.cardType === "staff") cardType = "staff";
+    }
+
     // Dynamic field list driven by designer/template configuration
-    const availableFields = getAvailableDynamicFields(elements);
+    const availableFields = getAvailableDynamicFields(elements, cardType);
     const excelBuffer = generateExampleExcelBuffer(availableFields);
 
+    const fileLabel = cardType === "staff" ? "staff" : "student";
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-    res.setHeader("Content-Disposition", `attachment; filename="id_card_requests_template.xlsx"`);
+    res.setHeader("Content-Disposition", `attachment; filename="id_card_requests_${fileLabel}_template.xlsx"`);
     res.setHeader("Content-Length", excelBuffer.length);
     res.end(excelBuffer);
   } catch (e) {
@@ -3483,7 +3505,7 @@ router.post("/id-card-requests/upload-excel", requireRole(schoolWriteRoles), asy
     }
 
     const tmplElements = await db.select().from(templateElements).where(eq(templateElements.templateId, templateId));
-    const availableFields = getAvailableDynamicFields(tmplElements);
+    const availableFields = getAvailableDynamicFields(tmplElements, (template as any)?.cardType || "student");
 
     // Decode base64 buffer
     let fileBuffer: Buffer;

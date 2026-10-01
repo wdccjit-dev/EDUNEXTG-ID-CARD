@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Separator } from "@/components/ui/separator";
-import { DYNAMIC_FIELDS } from "@shared/templateDesigner";
+import { DYNAMIC_FIELDS, getDynamicFieldsForCardType } from "@shared/templateDesigner";
 import type { DesignerElement, ElementConfig } from "@shared/templateDesigner";
 import type { DesignerAction, TemplateMeta } from "./useDesignerState";
 
@@ -251,7 +251,7 @@ export default function PropertyPanel({ selectedElement, template, dispatch }: P
                 <Select value={c.dynamicField ?? "student_name"} onValueChange={(v) => update({ dynamicField: v as ElementConfig["dynamicField"] })}>
                   <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {DYNAMIC_FIELDS.map((f) => (
+                  {getDynamicFieldsForCardType(template.cardType).map((f) => (
                       <SelectItem key={f.key} value={f.key}>{f.label}</SelectItem>
                     ))}
                   </SelectContent>
@@ -402,7 +402,7 @@ export default function PropertyPanel({ selectedElement, template, dispatch }: P
                 <Select value={c.qrField ?? "admission_number"} onValueChange={(v) => update({ qrField: v })}>
                   <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {DYNAMIC_FIELDS.map((f) => (
+                    {getDynamicFieldsForCardType(template.cardType).map((f) => (
                       <SelectItem key={f.key} value={f.key}>{f.label}</SelectItem>
                     ))}
                   </SelectContent>
@@ -420,7 +420,7 @@ export default function PropertyPanel({ selectedElement, template, dispatch }: P
                 <Select value={c.barcodeField ?? "admission_number"} onValueChange={(v) => update({ barcodeField: v })}>
                   <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {DYNAMIC_FIELDS.map((f) => (
+                    {getDynamicFieldsForCardType(template.cardType).map((f) => (
                       <SelectItem key={f.key} value={f.key}>{f.label}</SelectItem>
                     ))}
                   </SelectContent>

@@ -21,6 +21,10 @@ export type DesignerElementType = (typeof ELEMENT_TYPES)[number];
 
 export type DesignerSide = "FRONT" | "BACK";
 
+// ─── Card Type ──────────────────────────────────────────────────────────────
+
+export type CardType = "student" | "staff";
+
 // ─── Dynamic Fields ─────────────────────────────────────────────────────────
 
 export const DYNAMIC_FIELDS = [
@@ -40,7 +44,29 @@ export const DYNAMIC_FIELDS = [
   { key: "school_name", label: "School Name", category: "School" },
 ] as const;
 
+export const STAFF_DYNAMIC_FIELDS = [
+  { key: "staff_name", label: "Staff Name", category: "Staff" },
+  { key: "employee_id", label: "Employee ID", category: "Staff" },
+  { key: "department", label: "Department", category: "Staff" },
+  { key: "designation", label: "Designation", category: "Staff" },
+  { key: "dob", label: "Date of Birth", category: "Staff" },
+  { key: "gender", label: "Gender", category: "Staff" },
+  { key: "blood_group", label: "Blood Group", category: "Staff" },
+  { key: "qualification", label: "Qualification", category: "Staff" },
+  { key: "experience", label: "Experience", category: "Staff" },
+  { key: "joining_date", label: "Joining Date", category: "Staff" },
+  { key: "phone", label: "Phone", category: "Contact" },
+  { key: "address", label: "Address", category: "Contact" },
+  { key: "school_name", label: "School Name", category: "School" },
+] as const;
+
 export type DynamicFieldKey = (typeof DYNAMIC_FIELDS)[number]["key"];
+export type StaffDynamicFieldKey = (typeof STAFF_DYNAMIC_FIELDS)[number]["key"];
+
+/** Returns the correct dynamic fields array based on card type */
+export function getDynamicFieldsForCardType(cardType: CardType = "student") {
+  return cardType === "staff" ? [...STAFF_DYNAMIC_FIELDS] : [...DYNAMIC_FIELDS];
+}
 
 /**
  * Resolves the dynamic fields available for a given template configuration,
@@ -48,9 +74,12 @@ export type DynamicFieldKey = (typeof DYNAMIC_FIELDS)[number]["key"];
  */
 export function getAvailableDynamicFields(
   templateElements?: Array<any>,
+  cardType: CardType = "student",
 ): Array<{ key: string; label: string; category: string }> {
+  const baseFields = getDynamicFieldsForCardType(cardType);
+
   if (!templateElements || templateElements.length === 0) {
-    return [...DYNAMIC_FIELDS];
+    return baseFields;
   }
 
   const usedKeys = new Set<string>();
@@ -71,36 +100,49 @@ export function getAvailableDynamicFields(
     }
   }
 
-  // Always ensure essential student, academic, family, and contact fields are available in the Excel schema:
-  // Student Name, Class, Section, Roll Number, Admission Number, Date of Birth, Gender, Blood Group,
-  // Father's Name, Mother's Name, Guardian Name, Phone, Address
-  const defaultStandardKeys = [
-    "student_name",
-    "class",
-    "section",
-    "roll_number",
-    "admission_number",
-    "dob",
-    "gender",
-    "blood_group",
-    "father_name",
-    "mother_name",
-    "guardian_name",
-    "phone",
-    "address",
-  ];
+  // Always ensure essential fields are available in the Excel schema based on card type
+  const defaultStandardKeys = cardType === "staff"
+    ? [
+        "staff_name",
+        "employee_id",
+        "department",
+        "designation",
+        "dob",
+        "gender",
+        "blood_group",
+        "qualification",
+        "experience",
+        "joining_date",
+        "phone",
+        "address",
+      ]
+    : [
+        "student_name",
+        "class",
+        "section",
+        "roll_number",
+        "admission_number",
+        "dob",
+        "gender",
+        "blood_group",
+        "father_name",
+        "mother_name",
+        "guardian_name",
+        "phone",
+        "address",
+      ];
 
   for (const k of defaultStandardKeys) {
     usedKeys.add(k);
   }
 
-  const matched = DYNAMIC_FIELDS.filter((f) => {
+  const matched = baseFields.filter((f) => {
     if (usedKeys.has(f.key)) return true;
-    // Map roll_no to roll_number
+    // Map roll_no to roll_number (student only)
     if (f.key === "roll_number" && usedKeys.has("roll_no")) return true;
     return false;
   });
-  return matched.length > 0 ? matched : [...DYNAMIC_FIELDS];
+  return matched.length > 0 ? matched : baseFields;
 }
 
 /**
@@ -128,6 +170,7 @@ export function matchDynamicField(
 
   // 2. Common aliases/variations
   const aliases: Record<string, string> = {
+    // Student aliases
     studentname: "student_name",
     name: "student_name",
     student: "student_name",
@@ -150,6 +193,29 @@ export function matchDynamicField(
     guardianname: "guardian_name",
     guardiansname: "guardian_name",
     guardian: "guardian_name",
+    // Staff aliases
+    staffname: "staff_name",
+    employeename: "staff_name",
+    teachername: "staff_name",
+    employeeid: "employee_id",
+    empid: "employee_id",
+    staffid: "employee_id",
+    department: "department",
+    dept: "department",
+    designation: "designation",
+    position: "designation",
+    title: "designation",
+    role: "designation",
+    qualification: "qualification",
+    degree: "qualification",
+    education: "qualification",
+    experience: "experience",
+    exp: "experience",
+    joiningdate: "joining_date",
+    dateofjoining: "joining_date",
+    joindate: "joining_date",
+    doj: "joining_date",
+    // Common aliases
     dob: "dob",
     dateofbirth: "dob",
     birthdate: "dob",
@@ -231,6 +297,26 @@ export const SAMPLE_CARD_DATA: Record<string, string> = {
   address: "42 Park Avenue, New Delhi",
   school_name: "Greenwood High School",
 };
+
+export const SAMPLE_STAFF_CARD_DATA: Record<string, string> = {
+  staff_name: "Dr. Priya Sharma",
+  employee_id: "EMP-2026-042",
+  department: "Mathematics",
+  designation: "Senior Teacher",
+  dob: "15/08/1985",
+  gender: "Female",
+  blood_group: "O+",
+  qualification: "M.Sc., B.Ed.",
+  experience: "12 Years",
+  joining_date: "01/04/2014",
+  phone: "+91 98765 12345",
+  address: "18 Green Lane, New Delhi",
+  school_name: "Greenwood High School",
+};
+
+export function getSampleCardData(cardType: CardType = "student"): Record<string, string> {
+  return cardType === "staff" ? SAMPLE_STAFF_CARD_DATA : SAMPLE_CARD_DATA;
+}
 
 // ─── Element Configuration ──────────────────────────────────────────────────
 
@@ -343,7 +429,7 @@ export function defaultElementConfig(type: DesignerElementType, side: DesignerSi
     case "LINE":
       return { ...base, width: 200, height: 2, lineDirection: "horizontal", lineColor: "#cccccc", lineWidth: 2 };
     case "DYNAMIC_FIELD":
-      return { ...base, dynamicField: "student_name", fontFamily: "Inter", fontSize: 14, fontWeight: "600", fontStyle: "normal", textAlign: "left", textColor: "#1a1a1a" };
+      return { ...base, dynamicField: "student_name" as any, fontFamily: "Inter", fontSize: 14, fontWeight: "600", fontStyle: "normal", textAlign: "left", textColor: "#1a1a1a" };
     default:
       return base;
   }

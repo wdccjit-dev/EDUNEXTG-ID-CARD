@@ -292,10 +292,11 @@ export const api = {
     },
   },
   requests: {
-    downloadExampleExcel: async (params?: { schoolId?: number; templateId?: number }) => {
+    downloadExampleExcel: async (params?: { schoolId?: number; templateId?: number; cardType?: string }) => {
       const sp = new URLSearchParams();
       if (params?.schoolId) sp.set("schoolId", String(params.schoolId));
       if (params?.templateId) sp.set("templateId", String(params.templateId));
+      if (params?.cardType) sp.set("cardType", params.cardType);
       const qs = sp.toString();
       const res = await fetch(`/api/id-card-requests/example-excel${qs ? `?${qs}` : ""}`, {
         credentials: "include",

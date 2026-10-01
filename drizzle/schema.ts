@@ -71,6 +71,7 @@ export const schools = mysqlTable("schools", {
 });
 
 export const templateOrientationValues = ["portrait", "landscape"] as const;
+export const cardTypeValues = ["student", "staff"] as const;
 
 export const idCardTemplates = mysqlTable(
   "idCardTemplates",
@@ -79,6 +80,7 @@ export const idCardTemplates = mysqlTable(
     name: varchar("name", { length: 191 }).notNull(),
     meta: varchar("meta", { length: 191 }),
     orientation: mysqlEnum("orientation", templateOrientationValues).default("landscape").notNull(),
+    cardType: mysqlEnum("cardType", cardTypeValues).default("student").notNull(),
     cardWidth: int("cardWidth").default(324).notNull(),
     cardHeight: int("cardHeight").default(204).notNull(),
     accent: mysqlEnum("accent", ["teal", "coral", "indigo", "yellow"]).default("teal").notNull(),

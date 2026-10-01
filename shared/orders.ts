@@ -8,6 +8,26 @@ export const HOOK_TYPES = [
 
 export type HookType = (typeof HOOK_TYPES)[number];
 
+export const HOLDER_TYPES = [
+  "5pp (Plastic)",
+  "5pc (Plastic Transparent)",
+  "White (Plastic)",
+  "Metal Silver",
+  "Metal Gold",
+  "Transparent (Both side cover)",
+] as const;
+
+export type HolderType = (typeof HOLDER_TYPES)[number];
+
+export const LANYARD_SIZES = [
+  "16mm",
+  "18mm",
+  "20mm",
+] as const;
+
+export type LanyardSize = (typeof LANYARD_SIZES)[number];
+
+
 export const CARD_MATERIALS = [
   { value: "PVC_STANDARD", label: "PVC Standard" },
   { value: "PVC_PREMIUM", label: "PVC Premium" },

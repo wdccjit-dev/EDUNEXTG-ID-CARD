@@ -6,6 +6,7 @@ import type {
   ElementConfig,
   TemplateOrientation,
   TemplateStatus,
+  CardType,
 } from "@shared/templateDesigner";
 import { defaultElementConfig, generateElementKey } from "@shared/templateDesigner";
 
@@ -16,6 +17,7 @@ export interface TemplateMeta {
   name: string;
   description: string | null;
   orientation: TemplateOrientation;
+  cardType: CardType;
   cardWidth: number;
   cardHeight: number;
   status: TemplateStatus;
@@ -85,7 +87,11 @@ function designerReducer(state: DesignerState, action: DesignerAction): Designer
       const withUndo = pushUndo(state);
       const config = defaultElementConfig(action.elementType, state.activeSide);
       const key = generateElementKey(action.elementType);
-      const label = action.elementType === "DYNAMIC_FIELD" ? `{{${config.dynamicField ?? "student_name"}}}` : action.elementType;
+      const defaultField = state.template.cardType === "staff" ? "staff_name" : "student_name";
+      if (action.elementType === "DYNAMIC_FIELD") {
+        config.dynamicField = defaultField as any;
+      }
+      const label = action.elementType === "DYNAMIC_FIELD" ? `{{${config.dynamicField ?? defaultField}}}` : action.elementType;
       const newElement: DesignerElement = {
         elementKey: key,
         elementType: action.elementType,

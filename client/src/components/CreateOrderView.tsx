@@ -2,12 +2,16 @@ import { useEffect, useState } from "react";
 import { api, type ApiAuthUser, type ApiSchool } from "@/lib/api";
 import {
   HOOK_TYPES,
+  HOLDER_TYPES,
+  LANYARD_SIZES,
   CARD_MATERIALS,
   ORDER_TYPES,
   PRINT_SIDES,
   type OrderType,
   type PrintSides,
   type CardMaterial,
+  type HolderType,
+  type LanyardSize,
 } from "@shared/orders";
 import { isValidIndianMobileNumber } from "@shared/phoneValidation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -64,6 +68,7 @@ export default function CreateOrderView({
     isSchoolAdmin ? user.schoolId || null : null,
   );
   const [hookType, setHookType] = useState<string>("Lanyard hook");
+  const [holderType, setHolderType] = useState<HolderType>("5pp (Plastic)");
   const [clip, setClip] = useState<boolean>(true);
   const [className, setClassName] = useState<string>("");
   const [section, setSection] = useState<string>("");
@@ -72,6 +77,7 @@ export default function CreateOrderView({
   const [cardMaterial, setCardMaterial] = useState<CardMaterial>("PVC_STANDARD");
   const [lanyardIncluded, setLanyardIncluded] = useState<boolean>(true);
   const [lanyardColor, setLanyardColor] = useState<string>("Navy Blue");
+  const [lanyardSize, setLanyardSize] = useState<LanyardSize>("16mm");
   const [neededByDate, setNeededByDate] = useState<string>("");
   const [deliveryAddress, setDeliveryAddress] = useState<string>("");
   const [contactPerson, setContactPerson] = useState<string>(user.name || "");
@@ -169,7 +175,13 @@ export default function CreateOrderView({
         deliveryAddress: deliveryAddress.trim(),
         contactPerson: contactPerson.trim(),
         contactPhone: cleanPhone,
-        notes: notes.trim() || null,
+        notes: [
+          `Holder Type: ${holderType}`,
+          lanyardIncluded ? `Lanyard Size: ${lanyardSize}` : null,
+          notes.trim() || null,
+        ]
+          .filter(Boolean)
+          .join(" | "),
       });
 
       toast.success(`Order #${res.orderNumber} created successfully!`, {
@@ -376,7 +388,24 @@ export default function CreateOrderView({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 pt-2 border-t border-gray-100">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 pt-2 border-t border-gray-100">
+              {/* Holder Type */}
+              <div>
+                <Label className="text-xs font-bold text-gray-700">Holder Type *</Label>
+                <Select value={holderType} onValueChange={(val: HolderType) => setHolderType(val)}>
+                  <SelectTrigger className="mt-1 h-10 text-xs rounded-xl">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {HOLDER_TYPES.map((ht) => (
+                      <SelectItem key={ht} value={ht}>
+                        {ht}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               {/* Hook Type */}
               <div>
                 <Label className="text-xs font-bold text-gray-700">Hook Type *</Label>
@@ -421,14 +450,31 @@ export default function CreateOrderView({
               </div>
 
               {lanyardIncluded && (
-                <div className="pt-2 border-t border-gray-200">
-                  <Label className="text-xs font-bold text-gray-700">Lanyard Color</Label>
-                  <Input
-                    className="mt-1 text-xs rounded-xl bg-white"
-                    placeholder="e.g. Navy Blue, Maroon, Dark Green"
-                    value={lanyardColor}
-                    onChange={(e) => setLanyardColor(e.target.value)}
-                  />
+                <div className="pt-2 border-t border-gray-200 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs font-bold text-gray-700">Lanyard Size *</Label>
+                    <Select value={lanyardSize} onValueChange={(val: LanyardSize) => setLanyardSize(val)}>
+                      <SelectTrigger className="mt-1 h-10 text-xs rounded-xl bg-white">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {LANYARD_SIZES.map((size) => (
+                          <SelectItem key={size} value={size}>
+                            {size}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs font-bold text-gray-700">Lanyard Color</Label>
+                    <Input
+                      className="mt-1 text-xs rounded-xl bg-white h-10"
+                      placeholder="e.g. Navy Blue, Maroon, Dark Green"
+                      value={lanyardColor}
+                      onChange={(e) => setLanyardColor(e.target.value)}
+                    />
+                  </div>
                 </div>
               )}
             </div>
