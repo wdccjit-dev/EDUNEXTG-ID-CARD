@@ -153,17 +153,17 @@ export default function ExcelUploadModal({
         onOpenChange(v);
       }}
     >
-      <DialogContent className="w-[95vw] sm:max-w-lg p-5 sm:p-6">
+      <DialogContent className="w-[95vw] sm:max-w-lg p-5 sm:p-6 text-card-foreground">
         <DialogHeader>
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#eef7f4] text-[#0f7f79]">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
               <FileSpreadsheet className="h-5 w-5" />
             </div>
             <div>
-              <DialogTitle className="text-lg font-bold text-[#203734]">
+              <DialogTitle className="text-lg font-bold text-foreground">
                 Upload ID Card Requests
               </DialogTitle>
-              <DialogDescription className="text-xs text-[#778381] mt-0.5">
+              <DialogDescription className="text-xs text-muted-foreground mt-0.5">
                 Bulk create ID card requests from an Excel spreadsheet.
               </DialogDescription>
             </div>
@@ -174,15 +174,15 @@ export default function ExcelUploadModal({
           {/* School Selector (Super Admin only) */}
           {userRole === "SUPER_ADMIN" && schools.length > 0 && (
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-[#38514e]">Target School</label>
+              <label className="text-xs font-bold text-foreground">Target School</label>
               <Select
                 value={String(selectedSchoolId)}
                 onValueChange={(val) => setSelectedSchoolId(Number(val))}
               >
-                <SelectTrigger className="h-10 text-xs rounded-xl border-[#e2e8e3]">
+                <SelectTrigger className="h-10 text-xs rounded-xl border-border">
                   <SelectValue placeholder="Select School" />
                 </SelectTrigger>
-                <SelectContent className="rounded-xl border-[#e2e8e3]">
+                <SelectContent className="rounded-xl border-border">
                   {schools.map((s) => (
                     <SelectItem key={s.id} value={String(s.id)}>
                       {s.name} ({s.shortCode})
@@ -196,15 +196,15 @@ export default function ExcelUploadModal({
           {/* Template Selector */}
           {templates.length > 0 && (
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-[#38514e]">ID Card Template</label>
+              <label className="text-xs font-bold text-foreground">ID Card Template</label>
               <Select
                 value={selectedTemplateId ? String(selectedTemplateId) : undefined}
                 onValueChange={(val) => setSelectedTemplateId(Number(val))}
               >
-                <SelectTrigger className="h-10 text-xs rounded-xl border-[#e2e8e3]">
+                <SelectTrigger className="h-10 text-xs rounded-xl border-border">
                   <SelectValue placeholder="Auto-detect School Default Template" />
                 </SelectTrigger>
-                <SelectContent className="rounded-xl border-[#e2e8e3]">
+                <SelectContent className="rounded-xl border-border">
                   {templates.map((t) => (
                     <SelectItem key={t.id} value={String(t.id)}>
                       {t.name} ({t.orientation})
@@ -216,7 +216,7 @@ export default function ExcelUploadModal({
           )}
 
           {/* Critical Empty Value Handling Notice */}
-          <div className="flex items-start gap-2.5 rounded-xl border border-[#b7e3d9] bg-[#f0faf7] p-3 text-xs text-[#0f7f79]">
+          <div className="flex items-start gap-2.5 rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs text-primary">
             <Info className="h-4 w-4 shrink-0 mt-0.5" />
             <div className="leading-relaxed">
               <strong>Empty Field Rule:</strong> Any empty, blank, or whitespace cell in your Excel file will <strong>not</strong> be added to that student&apos;s ID card data.
@@ -225,7 +225,7 @@ export default function ExcelUploadModal({
 
           {/* File Picker */}
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-[#38514e]">Choose Excel Spreadsheet</label>
+            <label className="text-xs font-bold text-foreground">Choose Excel Spreadsheet</label>
             <input
               ref={fileInputRef}
               type="file"
@@ -236,23 +236,23 @@ export default function ExcelUploadModal({
             />
             <div
               onClick={() => fileInputRef.current?.click()}
-              className="flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[#dfe7e2] hover:border-[#0f7f79] p-5 text-center cursor-pointer transition-colors bg-[#fbfdfb]"
+              className="flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border hover:border-primary p-5 text-center cursor-pointer transition-colors bg-muted/20"
             >
-              <Upload className="h-6 w-6 text-[#98a4a1]" />
+              <Upload className="h-6 w-6 text-muted-foreground" />
               {selectedFile ? (
-                <div className="flex items-center gap-2 text-xs font-bold text-[#203734]">
-                  <FileSpreadsheet className="h-4 w-4 text-[#0f7f79]" />
+                <div className="flex items-center gap-2 text-xs font-bold text-foreground">
+                  <FileSpreadsheet className="h-4 w-4 text-primary" />
                   <span>{selectedFile.name}</span>
-                  <span className="text-gray-400 font-normal">
+                  <span className="text-muted-foreground font-normal">
                     ({(selectedFile.size / 1024).toFixed(1)} KB)
                   </span>
                 </div>
               ) : (
                 <>
-                  <div className="text-xs font-bold text-[#304541]">
+                  <div className="text-xs font-bold text-foreground">
                     Click to browse or drop file here
                   </div>
-                  <div className="text-[11px] text-[#98a4a1]">
+                  <div className="text-[11px] text-muted-foreground">
                     Supports Microsoft Excel (.xlsx, .xls) and CSV
                   </div>
                 </>
@@ -262,14 +262,14 @@ export default function ExcelUploadModal({
 
           {/* Upload Result Summary */}
           {result && (
-            <div className="rounded-2xl border border-[#e2e8e3] bg-white p-4 space-y-3">
+            <div className="rounded-2xl border border-border bg-card text-card-foreground p-4 space-y-3">
               <div className="flex items-center justify-between text-xs font-bold">
-                <div className="flex items-center gap-2 text-[#0f7f79]">
+                <div className="flex items-center gap-2 text-primary">
                   <CheckCircle2 className="h-4 w-4" />
                   <span>Successfully processed: {result.processed} rows</span>
                 </div>
                 {result.failed > 0 && (
-                  <div className="flex items-center gap-1.5 text-red-600 font-semibold">
+                  <div className="flex items-center gap-1.5 text-destructive font-semibold">
                     <AlertCircle className="h-4 w-4" />
                     <span>Failed / Skipped: {result.failed} rows</span>
                   </div>
@@ -277,8 +277,8 @@ export default function ExcelUploadModal({
               </div>
 
               {result.errors && result.errors.length > 0 && (
-                <div className="max-h-36 overflow-y-auto rounded-xl border border-red-100 bg-red-50/50 p-2.5 space-y-1.5 text-[11px] text-red-700">
-                  <div className="font-bold text-red-800">Errors & Warnings:</div>
+                <div className="max-h-36 overflow-y-auto rounded-xl border border-destructive/20 bg-destructive/10 p-2.5 space-y-1.5 text-[11px] text-destructive">
+                  <div className="font-bold">Errors & Warnings:</div>
                   {result.errors.map((e, idx) => (
                     <div key={idx} className="flex items-start gap-1">
                       <span className="font-mono font-bold shrink-0">Row {e.rowNumber}:</span>
@@ -291,7 +291,7 @@ export default function ExcelUploadModal({
           )}
         </div>
 
-        <DialogFooter className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-3 border-t border-[#edf0ed]">
+        <DialogFooter className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-3 border-t border-border">
           <Button
             type="button"
             variant="ghost"
@@ -305,7 +305,7 @@ export default function ExcelUploadModal({
             type="button"
             onClick={handleUpload}
             disabled={!selectedFile || uploading}
-            className="bg-[#0f7f79] hover:bg-[#096c67] text-white font-bold text-xs rounded-xl shadow-xs"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs rounded-xl shadow-xs"
           >
             {uploading ? (
               <>

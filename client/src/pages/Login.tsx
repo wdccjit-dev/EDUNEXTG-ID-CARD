@@ -44,16 +44,16 @@ export default function Login() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#eef4f1] px-4 py-8 sm:px-5">
+    <main className="flex min-h-screen items-center justify-center bg-background px-4 py-8 sm:px-5">
       <div className="w-full max-w-md">
         {/* Login Form Card */}
         <form
           onSubmit={submit}
-          className="rounded-3xl border border-[#dfe7e2] bg-[#fffefa] p-6 shadow-[0_18px_50px_rgba(38,71,65,0.10)] sm:p-8"
+          className="rounded-3xl border border-border bg-card p-6 shadow-[0_18px_50px_rgba(38,71,65,0.10)] sm:p-8 text-card-foreground"
         >
           <div className="mb-6 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white p-1 shadow-sm border border-[#dfe7e2]">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-card p-1 shadow-sm border border-border">
                 <img
                   src="/insight-education-logo.png"
                   alt="Insight Education"
@@ -61,25 +61,25 @@ export default function Login() {
                 />
               </div>
               <div>
-                <div className="font-extrabold text-[#182326]">
-                  Insight <span className="text-[#0f7f79]">Education</span>
+                <div className="font-extrabold text-foreground">
+                  Insight <span className="text-primary">Education</span>
                 </div>
-                <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#82908e]">
+                <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
                   ID Card Management Platform
                 </div>
               </div>
             </div>
           </div>
 
-          <h1 className="text-2xl font-extrabold tracking-[-0.05em] text-[#203734]">
+          <h1 className="text-2xl font-extrabold tracking-[-0.05em] text-foreground">
             Sign In
           </h1>
-          <p className="mt-1 text-sm text-[#778381]">
+          <p className="mt-1 text-sm text-muted-foreground">
             Enter your credentials to access your workspace.
           </p>
 
           <div className="mt-6 space-y-4">
-            <label className="block text-xs font-bold text-[#38514e]">
+            <label className="block text-xs font-bold text-foreground">
               Username, Login ID or Email
               <Input
                 type="text"
@@ -92,7 +92,7 @@ export default function Login() {
               />
             </label>
 
-            <div className="block text-xs font-bold text-[#38514e]">
+            <div className="block text-xs font-bold text-foreground">
               <label htmlFor="login-password">Password</label>
               <div className="relative mt-2">
                 <Input
@@ -108,7 +108,7 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => setShowPassword((prev) => !prev)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#778381] hover:text-[#203734] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7f79] rounded-md p-1 cursor-pointer transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-md p-1 cursor-pointer transition-colors"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                   title={showPassword ? "Hide password" : "Show password"}
                 >
@@ -125,12 +125,12 @@ export default function Login() {
           <Button
             type="submit"
             disabled={busy}
-            className="mt-7 h-11 w-full rounded-xl bg-[#0f7f79] font-bold text-white hover:bg-[#096c67] cursor-pointer"
+            className="mt-7 h-11 w-full rounded-xl bg-primary font-bold text-primary-foreground hover:bg-primary/90 cursor-pointer"
           >
             {busy ? "Signing in…" : "Sign In"}
           </Button>
 
-          <div className="mt-4 flex items-center justify-center text-xs font-semibold text-[#0f7f79]">
+          <div className="mt-4 flex items-center justify-center text-xs font-semibold text-primary">
             <button
               type="button"
               onClick={() => setShowContactAdminModal(true)}
@@ -143,21 +143,21 @@ export default function Login() {
 
         {/* Contact Administrator Dialog */}
         {showContactAdminModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-xs animate-in fade-in duration-150">
-            <div className="w-full max-w-sm rounded-3xl border border-[#dfe7e2] bg-[#fffefa] p-6 shadow-2xl space-y-4">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#e1f3ed] text-[#0f7f79]">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs animate-in fade-in duration-150">
+            <div className="w-full max-w-sm rounded-3xl border border-border bg-card p-6 shadow-2xl space-y-4 text-card-foreground">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                 <ShieldAlert className="h-6 w-6" />
               </div>
               <div className="text-center">
-                <h3 className="text-base font-extrabold text-[#203734]">Contact Administrator</h3>
-                <p className="mt-2 text-xs leading-5 text-[#5e716e]">
+                <h3 className="text-base font-extrabold text-foreground">Contact Administrator</h3>
+                <p className="mt-2 text-xs leading-5 text-muted-foreground">
                   Please contact your system <strong>Super Administrator</strong> or school administration to reset or recover your account password and login ID.
                 </p>
               </div>
               <Button
                 type="button"
                 onClick={() => setShowContactAdminModal(false)}
-                className="w-full rounded-xl bg-[#0f7f79] font-bold text-white hover:bg-[#096c67] cursor-pointer"
+                className="w-full rounded-xl bg-primary font-bold text-primary-foreground hover:bg-primary/90 cursor-pointer"
               >
                 Got it
               </Button>

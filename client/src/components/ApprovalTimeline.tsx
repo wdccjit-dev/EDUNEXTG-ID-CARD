@@ -42,14 +42,14 @@ const actionLabels: Record<string, string> = {
 };
 
 const statusTones: Record<string, { bg: string; text: string; border: string }> = {
-  DRAFT: { bg: "bg-gray-100", text: "text-gray-700", border: "border-gray-300" },
-  SUBMITTED: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200" },
-  UNDER_REVIEW: { bg: "bg-purple-50", text: "text-purple-700", border: "border-purple-200" },
-  CHANGES_REQUIRED: { bg: "bg-amber-50", text: "text-amber-800", border: "border-amber-300" },
-  RESUBMITTED: { bg: "bg-teal-50", text: "text-teal-700", border: "border-teal-200" },
-  APPROVED: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-300" },
-  REJECTED: { bg: "bg-rose-50", text: "text-rose-700", border: "border-rose-300" },
-  PRINTED: { bg: "bg-indigo-50", text: "text-indigo-700", border: "border-indigo-200" },
+  DRAFT: { bg: "bg-muted text-muted-foreground", text: "text-muted-foreground", border: "border-border" },
+  SUBMITTED: { bg: "bg-blue-50 dark:bg-blue-950/40", text: "text-blue-700 dark:text-blue-300", border: "border-blue-200 dark:border-blue-800" },
+  UNDER_REVIEW: { bg: "bg-purple-50 dark:bg-purple-950/40", text: "text-purple-700 dark:text-purple-300", border: "border-purple-200 dark:border-purple-800" },
+  CHANGES_REQUIRED: { bg: "bg-amber-50 dark:bg-amber-950/40", text: "text-amber-800 dark:text-amber-300", border: "border-amber-300 dark:border-amber-800" },
+  RESUBMITTED: { bg: "bg-teal-50 dark:bg-teal-950/40", text: "text-teal-700 dark:text-teal-300", border: "border-teal-200 dark:border-teal-800" },
+  APPROVED: { bg: "bg-emerald-50 dark:bg-emerald-950/40", text: "text-emerald-700 dark:text-emerald-300", border: "border-emerald-300 dark:border-emerald-800" },
+  REJECTED: { bg: "bg-rose-50 dark:bg-rose-950/40", text: "text-rose-700 dark:text-rose-300", border: "border-rose-300 dark:border-rose-800" },
+  PRINTED: { bg: "bg-indigo-50 dark:bg-indigo-950/40", text: "text-indigo-700 dark:text-indigo-300", border: "border-indigo-200 dark:border-indigo-800" },
 };
 
 export default function ApprovalTimeline({
@@ -62,24 +62,24 @@ export default function ApprovalTimeline({
     <div className={`space-y-4 ${className}`}>
       {/* Prominent Banner if changes are required */}
       {currentStatus === "CHANGES_REQUIRED" && reviewNote && (
-        <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-900 shadow-sm">
-          <div className="flex items-center gap-2 font-bold text-amber-950">
-            <AlertTriangle className="h-5 w-5 text-amber-600" />
+        <div className="rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-4 text-amber-900 dark:text-amber-200 shadow-sm">
+          <div className="flex items-center gap-2 font-bold text-amber-950 dark:text-amber-100">
+            <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
             <span>Action Required: Admin Requested Changes</span>
           </div>
-          <div className="mt-2 text-sm text-amber-800 pl-7 leading-relaxed bg-white/70 rounded-lg p-2.5 border border-amber-200">
+          <div className="mt-2 text-sm text-amber-800 dark:text-amber-300 pl-7 leading-relaxed bg-white/70 dark:bg-card/70 rounded-lg p-2.5 border border-amber-200 dark:border-amber-800/60">
             "{reviewNote}"
           </div>
-          <div className="mt-2 text-xs text-amber-700 pl-7">
+          <div className="mt-2 text-xs text-amber-700 dark:text-amber-400 pl-7">
             Please edit the draft with the requested changes, save, and click <strong>Resubmit for Approval</strong>.
           </div>
         </div>
       )}
 
       {/* History Timeline */}
-      <div className="relative pl-6 before:absolute before:bottom-0 before:left-2.5 before:top-2 before:w-0.5 before:bg-gray-200">
+      <div className="relative pl-6 before:absolute before:bottom-0 before:left-2.5 before:top-2 before:w-0.5 before:bg-border">
         {history.length === 0 ? (
-          <div className="py-3 text-xs text-gray-400 italic">No activity recorded yet.</div>
+          <div className="py-3 text-xs text-muted-foreground italic">No activity recorded yet.</div>
         ) : (
           history.map((item) => {
             const Icon = actionIcons[item.action] || Clock3;
@@ -90,7 +90,7 @@ export default function ApprovalTimeline({
               <div key={item.id} className="relative mb-5 last:mb-0">
                 {/* Node icon */}
                 <div
-                  className={`absolute -left-6 top-0.5 flex h-5 w-5 items-center justify-center rounded-full border bg-white shadow-xs ${tone.border} ${tone.text}`}
+                  className={`absolute -left-6 top-0.5 flex h-5 w-5 items-center justify-center rounded-full border bg-card shadow-xs ${tone.border} ${tone.text}`}
                 >
                   <Icon className="h-3 w-3" />
                 </div>
@@ -98,26 +98,26 @@ export default function ApprovalTimeline({
                 {/* Event details */}
                 <div className="flex flex-col">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-bold text-gray-900">{label}</span>
+                    <span className="text-xs font-bold text-foreground">{label}</span>
                     <span
                       className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold border ${tone.bg} ${tone.text} ${tone.border}`}
                     >
                       {item.toStatus}
                     </span>
-                    <span className="text-[11px] text-gray-400">
+                    <span className="text-[11px] text-muted-foreground">
                       {format(new Date(item.createdAt), "MMM d, yyyy · h:mm a")}
                     </span>
                   </div>
 
-                  <div className="mt-0.5 text-xs text-gray-500">
-                    by <span className="font-medium text-gray-700">{item.actorName || "System / User"}</span>
+                  <div className="mt-0.5 text-xs text-muted-foreground">
+                    by <span className="font-medium text-foreground">{item.actorName || "System / User"}</span>
                     {item.actorRole && (
-                      <span className="ml-1 text-[10px] text-gray-400">({item.actorRole})</span>
+                      <span className="ml-1 text-[10px] text-muted-foreground">({item.actorRole})</span>
                     )}
                   </div>
 
                   {item.comments && (
-                    <div className="mt-1.5 rounded-lg border border-gray-200 bg-gray-50/80 p-2.5 text-xs text-gray-700 leading-relaxed">
+                    <div className="mt-1.5 rounded-lg border border-border bg-muted/40 p-2.5 text-xs text-foreground leading-relaxed">
                       "{item.comments}"
                     </div>
                   )}

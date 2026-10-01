@@ -313,6 +313,29 @@ export const api = {
         total: number;
         errors?: Array<{ rowNumber: number; reason: string }>;
       }>("/api/id-card-requests/upload-excel", json(body)),
+    bulkUploadPhotos: (body: {
+      schoolId?: number;
+      zipBase64?: string;
+      images?: Array<{ filename: string; dataBase64: string; contentType?: string }>;
+      dryRun?: boolean;
+    }) =>
+      request<{
+        success: true;
+        total: number;
+        matched: number;
+        unmatched: number;
+        results: Array<{
+          filename: string;
+          identifier: string;
+          matched: boolean;
+          cardId?: number;
+          cardNumber?: string;
+          name?: string;
+          isStaff?: boolean;
+          photoUrl?: string;
+          reason?: string;
+        }>;
+      }>("/api/id-card-requests/bulk-upload-photos", json(body)),
   },
   approvals: {
     list: (params?: { status?: string }) => {
@@ -409,8 +432,10 @@ export const api = {
         page: number;
         pageSize: number;
         totalPages: number;
-        classCounts: Record<string, number>;
-        sectionCounts: Record<string, number>;
+        classCounts?: Record<string, number> | Array<{ className: string; count: number }>;
+        sectionCounts?: Record<string, number> | Array<{ section: string; count: number }>;
+        classes?: string[];
+        sections?: string[];
       }>(`/api/reports/removed-cards${q ? `?${q}` : ""}`);
     },
     exportRemovedCardsCsv: (params?: {

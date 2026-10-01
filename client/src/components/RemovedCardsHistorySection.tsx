@@ -53,6 +53,35 @@ export default function RemovedCardsHistorySection({
   const [fromDate, setFromDate] = useState<string>("");
   const [toDate, setToDate] = useState<string>("");
 
+  const normalizeCountMap = (
+    data: Record<string, number> | Array<{ className?: string; section?: string; count: number }> | undefined,
+    keyProp: "className" | "section",
+  ): Record<string, number> => {
+    if (!data) return {};
+    if (Array.isArray(data)) {
+      const map: Record<string, number> = {};
+      for (const item of data) {
+        const key = item[keyProp];
+        if (key && String(key).trim()) {
+          map[String(key).trim()] = Number(item.count || 0);
+        }
+      }
+      return map;
+    }
+    if (typeof data === "object") {
+      const map: Record<string, number> = {};
+      for (const [k, v] of Object.entries(data)) {
+        if (typeof v === "number") {
+          map[k] = v;
+        } else if (v && typeof v === "object" && "count" in (v as any)) {
+          map[k] = Number((v as any).count || 0);
+        }
+      }
+      return map;
+    }
+    return {};
+  };
+
   const fetchHistory = () => {
     setLoading(true);
     api.reports
@@ -69,8 +98,8 @@ export default function RemovedCardsHistorySection({
       .then((res) => {
         setCards(res.items);
         setTotal(res.total);
-        if (res.classCounts) setClassCounts(res.classCounts);
-        if (res.sectionCounts) setSectionCounts(res.sectionCounts);
+        setClassCounts(normalizeCountMap(res.classCounts, "className"));
+        setSectionCounts(normalizeCountMap(res.sectionCounts, "section"));
       })
       .catch((err) => {
         toast.error("Failed to load removed cards history", {
@@ -115,18 +144,18 @@ export default function RemovedCardsHistorySection({
       {/* Group by Class / Section Summary Strip */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {/* Class Breakdown Strip */}
-        <div className="rounded-2xl border border-[#dfe7e2] bg-[#f7faf8] p-3.5 space-y-2">
-          <div className="flex items-center justify-between text-xs font-bold text-[#1f3634]">
-            <span className="flex items-center gap-1.5 uppercase tracking-wider text-[11px] text-[#0f7f79]">
+        <div className="rounded-2xl border border-border bg-muted/30 p-3.5 space-y-2">
+          <div className="flex items-center justify-between text-xs font-bold text-foreground">
+            <span className="flex items-center gap-1.5 uppercase tracking-wider text-[11px] text-primary">
               <GraduationCap className="h-4 w-4" /> Classwise Breakdown
             </span>
-            <span className="text-[11px] text-gray-500 font-normal">
+            <span className="text-[11px] text-muted-foreground font-normal">
               {availableClasses.length} distinct classes
             </span>
           </div>
           <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pt-1">
             {availableClasses.length === 0 ? (
-              <span className="text-xs text-gray-400">No class records available</span>
+              <span className="text-xs text-muted-foreground">No class records available</span>
             ) : (
               availableClasses.map((cls) => (
                 <button
@@ -137,15 +166,15 @@ export default function RemovedCardsHistorySection({
                   }}
                   className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
                     classFilter === cls
-                      ? "bg-[#0f7f79] text-white shadow-2xs"
-                      : "bg-white border border-gray-200 text-gray-700 hover:bg-gray-100"
+                      ? "bg-primary text-primary-foreground shadow-2xs"
+                      : "bg-card border border-border text-foreground hover:bg-accent"
                   }`}
                 >
                   <span>Class {cls}</span>
                   <Badge
                     variant="secondary"
                     className={`h-4 px-1 text-[10px] ${
-                      classFilter === cls ? "bg-white/20 text-white" : "bg-gray-100 text-gray-700"
+                      classFilter === cls ? "bg-primary-foreground/20 text-primary-foreground" : "bg-muted text-muted-foreground"
                     }`}
                   >
                     {classCounts[cls]}
@@ -157,18 +186,18 @@ export default function RemovedCardsHistorySection({
         </div>
 
         {/* Section Breakdown Strip */}
-        <div className="rounded-2xl border border-[#dfe7e2] bg-[#f7faf8] p-3.5 space-y-2">
-          <div className="flex items-center justify-between text-xs font-bold text-[#1f3634]">
-            <span className="flex items-center gap-1.5 uppercase tracking-wider text-[11px] text-[#0f7f79]">
+        <div className="rounded-2xl border border-border bg-muted/30 p-3.5 space-y-2">
+          <div className="flex items-center justify-between text-xs font-bold text-foreground">
+            <span className="flex items-center gap-1.5 uppercase tracking-wider text-[11px] text-primary">
               <Layers className="h-4 w-4" /> Sectionwise Breakdown
             </span>
-            <span className="text-[11px] text-gray-500 font-normal">
+            <span className="text-[11px] text-muted-foreground font-normal">
               {availableSections.length} distinct sections
             </span>
           </div>
           <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pt-1">
             {availableSections.length === 0 ? (
-              <span className="text-xs text-gray-400">No section records available</span>
+              <span className="text-xs text-muted-foreground">No section records available</span>
             ) : (
               availableSections.map((sec) => (
                 <button
@@ -179,15 +208,15 @@ export default function RemovedCardsHistorySection({
                   }}
                   className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
                     sectionFilter === sec
-                      ? "bg-[#0f7f79] text-white shadow-2xs"
-                      : "bg-white border border-gray-200 text-gray-700 hover:bg-gray-100"
+                      ? "bg-primary text-primary-foreground shadow-2xs"
+                      : "bg-card border border-border text-foreground hover:bg-accent"
                   }`}
                 >
                   <span>Sec {sec}</span>
                   <Badge
                     variant="secondary"
                     className={`h-4 px-1 text-[10px] ${
-                      sectionFilter === sec ? "bg-white/20 text-white" : "bg-gray-100 text-gray-700"
+                      sectionFilter === sec ? "bg-primary-foreground/20 text-primary-foreground" : "bg-muted text-muted-foreground"
                     }`}
                   >
                     {sectionCounts[sec]}
@@ -200,11 +229,11 @@ export default function RemovedCardsHistorySection({
       </div>
 
       {/* Filter & Export Bar */}
-      <Card className="rounded-2xl border-[#e2e8e3] bg-white shadow-2xs p-4 space-y-3">
+      <Card className="rounded-2xl border border-border bg-card text-card-foreground shadow-2xs p-4 space-y-3">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
           {/* Search */}
           <div className="relative lg:col-span-2">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               className="pl-9 text-xs rounded-xl h-9"
               placeholder="Search card #, student name, template..."
@@ -268,11 +297,11 @@ export default function RemovedCardsHistorySection({
         </div>
 
         {/* Date range & CSV Export */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-gray-100 text-xs">
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-border text-xs">
           <div className="flex flex-wrap items-center gap-3">
-            <span className="font-semibold text-gray-700">Removed Date:</span>
+            <span className="font-semibold text-foreground">Removed Date:</span>
             <div className="flex items-center gap-1.5">
-              <span className="text-[11px] text-gray-500">From</span>
+              <span className="text-[11px] text-muted-foreground">From</span>
               <Input
                 type="date"
                 className="text-xs rounded-xl h-8 w-36"
@@ -281,7 +310,7 @@ export default function RemovedCardsHistorySection({
               />
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="text-[11px] text-gray-500">To</span>
+              <span className="text-[11px] text-muted-foreground">To</span>
               <Input
                 type="date"
                 className="text-xs rounded-xl h-8 w-36"
@@ -302,7 +331,7 @@ export default function RemovedCardsHistorySection({
                   setToDate("");
                   setPage(1);
                 }}
-                className="h-8 text-xs font-semibold text-gray-500 hover:text-gray-900"
+                className="h-8 text-xs font-semibold text-muted-foreground hover:text-foreground"
               >
                 <RotateCcw className="h-3 w-3 mr-1" /> Reset
               </Button>
@@ -314,7 +343,7 @@ export default function RemovedCardsHistorySection({
             size="sm"
             onClick={handleExportCsv}
             disabled={total === 0}
-            className="h-8 text-xs font-bold gap-1.5 rounded-xl border-[#0f7f79] text-[#0f7f79] hover:bg-[#eef7f4]"
+            className="h-8 text-xs font-bold gap-1.5 rounded-xl border-primary text-primary hover:bg-primary/10"
           >
             <Download className="h-3.5 w-3.5" /> Export CSV ({total})
           </Button>
@@ -322,11 +351,11 @@ export default function RemovedCardsHistorySection({
       </Card>
 
       {/* Removed Cards Table */}
-      <Card className="rounded-2xl border-[#e2e8e3] bg-white shadow-2xs overflow-hidden">
+      <Card className="rounded-2xl border border-border bg-card text-card-foreground shadow-2xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-[#edf0ed] bg-[#fbfdfb] text-[11px] font-extrabold uppercase tracking-wider text-[#637370]">
+              <tr className="border-b border-border bg-muted/40 text-[11px] font-extrabold uppercase tracking-wider text-muted-foreground">
                 <th className="py-3 px-4 w-12">#</th>
                 <th className="py-3 px-4">Card No</th>
                 <th className="py-3 px-4">Student Name</th>
@@ -339,44 +368,44 @@ export default function RemovedCardsHistorySection({
                 <th className="py-3 px-4">Removed On</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#edf0ed] text-xs">
+            <tbody className="divide-y divide-border text-xs">
               {loading ? (
                 <tr>
-                  <td colSpan={isSuperAdmin ? 10 : 9} className="py-16 text-center text-gray-400">
-                    <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2 text-[#0f7f79]" />
+                  <td colSpan={isSuperAdmin ? 10 : 9} className="py-16 text-center text-muted-foreground">
+                    <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2 text-primary" />
                     Loading history...
                   </td>
                 </tr>
               ) : cards.length === 0 ? (
                 <tr>
-                  <td colSpan={isSuperAdmin ? 10 : 9} className="py-16 text-center text-gray-400">
+                  <td colSpan={isSuperAdmin ? 10 : 9} className="py-16 text-center text-muted-foreground">
                     No removed cards match your filter criteria.
                   </td>
                 </tr>
               ) : (
                 cards.map((c, index) => (
-                  <tr key={c.id} className="hover:bg-[#fbfdfb] transition-colors">
-                    <td className="py-3 px-4 text-gray-400 font-mono text-[11px]">
+                  <tr key={c.id} className="hover:bg-muted/30 transition-colors">
+                    <td className="py-3 px-4 text-muted-foreground font-mono text-[11px]">
                       {(page - 1) * pageSize + index + 1}
                     </td>
-                    <td className="py-3 px-4 font-mono font-bold text-[#0f7f79]">
+                    <td className="py-3 px-4 font-mono font-bold text-primary">
                       {c.cardNumber}
                     </td>
-                    <td className="py-3 px-4 font-bold text-[#18312e]">
+                    <td className="py-3 px-4 font-bold text-foreground">
                       {c.studentName || "-"}
                     </td>
-                    <td className="py-3 px-4 font-semibold text-gray-800">
+                    <td className="py-3 px-4 font-semibold text-foreground">
                       {c.className || "-"}
                     </td>
-                    <td className="py-3 px-4 font-semibold text-gray-800">
+                    <td className="py-3 px-4 font-semibold text-foreground">
                       {c.section || "-"}
                     </td>
                     {isSuperAdmin && (
-                      <td className="py-3 px-4 text-gray-700 font-medium">
+                      <td className="py-3 px-4 text-muted-foreground font-medium">
                         School #{c.schoolId}
                       </td>
                     )}
-                    <td className="py-3 px-4 text-gray-600">
+                    <td className="py-3 px-4 text-muted-foreground">
                       {c.templateName || "-"}
                     </td>
                     <td className="py-3 px-4">
@@ -386,11 +415,11 @@ export default function RemovedCardsHistorySection({
                     </td>
                     <td className="py-3 px-4 whitespace-nowrap">
                       <div className="flex flex-col">
-                        <span className="font-semibold text-gray-800">{c.removedByName || "User"}</span>
-                        <span className="text-[10px] text-gray-400">{c.removedByRole || "ADMIN"}</span>
+                        <span className="font-semibold text-foreground">{c.removedByName || "User"}</span>
+                        <span className="text-[10px] text-muted-foreground">{c.removedByRole || "ADMIN"}</span>
                       </div>
                     </td>
-                    <td className="py-3 px-4 text-gray-500 whitespace-nowrap">
+                    <td className="py-3 px-4 text-muted-foreground whitespace-nowrap">
                       {format(new Date(c.removedAt), "dd MMM yyyy, HH:mm")}
                     </td>
                   </tr>
@@ -401,8 +430,8 @@ export default function RemovedCardsHistorySection({
         </div>
 
         {/* Pagination bar */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-t border-[#edf0ed] bg-[#fbfdfb]">
-          <div className="flex items-center gap-3 text-xs text-[#788784]">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-t border-border bg-muted/30">
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
             <span>
               Showing <b>{cards.length}</b> of <b>{total}</b> cards
             </span>
@@ -430,7 +459,7 @@ export default function RemovedCardsHistorySection({
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-xs text-[#788784] mr-2">
+            <span className="text-xs text-muted-foreground mr-2">
               Page {page} of {totalPages}
             </span>
             <Button

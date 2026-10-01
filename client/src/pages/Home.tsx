@@ -5,6 +5,7 @@ import IdCardFormModal from "./IdCardFormModal";
 import PrintModal from "@/components/PrintModal";
 import DeleteSchoolDialog from "@/components/DeleteSchoolDialog";
 import ExcelUploadModal from "@/components/ExcelUploadModal";
+import BulkImageUploadModal from "@/components/BulkImageUploadModal";
 import ApprovalTimeline from "@/components/ApprovalTimeline";
 import { DYNAMIC_FIELDS, SAMPLE_CARD_DATA, type DesignerElement } from "@shared/templateDesigner";
 import {
@@ -14,6 +15,7 @@ import {
   ArrowUpRight,
   BookOpenCheck,
   Building2,
+  Camera,
   CheckCircle2,
   ChevronDown,
   ClipboardCheck,
@@ -57,6 +59,7 @@ import {
 } from "lucide-react";
 import SuperAdminProfileDialog from "@/components/SuperAdminProfileDialog";
 import AboutUsSection from "@/components/AboutUsSection";
+import SettingsSection from "@/components/SettingsSection";
 import AuditLogsSection from "@/components/AuditLogsSection";
 import MarketingOverview from "@/components/MarketingOverview";
 import CreateOrderView from "@/components/CreateOrderView";
@@ -157,15 +160,16 @@ type NavLabel =
   | "Orders"
   | "Create Order"
   | "Order List"
-  | "Notifications";
+  | "Notifications"
+  | "Settings";
 
 type Tone = "teal" | "coral" | "indigo" | "yellow";
 
 const toneStyles: Record<Tone, { bg: string; fg: string; border: string }> = {
-  teal: { bg: "bg-[#dff3ee]", fg: "text-[#0b716b]", border: "border-[#b7e3d9]" },
-  coral: { bg: "bg-[#fff0e8]", fg: "text-[#c65c3d]", border: "border-[#f6cdbb]" },
-  indigo: { bg: "bg-[#e9ebfa]", fg: "text-[#5c64b7]", border: "border-[#cbd0f2]" },
-  yellow: { bg: "bg-[#fff8d9]", fg: "text-[#9d7611]", border: "border-[#f1dda0]" },
+  teal: { bg: "bg-[#dff3ee] dark:bg-[#0f3d38]", fg: "text-[#0b716b] dark:text-[#40c8bb]", border: "border-[#b7e3d9] dark:border-[#1e5c54]" },
+  coral: { bg: "bg-[#fff0e8] dark:bg-[#3d1e16]", fg: "text-[#c65c3d] dark:text-[#f28a63]", border: "border-[#f6cdbb] dark:border-[#5c2a1c]" },
+  indigo: { bg: "bg-[#e9ebfa] dark:bg-[#1e223d]", fg: "text-[#5c64b7] dark:text-[#8a94e8]", border: "border-[#cbd0f2] dark:border-[#343b6b]" },
+  yellow: { bg: "bg-[#fff8d9] dark:bg-[#3d3314]", fg: "text-[#9d7611] dark:text-[#f2c94c]", border: "border-[#f1dda0] dark:border-[#5c4a17]" },
 };
 
 function ToneIcon({
@@ -305,10 +309,16 @@ export default function Home({
     (initialNav as NavLabel) || "Overview",
   );
 
+  useEffect(() => {
+    if (initialNav) {
+      setActiveNav(initialNav as NavLabel);
+    }
+  }, [initialNav]);
+
   // Guard for marketing admin: prevent viewing templates, requests, schools, etc.
   useEffect(() => {
     if (portal === "marketing") {
-      const allowed = ["Overview", "Orders", "Create Order", "Order List", "Notifications"];
+      const allowed = ["Overview", "Orders", "Create Order", "Order List", "Notifications", "Settings", "About Us"];
       if (!allowed.includes(activeNav)) {
         setActiveNav("Overview");
       }
@@ -441,6 +451,8 @@ export default function Home({
 
   // Excel upload modal
   const [excelUploadOpen, setExcelUploadOpen] = useState(false);
+  // Bulk photo upload modal
+  const [bulkPhotoUploadOpen, setBulkPhotoUploadOpen] = useState(false);
 
   const handleDownloadExampleExcel = async (templateId?: number, cardType?: string) => {
     try {
@@ -1360,7 +1372,7 @@ export default function Home({
   };
 
   return (
-    <div className="min-h-screen app-shell bg-[#f7f6f2] text-[#182326]">
+    <div className="min-h-screen app-shell bg-background text-foreground">
       <aside
         className={`fixed inset-y-0 left-0 z-50 flex w-[244px] flex-col bg-[#102728] text-[#dfecea] transition-transform duration-200 lg:translate-x-0 overflow-y-auto overflow-x-hidden [scrollbar-width:thin] [scrollbar-color:#294344_transparent] ${sidebarOpen ? "translate-x-0" : "-translate-x-full"
           }`}
@@ -1513,15 +1525,20 @@ export default function Home({
               <span className="flex-1 text-left">About Us</span>
             </button>
 
-            {authenticatedUser.role === "SUPER_ADMIN" && (
-              <button
-                onClick={() => toast("Settings opened")}
-                className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-[12px] font-semibold text-[#99b6b2] hover:bg-[#1b3a3a] hover:text-white"
-              >
-                <Settings2 className="h-[17px] w-[17px] text-[#779b96]" />
-                Settings
-              </button>
-            )}
+            <button
+              onClick={() => goTo("Settings")}
+              className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-[12px] font-semibold transition-colors ${activeNav === "Settings"
+                ? "bg-[#dff3ee] text-[#123b3b]"
+                : "text-[#99b6b2] hover:bg-[#1b3a3a] hover:text-white"
+                }`}
+            >
+              <Settings2
+                className={`h-[17px] w-[17px] ${activeNav === "Settings" ? "text-[#0f7f79]" : "text-[#779b96]"
+                  }`}
+                strokeWidth={activeNav === "Settings" ? 2.3 : 1.8}
+              />
+              <span className="flex-1 text-left">Settings</span>
+            </button>
           </nav>
           <div className="flex items-center justify-between border-t border-[#294344] py-4">
             <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-[#6e928d]">
@@ -1544,11 +1561,11 @@ export default function Home({
       )}
 
       <main className="min-h-screen lg:pl-[244px]">
-        <header className="sticky top-0 z-30 flex h-[76px] items-center justify-between border-b border-[#e4e8e4] bg-[#f7f6f2]/90 px-3 sm:px-8 lg:px-11 backdrop-blur-xl">
+        <header className="sticky top-0 z-30 flex h-[76px] items-center justify-between border-b border-border bg-background/90 px-3 sm:px-8 lg:px-11 backdrop-blur-xl">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <button
               onClick={() => setSidebarOpen(true)}
-              className="rounded-lg p-2 text-[#6d7c7b] hover:bg-white lg:hidden shrink-0"
+              className="rounded-lg p-2 text-muted-foreground hover:bg-card lg:hidden shrink-0"
               aria-label="Open sidebar"
             >
               <Menu className="h-5 w-5" />
@@ -1565,9 +1582,9 @@ export default function Home({
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             {/* Super Admin School Dropdown Selector */}
             {authenticatedUser.role === "SUPER_ADMIN" && schools.length > 0 && (
-              <div className="flex items-center gap-1.5 sm:gap-2 rounded-xl border border-[#e0e6e1] bg-white px-2 sm:px-3 py-1.5 shadow-sm max-w-[150px] xs:max-w-[180px] sm:max-w-none">
-                <Building2 className="h-3.5 w-3.5 text-[#0f7f79] shrink-0" />
-                <span className="hidden md:inline text-[11px] font-bold text-[#778381]">School:</span>
+              <div className="flex items-center gap-1.5 sm:gap-2 rounded-xl border border-border bg-card px-2 sm:px-3 py-1.5 shadow-sm max-w-[150px] xs:max-w-[180px] sm:max-w-none">
+                <Building2 className="h-3.5 w-3.5 text-primary shrink-0" />
+                <span className="hidden md:inline text-[11px] font-bold text-muted-foreground">School:</span>
                 <Select
                   value={selectedSchoolId ? String(selectedSchoolId) : ""}
                   onValueChange={(val) => {
@@ -1577,7 +1594,7 @@ export default function Home({
                     toast.success(`Active school set to ${sch?.name ?? `School #${id}`}`);
                   }}
                 >
-                  <SelectTrigger className="h-7 border-0 bg-transparent px-1 sm:px-2 text-xs font-extrabold text-[#1f3733] shadow-none focus-visible:ring-0 max-w-[100px] xs:max-w-[130px] sm:max-w-[200px] truncate">
+                  <SelectTrigger className="h-7 border-0 bg-transparent px-1 sm:px-2 text-xs font-extrabold text-foreground shadow-none focus-visible:ring-0 max-w-[100px] xs:max-w-[130px] sm:max-w-[200px] truncate">
                     <SelectValue placeholder="Select active school" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1593,7 +1610,7 @@ export default function Home({
 
             {/* School Users Indicator */}
             {authenticatedUser.role !== "SUPER_ADMIN" && (
-              <div className="hidden items-center gap-2 rounded-xl border border-[#d6e4dc] bg-[#eef7f3] px-3 py-1.5 text-xs font-extrabold text-[#0f7f79] sm:flex">
+              <div className="hidden items-center gap-2 rounded-xl border border-primary/20 bg-primary/10 px-3 py-1.5 text-xs font-extrabold text-primary sm:flex">
                 <Building2 className="h-3.5 w-3.5" />
                 <span>
                   {authenticatedUser.schoolName ??
@@ -1611,7 +1628,7 @@ export default function Home({
                 aria-label="Profile Menu"
                 aria-haspopup="menu"
                 aria-expanded={profileMenuOpen}
-                className="flex items-center gap-2 rounded-xl border border-[#dfe6e1] bg-white p-1.5 pr-2.5 text-xs font-bold text-[#1f3733] shadow-sm transition hover:border-[#0f7f79]/50 hover:bg-[#f0faf7] cursor-pointer"
+                className="flex items-center gap-2 rounded-xl border border-border bg-card p-1.5 pr-2.5 text-xs font-bold text-foreground shadow-sm transition hover:border-primary/50 hover:bg-accent cursor-pointer"
               >
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#f5c87b] text-xs font-extrabold text-[#5c4523]">
                   {authenticatedUser.avatarUrl ? (
@@ -1632,7 +1649,7 @@ export default function Home({
                   {authenticatedUser.name?.split(" ")[0] ?? (authenticatedUser.role === "SUPER_ADMIN" ? "Admin" : "User")}
                 </span>
                 <ChevronDown
-                  className={`h-3 w-3 text-[#74817f] transition-transform duration-200 ${profileMenuOpen ? "rotate-180" : ""
+                  className={`h-3 w-3 text-muted-foreground transition-transform duration-200 ${profileMenuOpen ? "rotate-180" : ""
                     }`}
                 />
               </button>
@@ -1641,7 +1658,7 @@ export default function Home({
                 <div
                   role="menu"
                   aria-orientation="vertical"
-                  className="absolute right-0 top-full mt-2 w-48 rounded-xl border border-[#dfe6e1] bg-white p-1.5 shadow-[0_12px_32px_rgba(31,55,51,0.12)] z-50 animate-in fade-in zoom-in-95 duration-100"
+                  className="absolute right-0 top-full mt-2 w-48 rounded-xl border border-border bg-popover text-popover-foreground p-1.5 shadow-[0_12px_32px_rgba(31,55,51,0.12)] z-50 animate-in fade-in zoom-in-95 duration-100"
                 >
                   <button
                     role="menuitem"
@@ -1654,9 +1671,9 @@ export default function Home({
                         toast.info("Profile details are managed by your administrator.");
                       }
                     }}
-                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-semibold text-[#1f3733] transition hover:bg-[#f0faf7] hover:text-[#0f7f79] cursor-pointer"
+                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-semibold text-foreground transition hover:bg-accent hover:text-primary cursor-pointer"
                   >
-                    <User className="h-3.5 w-3.5 text-[#0f7f79]" />
+                    <User className="h-3.5 w-3.5 text-primary" />
                     <span>Edit Profile</span>
                   </button>
                   <button
@@ -1666,9 +1683,9 @@ export default function Home({
                       setProfileMenuOpen(false);
                       void logout();
                     }}
-                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-semibold text-[#dc2626] transition hover:bg-[#fef2f2] cursor-pointer"
+                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-semibold text-destructive transition hover:bg-destructive/10 cursor-pointer"
                   >
-                    <LogOut className="h-3.5 w-3.5 text-[#dc2626]" />
+                    <LogOut className="h-3.5 w-3.5 text-destructive" />
                     <span>Log Out</span>
                   </button>
                 </div>
@@ -1689,14 +1706,14 @@ export default function Home({
             <>
               <section className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
                 <div>
-                  <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-[#0f7f79]">
+                  <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-primary">
                     <Sparkles className="h-3.5 w-3.5" /> Your platform at a glance
                   </div>
                   <h2 className="max-w-xl text-3xl font-extrabold leading-[1.05] tracking-[-0.06em] sm:text-[38px]">
                     Keep every card moving{" "}
-                    <span className="text-[#0f7f79]">forward.</span>
+                    <span className="text-primary">forward.</span>
                   </h2>
-                  <p className="mt-3 max-w-lg text-sm leading-6 text-[#778381]">
+                  <p className="mt-3 max-w-lg text-sm leading-6 text-muted-foreground">
                     Manage school identity, approvals, and print-ready cards from
                     one calm workspace.
                   </p>
@@ -1705,7 +1722,7 @@ export default function Home({
                   {authenticatedUser.role === "SUPER_ADMIN" && (
                     <Button
                       onClick={openCreateSchool}
-                      className="h-10 rounded-xl bg-[#0f7f79] px-4 text-xs font-bold text-white shadow-[0_8px_18px_rgba(15,127,121,0.18)] hover:bg-[#096c67]"
+                      className="h-10 rounded-xl bg-primary px-4 text-xs font-bold text-primary-foreground shadow-[0_8px_18px_rgba(15,127,121,0.18)] hover:bg-primary/90"
                     >
                       <Building2 className="mr-2 h-4 w-4" /> Add school
                     </Button>
@@ -1714,7 +1731,7 @@ export default function Home({
                     <Button
                       onClick={openCreateTemplate}
                       variant="outline"
-                      className="h-10 rounded-xl border-[#dce5df] bg-white px-4 text-xs font-bold text-[#38514e] shadow-sm hover:bg-[#edf5f0]"
+                      className="h-10 rounded-xl border-border bg-card px-4 text-xs font-bold text-foreground shadow-sm hover:bg-accent"
                     >
                       <Palette className="mr-2 h-4 w-4" /> New template
                     </Button>
@@ -1722,7 +1739,7 @@ export default function Home({
                   {authenticatedUser.role === "SUPER_ADMIN" ? (
                     <Button
                       onClick={openCreateCard}
-                      className="h-10 rounded-xl bg-[#0f7f79] px-4 text-xs font-bold text-white hover:bg-[#096c67]"
+                      className="h-10 rounded-xl bg-primary px-4 text-xs font-bold text-primary-foreground hover:bg-primary/90"
                     >
                       <FilePlus2 className="mr-2 h-4 w-4" /> Create card
                     </Button>
@@ -1731,13 +1748,13 @@ export default function Home({
                       <Button
                         onClick={() => goTo("ID card templates")}
                         variant="outline"
-                        className="h-10 rounded-xl border-[#dce5df] bg-white px-4 text-xs font-bold text-[#38514e] shadow-sm hover:bg-[#edf5f0]"
+                        className="h-10 rounded-xl border-border bg-card px-4 text-xs font-bold text-foreground shadow-sm hover:bg-accent"
                       >
                         <Palette className="mr-2 h-4 w-4" /> Select Template
                       </Button>
                       <Button
                         onClick={() => goTo("ID card requests")}
-                        className="h-10 rounded-xl bg-[#0f7f79] px-4 text-xs font-bold text-white hover:bg-[#096c67]"
+                        className="h-10 rounded-xl bg-primary px-4 text-xs font-bold text-primary-foreground hover:bg-primary/90"
                       >
                         <ClipboardCheck className="mr-2 h-4 w-4" /> Review ID Cards
                       </Button>
@@ -1799,26 +1816,26 @@ export default function Home({
                     : "grid-cols-1"
                   }`}
               >
-                <Card className="overflow-hidden ui-card rounded-2xl border-[#e2e8e3] bg-[#fffefa] shadow-[0_14px_40px_rgba(38,71,65,0.05)]">
+                <Card className="overflow-hidden ui-card rounded-2xl border-border bg-card text-card-foreground shadow-[0_14px_40px_rgba(38,71,65,0.05)]">
                   <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 sm:px-6 pb-3 pt-5 sm:pt-6">
                     <div>
                       <CardTitle className="text-[15px] font-extrabold tracking-[-0.02em]">
                         Approval queue
                       </CardTitle>
-                      <p className="mt-1 text-xs text-[#84918e]">
+                      <p className="mt-1 text-xs text-muted-foreground">
                         Cards waiting for your review
                       </p>
                     </div>
                     <div className="flex items-center gap-2 overflow-x-auto max-w-full pb-1 sm:pb-0 [scrollbar-width:none]">
-                      <div className="flex rounded-lg border border-[#e4e9e5] bg-[#f8faf8] p-0.5 shrink-0">
+                      <div className="flex rounded-lg border border-border bg-muted/40 p-0.5 shrink-0">
                         {(["All", "Pending", "Changes required", "Rejected"] as const).map(
                           (item) => (
                             <button
                               key={item}
                               onClick={() => setFilter(item)}
                               className={`rounded-md px-2.5 py-1.5 text-[10px] font-bold whitespace-nowrap ${filter === item
-                                ? "bg-white text-[#0f7f79] shadow-sm"
-                                : "text-[#8a9793] hover:text-[#55605d]"
+                                ? "bg-card text-primary shadow-sm"
+                                : "text-muted-foreground hover:text-foreground"
                                 }`}
                             >
                               {item}
@@ -1828,7 +1845,7 @@ export default function Home({
                       </div>
                       <button
                         onClick={() => toast("Filters opened")}
-                        className="rounded-lg border border-[#e1e8e2] p-2 text-[#7b8985] hover:bg-[#f5f8f5] shrink-0"
+                        className="rounded-lg border border-border p-2 text-muted-foreground hover:bg-accent shrink-0"
                         title="Filter options"
                         aria-label="Filter options"
                       >
@@ -1838,7 +1855,7 @@ export default function Home({
                   </CardHeader>
                   <CardContent className="px-0">
                     {approvalsLoading ? (
-                      <div className="px-6 py-10 text-center text-sm text-[#7f8d89]">
+                      <div className="px-6 py-10 text-center text-sm text-muted-foreground">
                         Loading requests…
                       </div>
                     ) : Boolean(apiError) ? (
@@ -1850,7 +1867,7 @@ export default function Home({
                         <div className="overflow-x-auto [scrollbar-width:thin] max-w-full">
                           <table className="w-full min-w-[620px] text-left">
                             <thead>
-                              <tr className="border-y border-[#edf0ed] bg-[#fbfcfa] text-[10px] font-bold uppercase tracking-[0.13em] text-[#9aa5a1]">
+                              <tr className="border-y border-border bg-muted/40 text-[10px] font-bold uppercase tracking-[0.13em] text-muted-foreground">
                                 <th className="px-6 py-3 font-bold">Card holder</th>
                                 <th className="px-4 py-3 font-bold">School</th>
                                 <th className="px-4 py-3 font-bold">Submitted</th>
@@ -1862,7 +1879,7 @@ export default function Home({
                               {filteredApprovals.slice(0, 4).map((item) => (
                                 <tr
                                   key={item.id}
-                                  className="group border-b border-[#f0f2ef] last:border-0 hover:bg-[#fbfdfb]"
+                                  className="group border-b border-border last:border-0 hover:bg-muted/30"
                                 >
                                   <td className="px-6 py-4">
                                     <div className="flex items-center gap-3">
@@ -1872,19 +1889,19 @@ export default function Home({
                                         {item.initials}
                                       </div>
                                       <div>
-                                        <div className="text-xs font-extrabold text-[#29403d]">
+                                        <div className="text-xs font-extrabold text-foreground">
                                           {item.studentName}
                                         </div>
-                                        <div className="mt-0.5 font-mono text-[10px] text-[#96a19e]">
+                                        <div className="mt-0.5 font-mono text-[10px] text-muted-foreground">
                                           {item.admissionCode}
                                         </div>
                                       </div>
                                     </div>
                                   </td>
-                                  <td className="px-4 py-4 text-xs font-semibold text-[#667571]">
+                                  <td className="px-4 py-4 text-xs font-semibold text-muted-foreground">
                                     {item.schoolName}
                                   </td>
-                                  <td className="px-4 py-4 text-[11px] text-[#83918d]">
+                                  <td className="px-4 py-4 text-[11px] text-muted-foreground">
                                     {item.submitted}
                                   </td>
                                   <td className="px-4 py-4">
@@ -1927,14 +1944,14 @@ export default function Home({
                                         <button
                                           disabled={approveLoading}
                                           onClick={() => approve(item.id, item.studentName)}
-                                          className="rounded-lg bg-[#e1f3ed] px-3 py-2 text-[10px] font-extrabold text-[#0a716b] transition-colors hover:bg-[#c7ebe1] disabled:opacity-50"
+                                          className="rounded-lg bg-primary/15 px-3 py-2 text-[10px] font-extrabold text-primary transition-colors hover:bg-primary/25 disabled:opacity-50"
                                         >
                                           Approve
                                         </button>
                                       )}
                                     <button
                                       onClick={() => handleOpenReview(item.cardId || item.id)}
-                                      className="ml-1 rounded-lg p-2 text-[#a3adaa] hover:bg-[#eef5f1] hover:text-[#50706b]"
+                                      className="ml-1 rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-foreground"
                                       title="View card details"
                                     >
                                       <Eye className="h-4 w-4" />
@@ -1946,17 +1963,17 @@ export default function Home({
                           </table>
                         </div>
                         {filteredApprovals.length === 0 && (
-                          <div className="px-6 py-10 text-center text-sm text-[#7f8d89]">
+                          <div className="px-6 py-10 text-center text-sm text-muted-foreground">
                             No cards match your search.
                           </div>
                         )}
-                        <div className="flex items-center justify-between border-t border-[#edf0ed] px-6 py-4">
-                          <span className="font-mono text-[10px] text-[#a1aaa7]">
+                        <div className="flex items-center justify-between border-t border-border px-6 py-4">
+                          <span className="font-mono text-[10px] text-muted-foreground">
                             Showing {Math.min(filteredApprovals.length, 4)} of {pendingRequests.length} requests
                           </span>
                           <button
                             onClick={() => goTo("ID card requests")}
-                            className="flex items-center gap-1 text-[11px] font-extrabold text-[#0f7f79] hover:underline"
+                            className="flex items-center gap-1 text-[11px] font-extrabold text-primary hover:underline"
                           >
                             View all requests <ArrowUpRight className="h-3.5 w-3.5" />
                           </button>
@@ -1967,19 +1984,19 @@ export default function Home({
                 </Card>
 
                 {authenticatedUser.role === "SUPER_ADMIN" && (
-                  <Card className="ui-card rounded-2xl border-[#e2e8e3] bg-[#fffefa] shadow-[0_14px_40px_rgba(38,71,65,0.05)]">
+                  <Card className="ui-card rounded-2xl border-border bg-card text-card-foreground shadow-[0_14px_40px_rgba(38,71,65,0.05)]">
                     <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-6 pb-2 pt-6">
                       <div>
                         <CardTitle className="text-[15px] font-extrabold tracking-[-0.02em]">
                           Recent activity
                         </CardTitle>
-                        <p className="mt-1 text-xs text-[#84918e]">
+                        <p className="mt-1 text-xs text-muted-foreground">
                           Showing {displayedRecentActivity.length} of {activity.length} actions
                         </p>
                       </div>
                       <div className="flex items-center gap-3">
                         <div className="flex items-center gap-1.5">
-                          <label htmlFor="overview-activity-limit" className="text-xs font-semibold text-[#627571]">
+                          <label htmlFor="overview-activity-limit" className="text-xs font-semibold text-muted-foreground">
                             Show:
                           </label>
                           <select
@@ -1987,7 +2004,7 @@ export default function Home({
                             aria-label="Display count for recent activity"
                             value={overviewRecentActivityLimit}
                             onChange={(e) => setOverviewRecentActivityLimit(Number(e.target.value))}
-                            className="h-8 rounded-xl border border-[#d3ded8] bg-white px-2.5 text-xs font-bold text-[#304541] shadow-sm hover:border-[#0f7f79] focus:outline-none focus:ring-1 focus:ring-[#0f7f79] cursor-pointer"
+                            className="h-8 rounded-xl border border-border bg-card px-2.5 text-xs font-bold text-foreground shadow-sm hover:border-primary focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
                           >
                             <option value={5}>5</option>
                             <option value={10}>10</option>
@@ -2004,7 +2021,7 @@ export default function Home({
                         )}
                         <button
                           onClick={() => goTo("Audit logs")}
-                          className="text-[10px] font-extrabold text-[#0f7f79] hover:underline cursor-pointer"
+                          className="text-[10px] font-extrabold text-primary hover:underline cursor-pointer"
                         >
                           View log
                         </button>
@@ -2012,7 +2029,7 @@ export default function Home({
                     </CardHeader>
                     <CardContent className="px-6 pb-6 pt-4">
                       {displayedRecentActivity.length === 0 ? (
-                        <div className="py-8 text-center text-xs text-[#8ea49d]">
+                        <div className="py-8 text-center text-xs text-muted-foreground">
                           No recent activity entries.
                         </div>
                       ) : (
@@ -2022,17 +2039,17 @@ export default function Home({
                               <ToneIcon icon={BookOpenCheck} tone="teal" />
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-start justify-between gap-2">
-                                  <div className="text-xs font-extrabold text-[#304541]">
+                                  <div className="text-xs font-extrabold text-foreground">
                                     {item.action.replaceAll("_", " ")}
                                   </div>
-                                  <span className="whitespace-nowrap font-mono text-[9px] text-[#a3adaa]">
+                                  <span className="whitespace-nowrap font-mono text-[9px] text-muted-foreground">
                                     {formatDistanceToNow(new Date(item.createdAt), {
                                       addSuffix: true,
                                     })}
                                   </span>
                                 </div>
-                                <p className="mt-1 text-[11px] leading-4 text-[#81908b]">
-                                  {item.schoolName ? <span className="font-semibold text-[#0f7f79]">{item.schoolName}: </span> : null}
+                                <p className="mt-1 text-[11px] leading-4 text-muted-foreground">
+                                  {item.schoolName ? <span className="font-semibold text-primary">{item.schoolName}: </span> : null}
                                   {(item.newValues as any)?.templateName ? `Template "${(item.newValues as any).templateName}"` : null}
                                   {(item.newValues as any)?.studentName ? `Card ${(item.newValues as any)?.cardNumber || ""} for ${(item.newValues as any).studentName}` : null}
                                   {!((item.newValues as any)?.templateName) && !((item.newValues as any)?.studentName) ? `${item.entityType} #${item.entityId ?? "-"}` : ""}
@@ -2043,12 +2060,12 @@ export default function Home({
                         </div>
                       )}
                       {apiError ? (
-                        <div className="mt-6 rounded-xl border border-dashed border-[#fca5a5] bg-[#fff5f5] p-3 text-center">
-                          <div className="text-[10px] text-[#dc2626]">{apiError}</div>
+                        <div className="mt-6 rounded-xl border border-dashed border-[#fca5a5] bg-[#fff5f5] dark:bg-destructive/10 p-3 text-center">
+                          <div className="text-[10px] text-destructive">{apiError}</div>
                         </div>
                       ) : (
-                        <div className="mt-6 rounded-xl border border-dashed border-[#d6e4dc] bg-[#f7fbf8] p-3 text-center">
-                          <div className="font-mono text-[9px] uppercase tracking-[0.12em] text-[#8ea49d]">
+                        <div className="mt-6 rounded-xl border border-dashed border-border bg-muted/30 p-3 text-center">
+                          <div className="font-mono text-[9px] uppercase tracking-[0.12em] text-muted-foreground">
                             All systems operational
                           </div>
                         </div>
@@ -2059,19 +2076,19 @@ export default function Home({
               </section>
 
               <section className="mt-7 grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-                <Card className="ui-card rounded-2xl border-[#e2e8e3] bg-[#fffefa] shadow-[0_14px_40px_rgba(38,71,65,0.05)]">
+                <Card className="ui-card rounded-2xl border-border bg-card text-card-foreground shadow-[0_14px_40px_rgba(38,71,65,0.05)]">
                   <CardHeader className="flex flex-row items-start justify-between px-6 pb-3 pt-6">
                     <div>
                       <CardTitle className="text-[15px] font-extrabold tracking-[-0.02em]">
                         Template library
                       </CardTitle>
-                      <p className="mt-1 text-xs text-[#84918e]">
+                      <p className="mt-1 text-xs text-muted-foreground">
                         Active designs across your network
                       </p>
                     </div>
                     <button
                       onClick={() => goTo("ID card templates")}
-                      className="text-[10px] font-extrabold text-[#0f7f79] hover:underline"
+                      className="text-[10px] font-extrabold text-primary hover:underline"
                     >
                       Manage templates
                     </button>
@@ -2080,12 +2097,12 @@ export default function Home({
                     {templates.slice(0, 3).map((template) => (
                       <div
                         key={template.name}
-                        className="flex items-center gap-3 rounded-xl border border-[#edf1ed] bg-[#fcfdfb] p-3"
+                        className="flex items-center gap-3 rounded-xl border border-border bg-muted/30 p-3"
                       >
                         <CardPreview accent={template.accent as Tone} mini />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
-                            <div className="truncate text-xs font-extrabold text-[#304541]">
+                            <div className="truncate text-xs font-extrabold text-foreground">
                               {template.name}
                             </div>
                             {template.status === "ACTIVE" ? (
@@ -2094,18 +2111,18 @@ export default function Home({
                               <StatusPill tone="indigo">Draft</StatusPill>
                             )}
                           </div>
-                          <div className="mt-1 text-[10px] text-[#8b9793]">
+                          <div className="mt-1 text-[10px] text-muted-foreground">
                             {template.meta ??
                               template.description ??
                               "No description"}
                           </div>
-                          <div className="mt-2 font-mono text-[9px] uppercase tracking-[0.1em] text-[#adb6b2]">
+                          <div className="mt-2 font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground">
                             {template.status}
                           </div>
                         </div>
                         <button
                           onClick={() => void handlePreviewTemplate(template)}
-                          className="rounded-lg p-2 text-[#a1ada9] hover:bg-[#edf6f1] hover:text-[#0f7f79] cursor-pointer"
+                          className="rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-primary cursor-pointer"
                           title={`Preview ${template.name}`}
                         >
                           <ArrowUpRight className="h-4 w-4" />
@@ -2141,19 +2158,19 @@ export default function Home({
                 </Card>
 
                 {authenticatedUser.role === "SUPER_ADMIN" && (
-                  <Card className="ui-card xl:col-span-2 rounded-2xl border-[#e2e8e3] bg-[#fffefa] shadow-[0_14px_40px_rgba(38,71,65,0.05)]">
-                    <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-6 pb-3 pt-6 border-b border-[#edf0ed]">
+                  <Card className="ui-card xl:col-span-2 rounded-2xl border-border bg-card text-card-foreground shadow-[0_14px_40px_rgba(38,71,65,0.05)]">
+                    <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-6 pb-3 pt-6 border-b border-border">
                       <div>
                         <CardTitle className="text-[15px] font-extrabold tracking-[-0.02em]">
                           Active Schools ({displayedActiveSchools.length})
                         </CardTitle>
-                        <p className="mt-1 text-xs text-[#84918e]">
+                        <p className="mt-1 text-xs text-muted-foreground">
                           Showing {displayedActiveSchools.length} of {activeSchools.length} active schools
                         </p>
                       </div>
                       <div className="flex items-center gap-3">
                         <div className="flex items-center gap-1.5">
-                          <label htmlFor="overview-schools-limit" className="text-xs font-semibold text-[#627571]">
+                          <label htmlFor="overview-schools-limit" className="text-xs font-semibold text-muted-foreground">
                             Show:
                           </label>
                           <select
@@ -2161,7 +2178,7 @@ export default function Home({
                             aria-label="Display count for active schools"
                             value={overviewActiveSchoolsLimit}
                             onChange={(e) => setOverviewActiveSchoolsLimit(Number(e.target.value))}
-                            className="h-8 rounded-xl border border-[#d3ded8] bg-white px-2.5 text-xs font-bold text-[#304541] shadow-sm hover:border-[#0f7f79] focus:outline-none focus:ring-1 focus:ring-[#0f7f79] cursor-pointer"
+                            className="h-8 rounded-xl border border-border bg-card px-2.5 text-xs font-bold text-foreground shadow-sm hover:border-primary focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
                           >
                             <option value={5}>5</option>
                             <option value={10}>10</option>
@@ -2171,37 +2188,37 @@ export default function Home({
                         </div>
                       </div>
                     </CardHeader>
-                    <CardContent className="divide-y divide-[#edf0ed] p-0">
+                    <CardContent className="divide-y divide-border p-0">
                       {displayedActiveSchools.length === 0 ? (
-                        <div className="p-6 text-center text-xs text-[#98a4a1]">
+                        <div className="p-6 text-center text-xs text-muted-foreground">
                           {activeSchools.length === 0
                             ? "No active schools found."
                             : "No active schools to display."}
                         </div>
                       ) : (
                         displayedActiveSchools.map((school) => (
-                          <div key={school.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 px-6 gap-3 hover:bg-[#fbfdfb] transition-colors">
+                          <div key={school.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 px-6 gap-3 hover:bg-muted/30 transition-colors">
                             <div className="flex items-center gap-3">
-                              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#dff3ee] text-[#0b716b] shrink-0">
+                              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary shrink-0">
                                 <Building2 className="h-5 w-5" />
                               </div>
                               <div>
-                                <div className="text-sm font-extrabold text-[#304541] flex flex-wrap items-center gap-2">
+                                <div className="text-sm font-extrabold text-foreground flex flex-wrap items-center gap-2">
                                   {school.name}
                                   {school.templateSelectionStatus === "Selected" ? (
-                                    <span className="inline-flex items-center gap-1 rounded-full border border-teal-200 bg-teal-50 px-2 py-0.5 text-[10px] font-bold text-teal-800">
-                                      <CheckCircle2 className="h-3 w-3 text-teal-600" />
+                                    <span className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
+                                      <CheckCircle2 className="h-3 w-3 text-primary" />
                                       Template: {school.selectedTemplateName || "Selected"}
                                     </span>
                                   ) : (
-                                    <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-800">
-                                      <AlertTriangle className="h-3 w-3 text-amber-600" />
+                                    <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 dark:border-amber-800/50 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 text-[10px] font-bold text-amber-800 dark:text-amber-300">
+                                      <AlertTriangle className="h-3 w-3 text-amber-600 dark:text-amber-400" />
                                       Template: Not Selected
                                     </span>
                                   )}
                                 </div>
-                                <div className="text-[11px] text-[#8d9995] flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
-                                  <span>Code: <b className="text-[#304541]">{school.shortCode}</b></span>
+                                <div className="text-[11px] text-muted-foreground flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
+                                  <span>Code: <b className="text-foreground">{school.shortCode}</b></span>
                                 </div>
                               </div>
                             </div>
@@ -2211,11 +2228,11 @@ export default function Home({
                                 <Switch
                                   checked={school.isActive}
                                   onCheckedChange={() => handleToggleSchoolStatus(school)}
-                                  className="data-[state=checked]:bg-[#0f7f79]"
+                                  className="data-[state=checked]:bg-primary"
                                   aria-label={`Toggle active status for ${school.name}`}
                                 />
                                 <span
-                                  className={`text-xs font-bold ${school.isActive ? "text-[#0f7f79]" : "text-[#8d9995]"
+                                  className={`text-xs font-bold ${school.isActive ? "text-primary" : "text-muted-foreground"
                                     }`}
                                 >
                                   {school.isActive ? "Active" : "Inactive"}
@@ -2224,31 +2241,31 @@ export default function Home({
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                   <button
-                                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#d3ded8] bg-white text-[#556561] shadow-sm hover:border-[#0f7f79] hover:bg-[#f2f7f4] hover:text-[#0f7f79] focus:outline-none"
+                                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground shadow-sm hover:border-primary hover:bg-accent hover:text-primary focus:outline-none"
                                     title="Actions"
                                     aria-label={`Actions for ${school.name}`}
                                   >
                                     <MoreVertical className="h-4 w-4" />
                                   </button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-36 bg-white p-1 rounded-xl shadow-lg border border-[#e2e8e3]">
+                                <DropdownMenuContent align="end" className="w-36 bg-popover text-popover-foreground p-1 rounded-xl shadow-lg border border-border">
                                   <DropdownMenuItem
                                     onClick={() => handleGenerateCredentials(school)}
-                                    className="flex items-center gap-2 px-2.5 py-2 text-xs font-semibold text-[#0f7f79] hover:bg-[#eef7f4] rounded-lg cursor-pointer"
+                                    className="flex items-center gap-2 px-2.5 py-2 text-xs font-semibold text-primary hover:bg-accent rounded-lg cursor-pointer"
                                   >
                                     <KeyRound className="h-3.5 w-3.5" />
                                     View
                                   </DropdownMenuItem>
                                   <DropdownMenuItem
                                     onClick={() => handleEditSchool(school)}
-                                    className="flex items-center gap-2 px-2.5 py-2 text-xs font-semibold text-[#304541] hover:bg-[#f2f7f4] rounded-lg cursor-pointer"
+                                    className="flex items-center gap-2 px-2.5 py-2 text-xs font-semibold text-foreground hover:bg-accent rounded-lg cursor-pointer"
                                   >
                                     <FileEdit className="h-3.5 w-3.5" />
                                     Edit
                                   </DropdownMenuItem>
                                   <DropdownMenuItem
                                     onClick={() => handleDeleteSchool(school.id, school.name)}
-                                    className="flex items-center gap-2 px-2.5 py-2 text-xs font-semibold text-[#dc2626] hover:bg-[#fef2f2] rounded-lg cursor-pointer"
+                                    className="flex items-center gap-2 px-2.5 py-2 text-xs font-semibold text-destructive hover:bg-destructive/10 rounded-lg cursor-pointer"
                                   >
                                     <Trash2 className="h-3.5 w-3.5" />
                                     Delete
@@ -2267,6 +2284,8 @@ export default function Home({
             )
           ) : activeNav === "About Us" ? (
             <AboutUsSection />
+          ) : activeNav === "Settings" ? (
+            <SettingsSection />
           ) : activeNav === "Create Order" ? (
             <CreateOrderView
               user={authenticatedUser}
@@ -2338,6 +2357,7 @@ export default function Home({
               }}
               onRejectCardDirect={(id: number) => handleOpenReview(id)}
               onOpenExcelUpload={() => setExcelUploadOpen(true)}
+              onOpenBulkPhotoUpload={() => setBulkPhotoUploadOpen(true)}
               onDownloadExampleExcel={handleDownloadExampleExcel}
               onRemoveApproved={handleRemoveApprovedCards}
             />
@@ -2357,7 +2377,7 @@ export default function Home({
 
       {/* Dialog for Creating / Editing School */}
       <Dialog open={schoolModalOpen} onOpenChange={setSchoolModalOpen}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg bg-card border-border">
           <form onSubmit={handleCreateSchoolSubmit}>
             <DialogHeader>
               <DialogTitle>{editingSchool ? `Edit School: ${editingSchool.name}` : "Add New School"}</DialogTitle>
@@ -2370,7 +2390,7 @@ export default function Home({
             <div className="space-y-4 py-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-bold text-[#304541]">
+                  <label className="text-xs font-bold text-foreground">
                     School Name <span className="text-red-500">*</span>
                   </label>
                   <Input
@@ -2383,7 +2403,7 @@ export default function Home({
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-[#304541]">
+                  <label className="text-xs font-bold text-foreground">
                     Short Code <span className="text-red-500">*</span>
                   </label>
                   <Input
@@ -2399,7 +2419,7 @@ export default function Home({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-bold text-[#304541]">
+                  <label className="text-xs font-bold text-foreground">
                     Contact Email
                   </label>
                   <Input
@@ -2411,11 +2431,11 @@ export default function Home({
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-[#304541]">
+                  <label className="text-xs font-bold text-foreground">
                     Phone Number
                   </label>
                   <div className="mt-1 flex items-center gap-1.5">
-                    <div className="h-10 w-14 flex items-center justify-center rounded-xl border border-[#d2dbd8] bg-[#f5f8f7] text-xs font-bold text-[#2a4541] select-none shrink-0">
+                    <div className="h-10 w-14 flex items-center justify-center rounded-xl border border-border bg-muted text-xs font-bold text-foreground select-none shrink-0">
                       +91
                     </div>
                     <div className="flex-1">
@@ -2445,7 +2465,7 @@ export default function Home({
               </div>
 
               <div>
-                <label className="text-xs font-bold text-[#304541]">
+                <label className="text-xs font-bold text-foreground">
                   Campus Address
                 </label>
                 <Input
@@ -2467,7 +2487,7 @@ export default function Home({
               >
                 Cancel
               </Button>
-              <Button type="submit" className="bg-[#0f7f79] hover:bg-[#096c67]">
+              <Button type="submit" className="bg-primary hover:bg-primary/90 text-white font-bold">
                 {editingSchool ? "Update School" : "Create School"}
               </Button>
             </DialogFooter>
@@ -2477,7 +2497,7 @@ export default function Home({
 
       {/* Dialog for Creating Template */}
       <Dialog open={templateModalOpen} onOpenChange={setTemplateModalOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md bg-card border-border">
           <form onSubmit={handleCreateTemplateSubmit}>
             <DialogHeader>
               <DialogTitle>New ID Card Template</DialogTitle>
@@ -2487,7 +2507,7 @@ export default function Home({
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div>
-                <label className="text-xs font-bold text-[#304541]">
+                <label className="text-xs font-bold text-foreground">
                   Template Name
                 </label>
                 <Input
@@ -2507,7 +2527,7 @@ export default function Home({
               >
                 Cancel
               </Button>
-              <Button type="submit" className="bg-[#0f7f79] hover:bg-[#096c67]">
+              <Button type="submit" className="bg-primary hover:bg-primary/90 text-white font-bold">
                 Create Template
               </Button>
             </DialogFooter>
@@ -2520,7 +2540,7 @@ export default function Home({
         setUserModalOpen(open);
         if (!open) setEditingUser(null);
       }}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md bg-card border-border">
           <form onSubmit={handleUserSubmit} noValidate>
             <DialogHeader>
               <DialogTitle>{editingUser ? `Edit User: ${editingUser.name || editingUser.email || "User"}` : "Add New User"}</DialogTitle>
@@ -2532,7 +2552,7 @@ export default function Home({
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div>
-                <label className="text-xs font-bold text-[#304541]">
+                <label className="text-xs font-bold text-foreground">
                   Full Name <span className="text-red-500">*</span>
                 </label>
                 <Input
@@ -2554,7 +2574,7 @@ export default function Home({
                 )}
               </div>
               <div>
-                <label className="text-xs font-bold text-[#304541]">
+                <label className="text-xs font-bold text-foreground">
                   Email Address <span className="text-red-500">*</span>
                 </label>
                 <Input
@@ -2576,7 +2596,7 @@ export default function Home({
                 )}
               </div>
               <div>
-                <label className="text-xs font-bold text-[#304541]">
+                <label className="text-xs font-bold text-foreground">
                   {editingUser ? "New Password (leave blank to keep current)" : "Temporary Password (min 8 chars)"} {!editingUser && <span className="text-red-500">*</span>}
                 </label>
                 <Input
@@ -2598,7 +2618,7 @@ export default function Home({
                 )}
               </div>
               <div>
-                <label className="text-xs font-bold text-[#304541]">
+                <label className="text-xs font-bold text-foreground">
                   Role
                 </label>
                 <Select
@@ -2623,7 +2643,7 @@ export default function Home({
 
               {userRoleInput === "SCHOOL_ADMIN" && (
                 <div>
-                  <label className="text-xs font-bold text-[#304541]">
+                  <label className="text-xs font-bold text-foreground">
                     Assign School <span className="text-red-500">*</span>
                   </label>
                   <Select
@@ -2653,7 +2673,7 @@ export default function Home({
                       {userFormErrors.schoolId}
                     </p>
                   )}
-                  <p className="mt-1 text-[11px] text-[#788784]">
+                  <p className="mt-1 text-[11px] text-muted-foreground">
                     The School Admin will manage cards, orders, and approvals for this school.
                   </p>
                 </div>
@@ -2670,7 +2690,7 @@ export default function Home({
               >
                 Cancel
               </Button>
-              <Button type="submit" className="bg-[#0f7f79] hover:bg-[#096c67]">
+              <Button type="submit" className="bg-primary hover:bg-primary/90 text-white font-bold">
                 {editingUser ? "Save Changes" : "Create User"}
               </Button>
             </DialogFooter>
@@ -2685,16 +2705,16 @@ export default function Home({
           if (!open) setUserPendingDelete(null);
         }}
       >
-        <AlertDialogContent className="max-w-md">
+        <AlertDialogContent className="max-w-md bg-card border-border">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-red-600 flex items-center gap-2">
               <Trash2 className="h-5 w-5" />
               Delete User
             </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-2 text-sm text-gray-600">
+            <AlertDialogDescription className="space-y-2 text-sm text-muted-foreground">
               <p>
                 Are you sure you want to permanently delete user{" "}
-                <b className="text-gray-900">{userPendingDelete?.name || userPendingDelete?.openId}</b> ({userPendingDelete?.role})?
+                <b className="text-foreground">{userPendingDelete?.name || userPendingDelete?.openId}</b> ({userPendingDelete?.role})?
               </p>
               <p className="text-xs text-red-500 font-medium">
                 This action cannot be undone. All audit log assignments and notifications for this account will be cleaned up.
@@ -2719,17 +2739,17 @@ export default function Home({
 
       {/* School Credentials & ID Pass Modal */}
       <Dialog open={credentialsModalOpen} onOpenChange={setCredentialsModalOpen}>
-        <DialogContent className="sm:max-w-md bg-white border border-[#e2e8e3] rounded-2xl shadow-xl">
+        <DialogContent className="sm:max-w-md bg-card border border-border rounded-2xl shadow-xl">
           <DialogHeader>
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#dff3ee] text-[#0f7f79]">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
                 <KeyRound className="h-5 w-5" />
               </div>
               <div>
-                <DialogTitle className="text-base font-extrabold text-[#304541]">
+                <DialogTitle className="text-base font-extrabold text-foreground">
                   School ID Pass & Credentials
                 </DialogTitle>
-                <DialogDescription className="text-xs text-[#788784]">
+                <DialogDescription className="text-xs text-muted-foreground">
                   {credentialsData?.schoolName ? `Login credentials for ${credentialsData.schoolName}` : "School login credentials"}
                 </DialogDescription>
               </div>
@@ -2738,34 +2758,34 @@ export default function Home({
 
           <div className="space-y-4 py-2">
             {/* School Details */}
-            <div className="rounded-xl border border-[#d8e8e3] bg-[#f7fbf9] p-3.5 text-xs text-[#304541] space-y-2">
-              <div className="flex items-center justify-between border-b border-[#e5efe9] pb-2">
-                <span className="font-bold text-[#0f7f79] flex items-center gap-1.5">
+            <div className="rounded-xl border border-border bg-muted/40 p-3.5 text-xs text-foreground space-y-2">
+              <div className="flex items-center justify-between border-b border-border pb-2">
+                <span className="font-bold text-primary flex items-center gap-1.5">
                   <Building2 className="h-4 w-4" /> {credentialsData?.schoolName || "School Details"}
                 </span>
                 {credentialsData?.shortCode && (
-                  <span className="font-mono text-[10px] font-bold bg-[#e1f3ed] text-[#0a716b] px-2 py-0.5 rounded-full">
+                  <span className="font-mono text-[10px] font-bold bg-primary/15 text-primary px-2 py-0.5 rounded-full">
                     {credentialsData.shortCode}
                   </span>
                 )}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] pt-0.5">
                 <div>
-                  <span className="text-[#788784] font-medium block">Email:</span>
-                  <span className="font-semibold text-[#203734] break-all">
+                  <span className="text-muted-foreground font-medium block">Email:</span>
+                  <span className="font-semibold text-foreground break-all">
                     {credentialsData?.email || "—"}
                   </span>
                 </div>
                 <div>
-                  <span className="text-[#788784] font-medium block">Phone:</span>
-                  <span className="font-semibold text-[#203734]">
+                  <span className="text-muted-foreground font-medium block">Phone:</span>
+                  <span className="font-semibold text-foreground">
                     {credentialsData?.phone || "—"}
                   </span>
                 </div>
               </div>
-              <div className="text-[11px] pt-1 border-t border-[#edf4f0]">
-                <span className="text-[#788784] font-medium block">Address:</span>
-                <span className="font-semibold text-[#203734]">
+              <div className="text-[11px] pt-1 border-t border-border">
+                <span className="text-muted-foreground font-medium block">Address:</span>
+                <span className="font-semibold text-foreground">
                   {credentialsData?.address || "—"}
                 </span>
               </div>
@@ -2773,16 +2793,16 @@ export default function Home({
 
             {/* Login ID field */}
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-[#304541]">School Login ID</label>
+              <label className="text-xs font-bold text-foreground">School Login ID</label>
               <div className="flex items-center gap-2">
-                <div className="flex-1 font-mono text-sm font-bold text-[#1f3a35] bg-[#edf3f0] px-3 py-2 rounded-xl border border-[#d5e2dc] select-all break-all">
+                <div className="flex-1 font-mono text-sm font-bold text-foreground bg-muted px-3 py-2 rounded-xl border border-border select-all break-all">
                   {credentialsData?.loginId || "—"}
                 </div>
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="shrink-0 h-9 rounded-xl border-[#cfded8] text-xs font-bold hover:bg-[#eef6f3] hover:text-[#0f7f79]"
+                  className="shrink-0 h-9 rounded-xl border-border text-xs font-bold hover:bg-muted hover:text-primary"
                   onClick={() => {
                     if (credentialsData?.loginId) {
                       navigator.clipboard.writeText(credentialsData.loginId);
@@ -2797,16 +2817,16 @@ export default function Home({
 
             {/* Password / ID Pass field */}
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-[#304541]">Password / ID Pass</label>
+              <label className="text-xs font-bold text-foreground">Password / ID Pass</label>
               <div className="flex items-center gap-2">
-                <div className="flex-1 font-mono text-sm font-bold text-[#1f3a35] bg-[#edf3f0] px-3 py-2 rounded-xl border border-[#d5e2dc] select-all break-all">
+                <div className="flex-1 font-mono text-sm font-bold text-foreground bg-muted px-3 py-2 rounded-xl border border-border select-all break-all">
                   {credentialsData?.password || "••••••••••••"}
                 </div>
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="shrink-0 h-9 rounded-xl border-[#cfded8] text-xs font-bold hover:bg-[#eef6f3] hover:text-[#0f7f79]"
+                  className="shrink-0 h-9 rounded-xl border-border text-xs font-bold hover:bg-muted hover:text-primary"
                   onClick={() => {
                     if (credentialsData?.password) {
                       navigator.clipboard.writeText(credentialsData.password);
@@ -2825,7 +2845,7 @@ export default function Home({
               type="button"
               variant="outline"
               size="sm"
-              className="rounded-xl border-[#cfded8] text-xs font-bold text-[#0f7f79] hover:bg-[#eef6f3]"
+              className="rounded-xl border-border text-xs font-bold text-primary hover:bg-muted"
               onClick={() => {
                 if (credentialsData) {
                   const lines = [
@@ -2847,7 +2867,7 @@ export default function Home({
             </Button>
             <Button
               type="button"
-              className="rounded-xl bg-[#0f7f79] text-xs font-bold text-white hover:bg-[#096c67]"
+              className="rounded-xl bg-primary text-xs font-bold text-white hover:bg-primary/90"
               onClick={() => setCredentialsModalOpen(false)}
             >
               Done
@@ -2900,9 +2920,21 @@ export default function Home({
         }}
       />
 
+      {/* Bulk Image Upload Modal */}
+      <BulkImageUploadModal
+        open={bulkPhotoUploadOpen}
+        onOpenChange={setBulkPhotoUploadOpen}
+        schools={schools}
+        activeSchoolId={currentActiveSchool?.id ?? (authenticatedUser.schoolId ?? undefined)}
+        userRole={authenticatedUser.role}
+        onUploadSuccess={() => {
+          reloadWorkspace();
+        }}
+      />
+
       {/* Admin Card Review & Detail Modal */}
       <Dialog open={reviewModalOpen} onOpenChange={setReviewModalOpen}>
-        <DialogContent className="w-[95vw] sm:max-w-5xl xl:max-w-6xl max-h-[92vh] overflow-y-auto p-4 sm:p-6">
+        <DialogContent className="w-[95vw] sm:max-w-5xl xl:max-w-6xl max-h-[92vh] overflow-y-auto p-4 sm:p-6 bg-card border-border">
           {reviewingCard && (
             <div>
               <DialogHeader>
@@ -2912,10 +2944,10 @@ export default function Home({
                       <span>Card Review: #{reviewingCard.cardNumber}</span>
                       <span className={`text-xs px-2.5 py-0.5 rounded-full font-mono font-semibold ${
                         reviewingCard.status === "PRINTED"
-                          ? "bg-[#e9ebfa] text-[#5c64b7] border border-[#cbd0f2]"
+                          ? "bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800"
                           : reviewingCard.status === "APPROVED"
-                          ? "bg-[#dff3ee] text-[#0b716b] border border-[#b7e3d9]"
-                          : "bg-[#eef5f0] text-[#0f7f79]"
+                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
+                          : "bg-primary/10 text-primary border border-primary/20"
                       }`}>
                         {reviewingCard.status}
                       </span>
@@ -2925,14 +2957,14 @@ export default function Home({
                     </DialogDescription>
                   </div>
                   {/* Side switcher */}
-                  <div className="flex gap-1.5 bg-[#f0efec] p-1 rounded-xl shrink-0 self-start sm:self-auto">
+                  <div className="flex gap-1.5 bg-muted p-1 rounded-xl shrink-0 self-start sm:self-auto">
                     {(["FRONT", "BACK"] as const).map((side) => (
                       <button
                         key={side}
                         onClick={() => setReviewSide(side)}
                         className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${reviewSide === side
-                          ? "bg-[#0f7f79] text-white shadow-sm"
-                          : "text-[#55605d] hover:text-[#203734]"
+                          ? "bg-primary text-white shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
                           }`}
                       >
                         {side}
@@ -2942,9 +2974,9 @@ export default function Home({
                 </div>
               </DialogHeader>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 py-6 border-b border-[#edf0ed]">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 py-6 border-b border-border">
                 {/* Visual Card Preview */}
-                <div className="flex flex-col items-center justify-center p-3 sm:p-4 bg-[#f8faf8] rounded-2xl border border-[#e2e8e3] overflow-x-auto max-w-full [scrollbar-width:thin]">
+                <div className="flex flex-col items-center justify-center p-3 sm:p-4 bg-muted/40 rounded-2xl border border-border overflow-x-auto max-w-full [scrollbar-width:thin]">
                   <CardRenderer
                     cardWidth={reviewingCard.template?.cardWidth ?? 324}
                     cardHeight={reviewingCard.template?.cardHeight ?? 204}
@@ -2960,7 +2992,7 @@ export default function Home({
                     cardData={reviewingCard.dataMap ?? {}}
                     scale={1.2}
                   />
-                  <div className="mt-3 text-xs text-[#84918e]">
+                  <div className="mt-3 text-xs text-muted-foreground">
                     Card dimensions: {reviewingCard.template?.cardWidth ?? 324} × {reviewingCard.template?.cardHeight ?? 204}px
                   </div>
                 </div>
@@ -2968,10 +3000,10 @@ export default function Home({
                 {/* Form Data & Details */}
                 <div className="space-y-4">
                   <div>
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-[#84918e] mb-2">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
                       Card Fields & Data
                     </h4>
-                    <div className="rounded-xl border border-[#e2e8e3] bg-white divide-y divide-[#edf0ed] overflow-hidden">
+                    <div className="rounded-xl border border-border bg-card divide-y divide-border overflow-hidden">
                       {[
                         {
                           label: "Student Name",
@@ -3030,10 +3062,10 @@ export default function Home({
                         .filter((field): field is { label: string; value: string } => Boolean(field.value && field.value.trim()))
                         .map(({ label, value }) => (
                           <div key={label} className="flex justify-between items-center px-3 py-2 text-xs">
-                            <span className="font-semibold text-[#55605d]">
+                            <span className="font-semibold text-muted-foreground">
                               {label}
                             </span>
-                            <span className="font-mono text-[#203734] truncate max-w-[220px]" title={value}>
+                            <span className="font-mono text-foreground truncate max-w-[220px]" title={value}>
                               {value}
                             </span>
                           </div>
@@ -3044,7 +3076,7 @@ export default function Home({
                   {/* Attached files */}
                   {reviewingCard.files && reviewingCard.files.length > 0 && (
                     <div>
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-[#84918e] mb-2">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
                         Uploaded Assets
                       </h4>
                       <div className="flex flex-wrap gap-2">
@@ -3054,7 +3086,7 @@ export default function Home({
                             href={file.fileUrl}
                             target="_blank"
                             rel="noreferrer"
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#e2e8e3] bg-white text-xs text-[#0f7f79] hover:bg-[#eef7f3]"
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border bg-card text-xs text-primary hover:bg-muted"
                           >
                             <Eye className="w-3.5 h-3.5" />
                             <span className="font-medium">{file.fileType}</span>
@@ -3066,7 +3098,7 @@ export default function Home({
 
                   {/* Approval Timeline */}
                   <div>
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-[#84918e] mb-2">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
                       Approval & Audit History
                     </h4>
                     <ApprovalTimeline
@@ -3079,7 +3111,7 @@ export default function Home({
               </div>
 
               {/* Action buttons */}
-              <DialogFooter className="mt-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2 border-t border-[#edf0ed]">
+              <DialogFooter className="mt-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2 border-t border-border">
                 <div className="flex flex-wrap items-center gap-2">
                   <Button
                     variant="outline"
@@ -3110,7 +3142,7 @@ export default function Home({
                           variant="outline"
                           onClick={() => setRequestChangesOpen(true)}
                           disabled={actionLoading}
-                          className="border-[#f39c12] text-[#f39c12] hover:bg-[#fffbf0] text-xs"
+                          className="border-amber-500 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30 dark:text-amber-400 dark:border-amber-500/60 text-xs"
                         >
                           <RotateCcw className="w-3.5 h-3.5 mr-1" /> Request Changes
                         </Button>
@@ -3125,7 +3157,7 @@ export default function Home({
                         <Button
                           onClick={handleAdminApprove}
                           disabled={actionLoading}
-                          className="bg-[#0f7f79] hover:bg-[#096c67] text-white text-xs"
+                          className="bg-primary hover:bg-primary/90 text-white text-xs"
                         >
                           <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Approve Card
                         </Button>
@@ -3156,7 +3188,7 @@ export default function Home({
 
       {/* Request Changes Sub-Modal */}
       <Dialog open={requestChangesOpen} onOpenChange={setRequestChangesOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md bg-card border-border">
           <DialogHeader>
             <DialogTitle>Request Changes</DialogTitle>
             <DialogDescription>
@@ -3164,7 +3196,7 @@ export default function Home({
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <label className="text-xs font-bold text-[#304541]">
+            <label className="text-xs font-bold text-foreground">
               Review Comments / Instructions <span className="text-red-500">*</span>
             </label>
             <Textarea
@@ -3188,7 +3220,7 @@ export default function Home({
               type="button"
               onClick={handleAdminRequestChanges}
               disabled={actionLoading || !requestChangesComment.trim()}
-              className="bg-[#f39c12] hover:bg-[#e08e0b] text-white"
+              className="bg-amber-600 hover:bg-amber-700 text-white"
             >
               Submit Request
             </Button>
@@ -3198,7 +3230,7 @@ export default function Home({
 
       {/* Reject Card Sub-Modal */}
       <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md bg-card border-border">
           <DialogHeader>
             <DialogTitle>Reject ID Card</DialogTitle>
             <DialogDescription>
@@ -3206,7 +3238,7 @@ export default function Home({
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <label className="text-xs font-bold text-[#304541]">
+            <label className="text-xs font-bold text-foreground">
               Rejection Reason <span className="text-red-500">*</span>
             </label>
             <Textarea
@@ -3240,7 +3272,7 @@ export default function Home({
 
       {/* Bulk Reject Cards Dialog */}
       <Dialog open={bulkRejectModalOpen} onOpenChange={setBulkRejectModalOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md bg-card border-border">
           <DialogHeader>
             <DialogTitle>Reject Selected ID Cards</DialogTitle>
             <DialogDescription>
@@ -3248,7 +3280,7 @@ export default function Home({
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <label className="text-xs font-bold text-[#304541]">
+            <label className="text-xs font-bold text-foreground">
               Rejection Reason <span className="text-red-500">*</span>
             </label>
             <Textarea
@@ -3285,7 +3317,7 @@ export default function Home({
 
       {/* Dialog for Template Preview */}
       <Dialog open={!!previewModalTemplate} onOpenChange={(open) => !open && setPreviewModalTemplate(null)}>
-        <DialogContent className="max-w-[700px]">
+        <DialogContent className="max-w-[700px] bg-card border-border">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold">
               Template Preview — {previewModalTemplate?.name}
@@ -3299,42 +3331,44 @@ export default function Home({
                     key={side}
                     onClick={() => setPreviewModalSide(side)}
                     className={`rounded-lg px-4 py-1.5 text-xs font-bold transition-all ${previewModalSide === side
-                      ? "bg-[#0f7f79] text-white"
-                      : "bg-[#f0efec] text-[#778381] hover:bg-[#e5e4e0]"
+                      ? "bg-primary text-white"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80"
                       }`}
                   >
                     {side}
                   </button>
                 ))}
               </div>
-              <CardRenderer
-                cardWidth={previewModalTemplate.cardWidth ?? 324}
-                cardHeight={previewModalTemplate.cardHeight ?? 204}
-                elements={(previewModalTemplate.elements ?? []).map((el, i) => ({
-                  id: el.id,
-                  elementKey: el.elementKey,
-                  elementType: el.elementType as any,
-                  label: el.label ?? null,
-                  config: (el.config as any) ?? {
-                    x: 20,
-                    y: 20,
-                    width: 100,
-                    height: 30,
-                    side: "FRONT",
-                    rotation: 0,
-                    opacity: 1,
-                  },
-                  sortOrder: el.sortOrder ?? i,
-                }))}
-                side={previewModalSide}
-                cardData={SAMPLE_CARD_DATA}
-                scale={Math.min(
-                  1.75,
-                  520 / (previewModalTemplate.cardWidth ?? 324),
-                  420 / (previewModalTemplate.cardHeight ?? 204),
-                )}
-              />
-              <div className="text-center text-xs text-[#98a4a1]">
+              <div className="flex flex-col items-center justify-center p-3 sm:p-4 bg-muted/40 rounded-2xl border border-border overflow-x-auto max-w-full [scrollbar-width:thin]">
+                <CardRenderer
+                  cardWidth={previewModalTemplate.cardWidth ?? 324}
+                  cardHeight={previewModalTemplate.cardHeight ?? 204}
+                  elements={(previewModalTemplate.elements ?? []).map((el, i) => ({
+                    id: el.id,
+                    elementKey: el.elementKey,
+                    elementType: el.elementType as any,
+                    label: el.label ?? null,
+                    config: (el.config as any) ?? {
+                      x: 20,
+                      y: 20,
+                      width: 100,
+                      height: 30,
+                      side: "FRONT",
+                      rotation: 0,
+                      opacity: 1,
+                    },
+                    sortOrder: el.sortOrder ?? i,
+                  }))}
+                  side={previewModalSide}
+                  cardData={SAMPLE_CARD_DATA}
+                  scale={Math.min(
+                    1.75,
+                    520 / (previewModalTemplate.cardWidth ?? 324),
+                    420 / (previewModalTemplate.cardHeight ?? 204),
+                  )}
+                />
+              </div>
+              <div className="text-center text-xs text-muted-foreground">
                 {previewModalTemplate.elements && previewModalTemplate.elements.length > 0
                   ? "Live preview with designer layout and realistic student data."
                   : "This template has no custom elements yet. Super Admins can open the designer to add layout elements."}
@@ -3520,6 +3554,7 @@ function ModuleView({
   onApproveCardDirect,
   onRejectCardDirect,
   onOpenExcelUpload,
+  onOpenBulkPhotoUpload,
   onDownloadExampleExcel,
   onRemoveApproved,
 }: {
@@ -3566,6 +3601,7 @@ function ModuleView({
   onApproveCardDirect?: (cardId: number, num: string) => void;
   onRejectCardDirect?: (cardId: number) => void;
   onOpenExcelUpload?: () => void;
+  onOpenBulkPhotoUpload?: () => void;
   onDownloadExampleExcel?: (templateId?: number, cardType?: string) => void;
   onRemoveApproved?: (cardIds: number[]) => Promise<void>;
 }) {
@@ -3762,7 +3798,7 @@ function ModuleView({
                   : label
               : label}
           </h2>
-          <p className="mt-2 text-sm text-[#778381]">
+          <p className="mt-2 text-sm text-muted-foreground">
             {isRequests
               ? authenticatedUser.role === "SUPER_ADMIN"
                 ? activeSchool
@@ -3786,7 +3822,7 @@ function ModuleView({
               href="/demo-templates/Update-Catalog-ID-Card-and-Ribbon.pdf"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[#0f7f79]/30 bg-[#eef7f4] px-4 text-xs font-bold text-[#0f7f79] shadow-sm transition-all hover:border-[#0f7f79] hover:bg-[#dff1ec]"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-4 text-xs font-bold text-primary shadow-sm transition-all hover:border-primary hover:bg-primary/15"
               data-testid="button-view-demo-templates"
             >
               <FileText className="h-4 w-4" /> View Demo Templates
@@ -3795,26 +3831,45 @@ function ModuleView({
 
           {isRequests && authenticatedUser.role !== "VIEWER" && (
             <>
-              <Button
-                variant="outline"
-                onClick={() => onDownloadExampleExcel?.(activeSchool?.selectedTemplateId ?? undefined, "student")}
-                className="h-10 rounded-xl border-[#d1ded9] text-[#0f7f79] hover:bg-[#eef7f4] text-xs font-bold shadow-sm"
-              >
-                <Download className="mr-2 h-4 w-4" /> Student Excel
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => onDownloadExampleExcel?.(activeSchool?.selectedTemplateId ?? undefined, "staff")}
-                className="h-10 rounded-xl border-[#d1ded9] text-[#6d28d9] hover:bg-[#f3f0ff] text-xs font-bold shadow-sm"
-              >
-                <Download className="mr-2 h-4 w-4" /> Staff Excel
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="h-10 rounded-xl border-border text-primary hover:bg-primary/10 text-xs font-bold shadow-sm"
+                  >
+                    <Download className="mr-2 h-4 w-4" /> Download Example Excel <ChevronDown className="ml-1.5 h-3.5 w-3.5 opacity-60" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-52 rounded-xl border-border bg-card p-1.5 shadow-lg">
+                  <DropdownMenuItem
+                    onClick={() => onDownloadExampleExcel?.(activeSchool?.selectedTemplateId ?? undefined, "student")}
+                    className="cursor-pointer rounded-lg px-3 py-2 text-xs font-medium text-primary hover:bg-primary/10 focus:bg-primary/10 focus:text-primary"
+                  >
+                    <Download className="mr-2 h-4 w-4 text-primary" />
+                    <span>Student Excel Template</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => onDownloadExampleExcel?.(activeSchool?.selectedTemplateId ?? undefined, "staff")}
+                    className="cursor-pointer rounded-lg px-3 py-2 text-xs font-medium text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/40 focus:bg-purple-50 focus:text-purple-600"
+                  >
+                    <Download className="mr-2 h-4 w-4 text-purple-600 dark:text-purple-400" />
+                    <span>Staff Excel Template</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Button
                 variant="outline"
                 onClick={onOpenExcelUpload}
-                className="h-10 rounded-xl border-[#0f7f79] text-[#0f7f79] hover:bg-[#eef7f4] text-xs font-bold shadow-sm"
+                className="h-10 rounded-xl border-primary text-primary hover:bg-primary/10 text-xs font-bold shadow-sm"
               >
                 <Upload className="mr-2 h-4 w-4" /> Upload Excel
+              </Button>
+              <Button
+                variant="outline"
+                onClick={onOpenBulkPhotoUpload}
+                className="h-10 rounded-xl border-primary text-primary hover:bg-primary/10 text-xs font-bold shadow-sm"
+              >
+                <Camera className="mr-2 h-4 w-4" /> Bulk Upload Images
               </Button>
             </>
           )}
@@ -3825,7 +3880,7 @@ function ModuleView({
             (isUsers && authenticatedUser.role === "SUPER_ADMIN")) && (
               <Button
                 onClick={onCreate}
-                className="h-10 rounded-xl bg-[#0f7f79] text-xs font-bold text-white hover:bg-[#096c67]"
+                className="h-10 rounded-xl bg-primary text-xs font-bold text-white hover:bg-primary/90"
               >
                 <FilePlus2 className="mr-2 h-4 w-4" />{" "}
                 {isRequests ? "New ID Card Draft" : isUsers ? "New User" : "Create new"}
@@ -3837,29 +3892,29 @@ function ModuleView({
       {/* 1. Templates Tab */}
       {isTemplates && (
         <div className="space-y-5">
-          <div className="flex flex-col gap-3 rounded-2xl border border-[#e2e8e3] bg-[#fffefa] p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
             <div className="relative w-full max-w-sm">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#98a4a1]" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Search templates by name, description..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="h-10 rounded-xl border-[#e2e8e3] pl-9 text-xs shadow-none"
+                className="h-10 rounded-xl border-border bg-background pl-9 text-xs shadow-none"
               />
             </div>
 
             <div className="flex flex-wrap items-center justify-between sm:justify-end gap-3 w-full sm:w-auto">
               {authenticatedUser.role === "SUPER_ADMIN" && (
                 <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-bold text-[#4e5c59] mr-1">Status:</span>
+                  <span className="text-xs font-bold text-muted-foreground mr-1">Status:</span>
                   {(["All", "ACTIVE", "INACTIVE"] as const).map((status) => (
                     <button
                       key={status}
                       type="button"
                       onClick={() => setTemplateStatusFilter(status)}
                       className={`rounded-lg px-2.5 py-1.5 text-xs font-bold transition-all ${templateStatusFilter === status
-                          ? "bg-[#0f7f79] text-white shadow-xs"
-                          : "bg-[#edf2ee] text-[#556360] hover:bg-[#dfe6e1]"
+                          ? "bg-primary text-white shadow-xs"
+                          : "bg-muted text-muted-foreground hover:bg-muted/80"
                         }`}
                     >
                       {status === "All" ? "All" : status === "ACTIVE" ? "Active" : "Inactive"}
@@ -3867,21 +3922,21 @@ function ModuleView({
                   ))}
                 </div>
               )}
-              <div className="text-xs text-[#788784]">
+              <div className="text-xs text-muted-foreground">
                 Showing <b>{filteredTemplates.length}</b> {filteredTemplates.length === 1 ? "template" : "templates"}
               </div>
             </div>
           </div>
 
           {filteredTemplates.length === 0 ? (
-            <div className="rounded-2xl border border-[#e2e8e3] bg-[#fffefa] p-12 text-center text-sm text-[#8d9995] shadow-sm">
-              <Palette className="mx-auto mb-3 h-8 w-8 text-[#98a4a1]" />
-              <p className="font-semibold text-[#304541]">
+            <div className="rounded-2xl border border-border bg-card p-12 text-center text-sm text-muted-foreground shadow-sm">
+              <Palette className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
+              <p className="font-semibold text-foreground">
                 {searchTerm || templateStatusFilter !== "All"
                   ? "No templates matching your search or filter"
                   : "No templates available"}
               </p>
-              <p className="mt-1 text-xs text-[#98a4a1]">
+              <p className="mt-1 text-xs text-muted-foreground">
                 {searchTerm
                   ? "Try adjusting your search terms or resetting the filter."
                   : "Create a new template to get started."}
@@ -3892,22 +3947,22 @@ function ModuleView({
               {filteredTemplates.map((template) => (
                 <Card
                   key={template.id}
-                  className="overflow-hidden rounded-2xl border-[#e2e8e3] bg-[#fffefa] shadow-[0_12px_35px_rgba(38,71,65,0.05)]"
+                  className="overflow-hidden rounded-2xl border-border bg-card shadow-[0_12px_35px_rgba(38,71,65,0.05)]"
                 >
-                  <div className="flex h-44 items-center justify-center bg-[#eef5f0]">
+                  <div className="flex h-44 items-center justify-center bg-muted/50">
                     <CardPreview accent={template.accent as Tone} />
                   </div>
                   <CardContent className="p-5">
                     <div className="flex items-center justify-between gap-2">
-                      <h3 className="font-extrabold text-[#304541] truncate">
+                      <h3 className="font-extrabold text-foreground truncate">
                         {template.name}
                       </h3>
                       {authenticatedUser.role === "SUPER_ADMIN" ? (
                         <button
                           onClick={() => onToggleTemplateStatus(template)}
                           className={`rounded-lg px-2.5 py-1 text-[10px] font-extrabold transition-colors shrink-0 ${template.status === "ACTIVE"
-                            ? "bg-[#fff0e8] text-[#c65c3d] hover:bg-[#fde2d6]"
-                            : "bg-[#e1f3ed] text-[#0a716b] hover:bg-[#cbf0e4]"
+                            ? "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 hover:bg-amber-100"
+                            : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100"
                             }`}
                         >
                           {template.status === "ACTIVE" ? "Deactivate" : "Activate"}
@@ -3919,36 +3974,36 @@ function ModuleView({
                       )}
                     </div>
                     {Boolean(template.description || template.meta) && (
-                      <p className="mt-1 text-xs text-[#84918e]">
+                      <p className="mt-1 text-xs text-muted-foreground">
                         {template.description || template.meta}
                       </p>
                     )}
                     <div className="mt-5 flex items-center justify-between gap-2">
-                      <span className="font-mono text-[10px] text-[#9aa6a2]">
+                      <span className="font-mono text-[10px] text-muted-foreground">
                         {template.status}
                       </span>
                       <div className="flex flex-1 items-center justify-end gap-2">
                         <button
                           onClick={() => onPreviewTemplate(template)}
-                          className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#f0efec] px-3.5 py-2 text-xs font-bold text-[#3d4946] shadow-2xs hover:bg-[#e2e0dc] transition-all"
+                          className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-muted px-3.5 py-2 text-xs font-bold text-foreground shadow-2xs hover:bg-muted/80 transition-all"
                         >
-                          <Eye className="w-3.5 h-3.5 text-[#55605d]" />
+                          <Eye className="w-3.5 h-3.5 text-muted-foreground" />
                           <span>Preview</span>
                         </button>
 
                         {authenticatedUser.role === "SUPER_ADMIN" && (
                           <button
                             onClick={() => navigate(`/admin/templates/${template.id}/design`)}
-                            className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#e9ebfa] px-3.5 py-2 text-xs font-bold text-[#5c64b7] shadow-2xs hover:bg-[#d8dbf3] transition-all"
+                            className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 px-3.5 py-2 text-xs font-bold text-indigo-600 dark:text-indigo-400 shadow-2xs hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-all"
                           >
-                            <Palette className="w-3.5 h-3.5 text-[#5c64b7]" />
+                            <Palette className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
                             <span>Design</span>
                           </button>
                         )}
 
                         {/* Final template badge + unselect button if this is school's selected template */}
                         {activeSchool?.selectedTemplateId === template.id && (
-                          <span className="inline-flex items-center gap-1 rounded-xl bg-[#0f7f79] px-1.5 pl-3 py-1.5 text-xs font-bold text-white shadow-xs">
+                          <span className="inline-flex items-center gap-1 rounded-xl bg-primary px-1.5 pl-3 py-1.5 text-xs font-bold text-white shadow-xs">
                             <CheckCircle2 className="w-3.5 h-3.5" /> Final Selected
                             {authenticatedUser.role !== "SUPER_ADMIN" && (
                               <button
@@ -3969,7 +4024,7 @@ function ModuleView({
                           activeSchool?.selectedTemplateId !== template.id && (
                             <button
                               onClick={() => onSelectTemplate(template)}
-                              className="inline-flex items-center justify-center gap-1 rounded-xl bg-[#e1f3ed] px-3 py-2 text-xs font-bold text-[#0a716b] hover:bg-[#cbf0e4] transition-all"
+                              className="inline-flex items-center justify-center gap-1 rounded-xl bg-primary/10 px-3 py-2 text-xs font-bold text-primary hover:bg-primary/20 transition-all"
                             >
                               Select as Final Template
                             </button>
@@ -3979,7 +4034,7 @@ function ModuleView({
                         {authenticatedUser.role === "SUPER_ADMIN" && (
                           <button
                             onClick={() => onDeleteTemplate?.(template.id, template.name)}
-                            className="rounded-lg border border-[#fecaca] bg-[#fff5f5] p-2 text-[#dc2626] hover:bg-[#fee2e2] transition-colors"
+                            className="rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/40 p-2 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/60 transition-colors"
                             title={`Delete ${template.name}`}
                             aria-label={`Delete ${template.name}`}
                           >
@@ -3998,21 +4053,21 @@ function ModuleView({
 
       {/* 2. ID Card Requests / LifeCycle Queue */}
       {isRequests && (
-        <Card className="rounded-2xl border-[#e2e8e3] bg-[#fffefa] shadow-[0_12px_35px_rgba(38,71,65,0.05)]">
-          <div className="flex flex-col gap-3 border-b border-[#edf0ed] p-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
+        <Card className="rounded-2xl border-border bg-card shadow-[0_12px_35px_rgba(38,71,65,0.05)]">
+          <div className="flex flex-col gap-3 border-b border-border p-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full lg:w-auto">
               <div className="relative w-full sm:w-64 shrink-0">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#98a4a1]" />
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   placeholder="Search card #, student, or school..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="h-10 rounded-xl border-[#e2e8e3] pl-9 text-xs shadow-none w-full"
+                  className="h-10 rounded-xl border-border bg-background pl-9 text-xs shadow-none w-full"
                 />
               </div>
               {/* Status Filter dropdown */}
               <div className="flex items-center gap-2 shrink-0">
-                <label htmlFor="id-card-request-status-filter" className="text-xs font-semibold text-[#55605d] shrink-0">
+                <label htmlFor="id-card-request-status-filter" className="text-xs font-semibold text-muted-foreground shrink-0">
                   Status:
                 </label>
                 <Select
@@ -4022,7 +4077,7 @@ function ModuleView({
                   <SelectTrigger
                     id="id-card-request-status-filter"
                     aria-label="Status Filter"
-                    className="h-10 w-[170px] rounded-xl border-[#e2e8e3] bg-white text-xs font-medium"
+                    className="h-10 w-[170px] rounded-xl border-border bg-background text-xs font-medium"
                   >
                     <SelectValue placeholder="All" />
                   </SelectTrigger>
@@ -4041,14 +4096,14 @@ function ModuleView({
             {/* Bulk Approval & Rejection Toolbar for both Admin and School */}
             <div className="flex flex-wrap items-center gap-2 self-start sm:self-end lg:self-center shrink-0">
               {selectedRequestCardIds.length > 0 && (
-                <span className="text-xs font-semibold text-[#84918e] mr-1">
+                <span className="text-xs font-semibold text-muted-foreground mr-1">
                   {selectedRequestCardIds.length} of {requestCards.length} selected
                 </span>
               )}
               <Button
                 onClick={onBulkApproveRequests}
                 disabled={selectedRequestCardIds.length === 0 || bulkActionLoading}
-                className="h-9 sm:h-10 rounded-xl bg-[#0f7f79] hover:bg-[#096c67] text-xs font-bold text-white shadow-sm"
+                className="h-9 sm:h-10 rounded-xl bg-primary hover:bg-primary/90 text-xs font-bold text-white shadow-sm"
               >
                 <CheckCircle2 className="w-4 h-4 mr-1.5" /> Approve all
               </Button>
@@ -4056,7 +4111,7 @@ function ModuleView({
                 variant="outline"
                 onClick={onBulkRejectRequests}
                 disabled={selectedRequestCardIds.length === 0 || bulkActionLoading}
-                className="h-9 sm:h-10 rounded-xl border-[#fecaca] text-[#dc2626] hover:bg-[#fef2f2] hover:text-[#b91c1c] text-xs font-bold shadow-sm"
+                className="h-9 sm:h-10 rounded-xl border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 text-xs font-bold shadow-sm"
               >
                 <XCircle className="w-4 h-4 mr-1.5" /> Reject all
               </Button>
@@ -4065,7 +4120,7 @@ function ModuleView({
 
           <div className="overflow-x-auto [scrollbar-width:thin] max-w-full">
             <table className="w-full text-left text-xs min-w-[680px]">
-              <thead className="bg-[#f8faf8] border-b border-[#edf0ed] text-[#84918e] uppercase tracking-wider font-semibold">
+              <thead className="bg-muted/50 border-b border-border text-muted-foreground uppercase tracking-wider font-semibold">
                 <tr>
                   <th className="px-5 py-3.5 w-12 text-center">
                     <Checkbox
@@ -4085,16 +4140,16 @@ function ModuleView({
                   <th className="px-5 py-3.5 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#edf0ed]">
+              <tbody className="divide-y divide-border">
                 {paginatedRequestCards.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-5 py-10 text-center text-[#98a4a1]">
+                    <td colSpan={7} className="px-5 py-10 text-center text-muted-foreground">
                       No ID card requests found matching the current filters.
                     </td>
                   </tr>
                 ) : (
                   paginatedRequestCards.map((card) => (
-                    <tr key={card.id} className="hover:bg-[#fbfdfb] transition-colors">
+                    <tr key={card.id} className="hover:bg-muted/40 transition-colors">
                       <td className="px-5 py-4 text-center">
                         <Checkbox
                           checked={selectedRequestCardIds.includes(card.id)}
@@ -4102,13 +4157,13 @@ function ModuleView({
                           aria-label={`Select card ${card.cardNumber}`}
                         />
                       </td>
-                      <td className="px-5 py-4 font-mono font-bold text-[#203734]">
+                      <td className="px-5 py-4 font-mono font-bold text-foreground">
                         {card.cardNumber}
                       </td>
-                      <td className="px-5 py-4 font-medium text-[#304541]">
+                      <td className="px-5 py-4 font-medium text-foreground">
                         {card.schoolName}
                       </td>
-                      <td className="px-5 py-4 text-[#778381]">
+                      <td className="px-5 py-4 text-muted-foreground">
                         {card.templateName}
                       </td>
                       <td className="px-5 py-4">
@@ -4116,7 +4171,7 @@ function ModuleView({
                           {card.status.replace(/_/g, " ")}
                         </StatusPill>
                       </td>
-                      <td className="px-5 py-4 text-[#84918e]">
+                      <td className="px-5 py-4 text-muted-foreground">
                         {card.updatedAt
                           ? formatDistanceToNow(new Date(card.updatedAt), { addSuffix: true })
                           : "Recently"}
@@ -4126,7 +4181,7 @@ function ModuleView({
                           {/* Review/Detail for all */}
                           <button
                             onClick={() => onOpenReview(card.id)}
-                            className="rounded-lg bg-[#e1f3ed] px-2.5 py-1.5 text-[11px] font-bold text-[#0a716b] hover:bg-[#cbf0e4]"
+                            className="rounded-lg bg-primary/10 px-2.5 py-1.5 text-[11px] font-bold text-primary hover:bg-primary/20"
                           >
                             <Eye className="inline w-3 h-3 mr-1" />
                             {authenticatedUser.role === "SUPER_ADMIN" ? "Review" : "View"}
@@ -4138,20 +4193,20 @@ function ModuleView({
                               <>
                                 <button
                                   onClick={() => onEditCard(card.id)}
-                                  className="rounded-lg bg-[#f0efec] px-2.5 py-1.5 text-[11px] font-bold text-[#55605d] hover:bg-[#e4e2de]"
+                                  className="rounded-lg bg-muted px-2.5 py-1.5 text-[11px] font-bold text-foreground hover:bg-muted/80"
                                 >
                                   <FileEdit className="inline w-3 h-3 mr-1" /> Edit
                                 </button>
                                 <button
                                   onClick={() => onSubmitCard(card.id, card.cardNumber)}
-                                  className="rounded-lg bg-[#0f7f79] px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-[#096c67]"
+                                  className="rounded-lg bg-primary px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-primary/90"
                                 >
                                   <Send className="inline w-3 h-3 mr-1" /> Submit
                                 </button>
                                 {card.status === "DRAFT" && (
                                   <button
                                     onClick={() => onDeleteCard(card.id, card.cardNumber, card.status)}
-                                    className="rounded-lg p-1.5 text-[#e74c3c] hover:bg-[#fdeae8]"
+                                    className="rounded-lg p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40"
                                     title="Delete draft"
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
@@ -4164,7 +4219,7 @@ function ModuleView({
                           {card.status === "REJECTED" && authenticatedUser.role === "SUPER_ADMIN" && (
                             <button
                               onClick={() => onDeleteCard(card.id, card.cardNumber, card.status)}
-                              className="rounded-lg bg-[#fef2f2] border border-[#fecaca] px-2.5 py-1.5 text-[11px] font-bold text-[#dc2626] hover:bg-[#fee2e2] flex items-center gap-1"
+                              className="rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 px-2.5 py-1.5 text-[11px] font-bold text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 flex items-center gap-1"
                               title="Delete rejected card (removes from both admin and school sides)"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -4177,13 +4232,13 @@ function ModuleView({
                             <>
                               <button
                                 onClick={() => onApproveCardDirect?.(card.id, card.cardNumber)}
-                                className="rounded-lg bg-[#dff3ee] border border-[#a2d8ce] px-2.5 py-1.5 text-[11px] font-bold text-[#0a716b] hover:bg-[#caebe3]"
+                                className="rounded-lg bg-primary/10 border border-primary/30 px-2.5 py-1.5 text-[11px] font-bold text-primary hover:bg-primary/20"
                               >
                                 <CheckCircle2 className="inline w-3 h-3 mr-1" /> Approve
                               </button>
                               <button
                                 onClick={() => onRejectCardDirect?.(card.id)}
-                                className="rounded-lg bg-[#fef2f2] border border-[#fecaca] px-2.5 py-1.5 text-[11px] font-bold text-[#dc2626] hover:bg-[#fee2e2]"
+                                className="rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 px-2.5 py-1.5 text-[11px] font-bold text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50"
                               >
                                 <XCircle className="inline w-3 h-3 mr-1" /> Reject
                               </button>
@@ -4199,8 +4254,8 @@ function ModuleView({
           </div>
 
           {totalRequestPages > 1 && (
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-t border-[#edf0ed] bg-[#fbfdfb]">
-              <div className="text-xs text-[#788784]">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-t border-border bg-muted/30">
+              <div className="text-xs text-muted-foreground">
                 Page {requestsPage} of {totalRequestPages} ({requestCards.length} {requestCards.length === 1 ? "card" : "cards"})
               </div>
               <div className="flex items-center gap-2">
@@ -4230,22 +4285,22 @@ function ModuleView({
 
       {/* 3. Approved Cards Tab with Bulk Actions */}
       {isApproved && (
-        <Card className="rounded-2xl border-[#e2e8e3] bg-[#fffefa] shadow-[0_12px_35px_rgba(38,71,65,0.05)]">
-          <div className="flex flex-col gap-3 border-b border-[#edf0ed] p-4 sm:p-5 sm:flex-row sm:items-center sm:justify-between">
+        <Card className="rounded-2xl border-border bg-card shadow-[0_12px_35px_rgba(38,71,65,0.05)]">
+          <div className="flex flex-col gap-3 border-b border-border p-4 sm:p-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="relative w-full sm:max-w-sm">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#98a4a1]" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Search approved cards..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="h-10 rounded-xl border-[#e2e8e3] pl-9 text-xs shadow-none w-full"
+                className="h-10 rounded-xl border-border bg-background pl-9 text-xs shadow-none w-full"
               />
             </div>
 
             {/* Bulk Actions Toolbar */}
             <div className="flex flex-wrap items-center gap-2">
               {selectedApprovedCardIds.length > 0 && (
-                <span className="text-xs font-semibold text-[#84918e] mr-1">
+                <span className="text-xs font-semibold text-muted-foreground mr-1">
                   {selectedApprovedCardIds.length} card(s) selected
                 </span>
               )}
@@ -4256,7 +4311,7 @@ function ModuleView({
                     setCardsPendingRemove(selectedApprovedCardIds);
                     setRemoveConfirmOpen(true);
                   }}
-                  className="h-9 sm:h-10 rounded-xl text-xs font-bold border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                  className="h-9 sm:h-10 rounded-xl text-xs font-bold border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40"
                 >
                   <Trash2 className="w-4 h-4 mr-1.5" /> Remove ({selectedApprovedCardIds.length})
                 </Button>
@@ -4267,14 +4322,14 @@ function ModuleView({
                     variant="outline"
                     onClick={onBulkPrint}
                     disabled={selectedApprovedCardIds.length === 0}
-                    className="h-9 sm:h-10 rounded-xl text-xs font-bold border-[#e2e8e3]"
+                    className="h-9 sm:h-10 rounded-xl text-xs font-bold border-border"
                   >
-                    <Printer className="w-4 h-4 mr-1.5 text-[#0f7f79]" /> Bulk Print
+                    <Printer className="w-4 h-4 mr-1.5 text-primary" /> Bulk Print
                   </Button>
                   <Button
                     onClick={onBulkPdf}
                     disabled={selectedApprovedCardIds.length === 0}
-                    className="h-9 sm:h-10 rounded-xl bg-[#0f7f79] hover:bg-[#096c67] text-xs font-bold text-white"
+                    className="h-9 sm:h-10 rounded-xl bg-primary hover:bg-primary/90 text-xs font-bold text-white"
                   >
                     <Download className="w-4 h-4 mr-1.5" /> Download PDF
                   </Button>
@@ -4285,7 +4340,7 @@ function ModuleView({
 
           <div className="overflow-x-auto [scrollbar-width:thin] max-w-full">
             <table className="w-full text-left text-xs min-w-[640px]">
-              <thead className="bg-[#f8faf8] border-b border-[#edf0ed] text-[#84918e] uppercase tracking-wider font-semibold">
+              <thead className="bg-muted/50 border-b border-border text-muted-foreground uppercase tracking-wider font-semibold">
                 <tr>
                   <th className="px-5 py-3.5 w-12 text-center">
                     <Checkbox
@@ -4312,29 +4367,29 @@ function ModuleView({
                   <th className="px-5 py-3.5 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#edf0ed]">
+              <tbody className="divide-y divide-border">
                 {paginatedApprovedCards.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-5 py-10 text-center text-[#98a4a1]">
+                    <td colSpan={6} className="px-5 py-10 text-center text-muted-foreground">
                       No approved cards found. Submit cards and approve them to view here.
                     </td>
                   </tr>
                 ) : (
                   paginatedApprovedCards.map((card) => (
-                    <tr key={card.id} className="hover:bg-[#fbfdfb] transition-colors">
+                    <tr key={card.id} className="hover:bg-muted/40 transition-colors">
                       <td className="px-5 py-4 text-center">
                         <Checkbox
                           checked={selectedApprovedCardIds.includes(card.id)}
                           onCheckedChange={() => onToggleSelectApproved(card.id)}
                         />
                       </td>
-                      <td className="px-5 py-4 font-mono font-bold text-[#203734]">
+                      <td className="px-5 py-4 font-mono font-bold text-foreground">
                         {card.cardNumber}
                       </td>
-                      <td className="px-5 py-4 font-medium text-[#304541]">
+                      <td className="px-5 py-4 font-medium text-foreground">
                         {card.schoolName}
                       </td>
-                      <td className="px-5 py-4 text-[#778381]">
+                      <td className="px-5 py-4 text-muted-foreground">
                         {card.templateName}
                       </td>
                       <td className="px-5 py-4">
@@ -4347,14 +4402,14 @@ function ModuleView({
                           {authenticatedUser.role === "SUPER_ADMIN" && (
                             <button
                               onClick={() => onPrintCard(card.id)}
-                              className="rounded-lg bg-[#e1f3ed] px-2.5 py-1.5 text-[11px] font-bold text-[#0a716b] hover:bg-[#cbf0e4]"
+                              className="rounded-lg bg-primary/10 px-2.5 py-1.5 text-[11px] font-bold text-primary hover:bg-primary/20"
                             >
                               <Printer className="inline w-3 h-3 mr-1" /> Print / PDF
                             </button>
                           )}
                           <button
                             onClick={() => onOpenReview(card.id)}
-                            className="rounded-lg bg-[#f0efec] px-2.5 py-1.5 text-[11px] font-bold text-[#55605d] hover:bg-[#e4e2de]"
+                            className="rounded-lg bg-muted px-2.5 py-1.5 text-[11px] font-bold text-foreground hover:bg-muted/80"
                           >
                             <Eye className="inline w-3 h-3 mr-1" /> View
                           </button>
@@ -4363,7 +4418,7 @@ function ModuleView({
                               setCardsPendingRemove([card.id]);
                               setRemoveConfirmOpen(true);
                             }}
-                            className="rounded-lg bg-red-50 px-2.5 py-1.5 text-[11px] font-bold text-red-600 hover:bg-red-100"
+                            className="rounded-lg bg-red-50 dark:bg-red-950/40 px-2.5 py-1.5 text-[11px] font-bold text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50"
                             title="Remove from approved cards"
                           >
                             <Trash2 className="inline w-3 h-3 mr-1" /> Remove
@@ -4379,7 +4434,7 @@ function ModuleView({
 
           {/* Plain confirmation dialog for card removal */}
           <AlertDialog open={removeConfirmOpen} onOpenChange={setRemoveConfirmOpen}>
-            <AlertDialogContent>
+            <AlertDialogContent className="bg-card border-border">
               <AlertDialogHeader>
                 <AlertDialogTitle>
                   Remove {cardsPendingRemove.length} card{cardsPendingRemove.length === 1 ? "" : "s"} from Approved cards?
@@ -4414,8 +4469,8 @@ function ModuleView({
           </AlertDialog>
 
           {totalApprovedPages > 1 && (
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-t border-[#edf0ed] bg-[#fbfdfb]">
-              <div className="text-xs text-[#788784]">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-t border-border bg-muted/30">
+              <div className="text-xs text-muted-foreground">
                 Page {approvedPage} of {totalApprovedPages} ({approvedCards.length} {approvedCards.length === 1 ? "card" : "cards"})
               </div>
               <div className="flex items-center gap-2">
@@ -4457,20 +4512,20 @@ function ModuleView({
 
       {/* 6. Schools Table View */}
       {isSchools && (
-        <Card className="rounded-2xl border-[#e2e8e3] bg-[#fffefa] shadow-[0_12px_35px_rgba(38,71,65,0.05)] overflow-hidden">
-          <div className="flex flex-col gap-3 border-b border-[#edf0ed] p-5 sm:flex-row sm:items-center sm:justify-between">
+        <Card className="rounded-2xl border-border bg-card shadow-[0_12px_35px_rgba(38,71,65,0.05)] overflow-hidden">
+          <div className="flex flex-col gap-3 border-b border-border p-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="relative w-full max-w-sm">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#98a4a1]" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Search schools by name, code, email..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="h-10 rounded-xl border-[#e2e8e3] pl-9 text-xs shadow-none"
+                className="h-10 rounded-xl border-border bg-background pl-9 text-xs shadow-none"
               />
             </div>
             <div className="flex flex-wrap items-center justify-between sm:justify-end gap-3 w-full sm:w-auto">
               <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold text-[#4e5c59] mr-1">Status:</span>
+                <span className="text-xs font-bold text-muted-foreground mr-1">Status:</span>
                 {(["All", "Active", "Inactive"] as const).map((status) => (
                   <button
                     key={status}
@@ -4480,15 +4535,15 @@ function ModuleView({
                       setSchoolsPage(1);
                     }}
                     className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${schoolsStatusFilter === status
-                      ? "bg-[#0f7f79] text-white shadow-sm"
-                      : "bg-[#edf3f0] text-[#55605d] hover:bg-[#e2ebe6]"
+                      ? "bg-primary text-white shadow-sm"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80"
                       }`}
                   >
                     {status === "All" ? "All Schools" : status}
                   </button>
                 ))}
               </div>
-              <div className="text-xs text-[#788784]">
+              <div className="text-xs text-muted-foreground">
                 Showing <b>{filteredSchools.length}</b> {filteredSchools.length === 1 ? "school" : "schools"}
               </div>
             </div>
@@ -4496,7 +4551,7 @@ function ModuleView({
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs min-w-[1120px]">
-              <thead className="bg-[#f8faf8] border-b border-[#edf0ed] text-[#84918e] uppercase tracking-wider font-semibold text-[11px]">
+              <thead className="bg-muted/50 border-b border-border text-muted-foreground uppercase tracking-wider font-semibold text-[11px]">
                 <tr>
                   <th className="px-5 py-3.5">School Name</th>
                   <th className="px-5 py-3.5">School Code / ID</th>
@@ -4508,17 +4563,17 @@ function ModuleView({
                   <th className="px-5 py-3.5 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#edf0ed]">
+              <tbody className="divide-y divide-border">
                 {paginatedSchools.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="p-12 text-center text-sm text-[#8d9995]">
-                      <Building2 className="mx-auto mb-3 h-8 w-8 text-[#98a4a1]" />
-                      <p className="font-semibold text-[#304541]">
+                    <td colSpan={8} className="p-12 text-center text-sm text-muted-foreground">
+                      <Building2 className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
+                      <p className="font-semibold text-foreground">
                         {searchTerm || schoolsStatusFilter !== "All"
                           ? "No schools matching your search or filter"
                           : "No schools registered yet"}
                       </p>
-                      <p className="mt-1 text-xs text-[#98a4a1]">
+                      <p className="mt-1 text-xs text-muted-foreground">
                         {searchTerm || schoolsStatusFilter !== "All"
                           ? "Try changing your search term or filter options."
                           : 'Click "Create new" above to add a new school and generate its credentials.'}
@@ -4527,14 +4582,14 @@ function ModuleView({
                   </tr>
                 ) : (
                   paginatedSchools.map((school) => (
-                    <tr key={school.id} className="hover:bg-[#fbfdfb] transition-colors">
+                    <tr key={school.id} className="hover:bg-muted/40 transition-colors">
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#dff3ee] text-[#0b716b] shrink-0">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary shrink-0">
                             <Building2 className="h-5 w-5" />
                           </div>
                           <div className="min-w-0">
-                            <div className="text-sm font-extrabold text-[#304541] flex items-center gap-2">
+                            <div className="text-sm font-extrabold text-foreground flex items-center gap-2">
                               {school.name}
                             </div>
                           </div>
@@ -4543,11 +4598,11 @@ function ModuleView({
                       <td className="px-5 py-4 whitespace-nowrap">
                         <div className="flex flex-col gap-0.5">
                           <div>
-                            <span className="font-mono font-bold text-[#0f7f79] bg-[#eef7f4] px-2 py-0.5 rounded text-xs">
+                            <span className="font-mono font-bold text-primary bg-primary/10 px-2 py-0.5 rounded text-xs">
                               {school.shortCode}
                             </span>
                           </div>
-                          <span className="text-[10px] text-[#8d9995] font-mono">
+                          <span className="text-[10px] text-muted-foreground font-mono">
                             ID: #{school.id}
                           </span>
                         </div>
@@ -4555,11 +4610,11 @@ function ModuleView({
                       <td className="px-5 py-4 whitespace-nowrap">
                         {school.phone ? (
                           <div className="flex items-center gap-1.5">
-                            <span className="font-semibold text-[#304541]">{school.phone}</span>
+                            <span className="font-semibold text-foreground">{school.phone}</span>
                             <button
                               type="button"
                               onClick={() => void copySchoolDetail(school.phone!, "Phone number")}
-                              className="flex h-7 w-7 items-center justify-center rounded-lg text-[#0f7f79] hover:bg-[#e8f4f0]"
+                              className="flex h-7 w-7 items-center justify-center rounded-lg text-primary hover:bg-primary/10"
                               title="Copy phone number"
                               aria-label={`Copy phone number for ${school.name}`}
                             >
@@ -4567,19 +4622,19 @@ function ModuleView({
                             </button>
                           </div>
                         ) : (
-                          <span className="text-[#98a4a1]">Not added</span>
+                          <span className="text-muted-foreground">Not added</span>
                         )}
                       </td>
                       <td className="px-5 py-4 whitespace-nowrap">
                         {getSchoolLoginId(school) ? (
                           <div className="flex items-center gap-1.5">
-                            <span className="rounded-md bg-[#eef7f4] px-2 py-1 font-mono font-bold text-[#0f7f79]">
+                            <span className="rounded-md bg-primary/10 px-2 py-1 font-mono font-bold text-primary">
                               {getSchoolLoginId(school)}
                             </span>
                             <button
                               type="button"
                               onClick={() => void copySchoolDetail(getSchoolLoginId(school), "School Login ID")}
-                              className="flex h-7 w-7 items-center justify-center rounded-lg text-[#0f7f79] hover:bg-[#e8f4f0]"
+                              className="flex h-7 w-7 items-center justify-center rounded-lg text-primary hover:bg-primary/10"
                               title="Copy School Login ID"
                               aria-label={`Copy School Login ID for ${school.name}`}
                             >
@@ -4587,19 +4642,19 @@ function ModuleView({
                             </button>
                           </div>
                         ) : (
-                          <span className="text-[#98a4a1]">Not generated</span>
+                          <span className="text-muted-foreground">Not generated</span>
                         )}
                       </td>
                       <td className="px-5 py-4 whitespace-nowrap">
                         {authenticatedUser.role === "SUPER_ADMIN" && school.credentials?.password ? (
                           <div className="flex items-center gap-1.5">
-                            <span className="rounded-md border border-[#d8e8e4] bg-white px-2 py-1 font-mono font-bold text-[#304541]">
+                            <span className="rounded-md border border-border bg-muted px-2 py-1 font-mono font-bold text-foreground">
                               {school.credentials.password}
                             </span>
                             <button
                               type="button"
                               onClick={() => void copySchoolDetail(school.credentials!.password, "ID Pass")}
-                              className="flex h-7 w-7 items-center justify-center rounded-lg text-[#0f7f79] hover:bg-[#e8f4f0]"
+                              className="flex h-7 w-7 items-center justify-center rounded-lg text-primary hover:bg-primary/10"
                               title="Copy ID Pass"
                               aria-label={`Copy ID Pass for ${school.name}`}
                             >
@@ -4610,25 +4665,25 @@ function ModuleView({
                           <button
                             type="button"
                             onClick={() => onGenerateCredentials?.(school)}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-[#cfe2dc] bg-[#f5faf8] px-2.5 py-1.5 text-[11px] font-bold text-[#0f7f79] hover:bg-[#e8f4f0]"
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 px-2.5 py-1.5 text-[11px] font-bold text-primary hover:bg-primary/15"
                             title="Generate a new ID Pass to display and copy"
                           >
                             <KeyRound className="h-3.5 w-3.5" />
                             Generate to view
                           </button>
                         ) : (
-                          <span className="text-[#98a4a1]">Restricted</span>
+                          <span className="text-muted-foreground">Restricted</span>
                         )}
                       </td>
                       <td className="px-5 py-4 whitespace-nowrap">
                         {school.templateSelectionStatus === "Selected" ? (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-teal-200 bg-teal-50 px-2.5 py-0.5 text-[10px] font-bold text-teal-800">
-                            <CheckCircle2 className="h-3 w-3 text-teal-600" />
+                          <span className="inline-flex items-center gap-1 rounded-full border border-teal-200 dark:border-teal-900/50 bg-teal-50 dark:bg-teal-950/40 px-2.5 py-0.5 text-[10px] font-bold text-teal-800 dark:text-teal-300">
+                            <CheckCircle2 className="h-3 w-3 text-teal-600 dark:text-teal-400" />
                             {school.selectedTemplateName || "Selected"}
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[10px] font-bold text-amber-800">
-                            <AlertTriangle className="h-3 w-3 text-amber-600" />
+                          <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/40 px-2.5 py-0.5 text-[10px] font-bold text-amber-800 dark:text-amber-300">
+                            <AlertTriangle className="h-3 w-3 text-amber-600 dark:text-amber-400" />
                             Not Selected
                           </span>
                         )}
@@ -4639,11 +4694,11 @@ function ModuleView({
                             <Switch
                               checked={school.isActive}
                               onCheckedChange={() => onToggleSchoolStatus?.(school)}
-                              className="data-[state=checked]:bg-[#0f7f79]"
+                              className="data-[state=checked]:bg-primary"
                               aria-label={`Toggle active status for ${school.name}`}
                             />
                             <span
-                              className={`text-xs font-bold ${school.isActive ? "text-[#0f7f79]" : "text-[#8d9995]"
+                              className={`text-xs font-bold ${school.isActive ? "text-primary" : "text-muted-foreground"
                                 }`}
                             >
                               {school.isActive ? "Active" : "Inactive"}
@@ -4661,31 +4716,31 @@ function ModuleView({
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <button
-                                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#d3ded8] bg-white text-[#556561] shadow-sm hover:border-[#0f7f79] hover:bg-[#f2f7f4] hover:text-[#0f7f79] focus:outline-none"
+                                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground shadow-sm hover:border-primary hover:bg-primary/10 hover:text-primary focus:outline-none"
                                   title="Actions"
                                   aria-label={`Actions for ${school.name}`}
                                 >
                                   <MoreVertical className="h-4 w-4" />
                                 </button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-36 bg-white p-1 rounded-xl shadow-lg border border-[#e2e8e3]">
+                              <DropdownMenuContent align="end" className="w-36 bg-card p-1 rounded-xl shadow-lg border border-border">
                                 <DropdownMenuItem
                                   onClick={() => onGenerateCredentials?.(school)}
-                                  className="flex items-center gap-2 px-2.5 py-2 text-xs font-semibold text-[#0f7f79] hover:bg-[#eef7f4] rounded-lg cursor-pointer"
+                                  className="flex items-center gap-2 px-2.5 py-2 text-xs font-semibold text-primary hover:bg-primary/10 rounded-lg cursor-pointer"
                                 >
                                   <KeyRound className="h-3.5 w-3.5" />
                                   View
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                   onClick={() => onEditSchool?.(school)}
-                                  className="flex items-center gap-2 px-2.5 py-2 text-xs font-semibold text-[#304541] hover:bg-[#f2f7f4] rounded-lg cursor-pointer"
+                                  className="flex items-center gap-2 px-2.5 py-2 text-xs font-semibold text-foreground hover:bg-muted rounded-lg cursor-pointer"
                                 >
                                   <FileEdit className="h-3.5 w-3.5" />
                                   Edit
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                   onClick={() => onDeleteSchool?.(school.id, school.name)}
-                                  className="flex items-center gap-2 px-2.5 py-2 text-xs font-semibold text-[#dc2626] hover:bg-[#fef2f2] rounded-lg cursor-pointer"
+                                  className="flex items-center gap-2 px-2.5 py-2 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg cursor-pointer"
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
                                   Delete
@@ -4703,8 +4758,8 @@ function ModuleView({
           </div>
 
           {totalSchoolPages > 1 && (
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-t border-[#edf0ed] bg-[#fbfdfb]">
-              <div className="text-xs text-[#788784]">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-t border-border bg-muted/30">
+              <div className="text-xs text-muted-foreground">
                 Page {schoolsPage} of {totalSchoolPages} ({filteredSchools.length} {filteredSchools.length === 1 ? "school" : "schools"})
               </div>
               <div className="flex items-center gap-2">
@@ -4735,13 +4790,13 @@ function ModuleView({
       {/* 7. Reports module */}
       {label === "Reports" && (
         <div className="space-y-4">
-          <div className="flex items-center gap-2 border-b border-[#edf0ed] pb-3">
+          <div className="flex items-center gap-2 border-b border-border pb-3">
             <button
               onClick={() => setReportsTab("removed_history")}
               className={`rounded-xl px-4 py-2 text-xs font-bold transition-all ${
                 reportsTab === "removed_history"
-                  ? "bg-[#0f7f79] text-white shadow-2xs"
-                  : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
+                  ? "bg-primary text-white shadow-2xs"
+                  : "bg-card text-muted-foreground border border-border hover:bg-muted/50"
               }`}
             >
               Removed Cards History
@@ -4750,8 +4805,8 @@ function ModuleView({
               onClick={() => setReportsTab("general")}
               className={`rounded-xl px-4 py-2 text-xs font-bold transition-all ${
                 reportsTab === "general"
-                  ? "bg-[#0f7f79] text-white shadow-2xs"
-                  : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
+                  ? "bg-primary text-white shadow-2xs"
+                  : "bg-card text-muted-foreground border border-border hover:bg-muted/50"
               }`}
             >
               General Reports
@@ -4761,7 +4816,7 @@ function ModuleView({
           {reportsTab === "removed_history" ? (
             <RemovedCardsHistorySection user={authenticatedUser} schools={schools} />
           ) : (
-            <Card className="rounded-2xl border-[#e2e8e3] bg-white p-8 text-center text-xs text-gray-500 shadow-2xs">
+            <Card className="rounded-2xl border-border bg-card p-8 text-center text-xs text-muted-foreground shadow-2xs">
               System analytics and card generation summary reports.
             </Card>
           )}
@@ -4770,22 +4825,22 @@ function ModuleView({
 
       {/* 8. Users Standard Table */}
       {isUsers && (
-        <Card className="rounded-2xl border-[#e2e8e3] bg-[#fffefa] shadow-[0_12px_35px_rgba(38,71,65,0.05)]">
-          <div className="flex flex-col gap-3 border-b border-[#edf0ed] p-5 sm:flex-row sm:items-center sm:justify-between">
+        <Card className="rounded-2xl border-border bg-card shadow-[0_12px_35px_rgba(38,71,65,0.05)]">
+          <div className="flex flex-col gap-3 border-b border-border p-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="relative w-full max-w-sm">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#98a4a1]" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Search users..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="h-10 rounded-xl border-[#e2e8e3] pl-9 text-xs shadow-none"
+                className="h-10 rounded-xl border-border bg-background pl-9 text-xs shadow-none"
               />
             </div>
           </div>
-          <div className="divide-y divide-[#edf0ed]">
-            <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-[#fbfdfb] border-b border-[#edf0ed]">
+          <div className="divide-y divide-border">
+            <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-muted/30 border-b border-border">
               <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold text-[#4e5c59] mr-1">Role:</span>
+                <span className="text-xs font-bold text-muted-foreground mr-1">Role:</span>
                 {["All", "SUPER_ADMIN", "SCHOOL_ADMIN", "MARKETING_ADMIN", "VIEWER"].map((role) => (
                   <button
                     key={role}
@@ -4794,41 +4849,41 @@ function ModuleView({
                       setUsersPage(1);
                     }}
                     className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${userRoleFilter === role
-                      ? "bg-[#0f7f79] text-white shadow-sm"
-                      : "bg-[#edf3f0] text-[#55605d] hover:bg-[#e2ebe6]"
+                      ? "bg-primary text-white shadow-sm"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80"
                       }`}
                   >
                     {role === "All" ? "All Roles" : role === "MARKETING_ADMIN" ? "Marketing Admin" : role.replace(/_/g, " ")}
                   </button>
                 ))}
               </div>
-              <div className="text-xs text-[#788784]">
+              <div className="text-xs text-muted-foreground">
                 Showing <b>{filteredUsers.length}</b> {filteredUsers.length === 1 ? "user" : "users"}
               </div>
             </div>
 
             {paginatedUsers.length === 0 ? (
-              <div className="p-8 text-center text-xs text-[#98a4a1]">
+              <div className="p-8 text-center text-xs text-muted-foreground">
                 No users matching the selected filter or search term.
               </div>
             ) : (
               paginatedUsers.map((user) => (
-                <div key={user.id} className="flex items-center justify-between p-4 hover:bg-[#fbfdfb] transition-colors">
+                <div key={user.id} className="flex items-center justify-between p-4 hover:bg-muted/40 transition-colors">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#e9ebfa] text-[#5c64b7] font-bold text-xs shrink-0">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-bold text-xs shrink-0">
                       {user.name ? user.name[0]?.toUpperCase() : "U"}
                     </div>
                     <div>
-                      <div className="text-sm font-extrabold text-[#304541] flex items-center gap-2">
+                      <div className="text-sm font-extrabold text-foreground flex items-center gap-2">
                         {user.name || user.email || "User"}
                         {user.schoolId && (
-                          <span className="text-[10px] font-semibold text-[#0f7f79] bg-[#eef7f4] px-2 py-0.5 rounded-full">
+                          <span className="text-[10px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
                             School #{user.schoolId}
                           </span>
                         )}
                       </div>
                       {user.email && (
-                        <div className="text-[11px] text-[#8d9995]">
+                        <div className="text-[11px] text-muted-foreground">
                           {user.email}
                         </div>
                       )}
@@ -4851,17 +4906,17 @@ function ModuleView({
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <button
-                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#d3ded8] bg-white text-[#556561] shadow-2xs hover:border-[#0f7f79] hover:bg-[#f2f7f4] hover:text-[#0f7f79] focus:outline-none"
+                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground shadow-2xs hover:border-primary hover:bg-primary/10 hover:text-primary focus:outline-none"
                             title="Actions"
                             aria-label={`Actions for user ${user.name || user.openId}`}
                           >
                             <MoreVertical className="h-4 w-4" />
                           </button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-36 bg-white p-1 rounded-xl shadow-lg border border-[#e2e8e3]">
+                        <DropdownMenuContent align="end" className="w-36 bg-card p-1 rounded-xl shadow-lg border border-border">
                           <DropdownMenuItem
                             onClick={() => onEditUser?.(user)}
-                            className="flex items-center gap-2 px-2.5 py-2 text-xs font-semibold text-[#304541] hover:bg-[#f2f7f4] rounded-lg cursor-pointer"
+                            className="flex items-center gap-2 px-2.5 py-2 text-xs font-semibold text-foreground hover:bg-muted rounded-lg cursor-pointer"
                           >
                             <FileEdit className="h-3.5 w-3.5" />
                             Edit
@@ -4869,7 +4924,7 @@ function ModuleView({
                           {user.id !== authenticatedUser.id && (
                             <DropdownMenuItem
                               onClick={() => onDeleteUser?.(user)}
-                              className="flex items-center gap-2 px-2.5 py-2 text-xs font-semibold text-[#dc2626] hover:bg-[#fef2f2] rounded-lg cursor-pointer"
+                              className="flex items-center gap-2 px-2.5 py-2 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg cursor-pointer"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                               Delete
@@ -4884,8 +4939,8 @@ function ModuleView({
             )}
 
             {totalUserPages > 1 && (
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-t border-[#edf0ed] bg-[#fbfdfb]">
-                <div className="text-xs text-[#788784]">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-t border-border bg-muted/30">
+                <div className="text-xs text-muted-foreground">
                   Page {usersPage} of {totalUserPages}
                 </div>
                 <div className="flex items-center gap-2">

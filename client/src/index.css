@@ -40,6 +40,13 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-text-strong: var(--text-strong);
+  --color-text-muted: var(--text-muted);
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-danger: var(--danger);
 }
 
 :root {
@@ -76,9 +83,18 @@
   --sidebar-accent-foreground: #ffffff;
   --sidebar-border: #294344;
   --sidebar-ring: #43b9ad;
+  --surface: #fffefa;
+  --surface-muted: #f7f6f2;
+  --text-strong: #182326;
+  --text-muted: #72807e;
+  --brand: #0f7f79;
+  --brand-hover: #096c67;
+  --danger: #c9554e;
 }
 
 .dark {
+  --primary: #25a89f;
+  --primary-foreground: #ffffff;
   --background: #102728;
   --foreground: #eaf4f0;
   --card: #173534;
@@ -100,6 +116,13 @@
   --sidebar-accent-foreground: #ffffff;
   --sidebar-border: #294344;
   --sidebar-ring: #43b9ad;
+  --surface: #173534;
+  --surface-muted: #102728;
+  --text-strong: #eaf4f0;
+  --text-muted: #a6c0bb;
+  --brand: #40c8bb;
+  --brand-hover: #2db3a6;
+  --danger: #e06c65;
 }
 
 @layer base {

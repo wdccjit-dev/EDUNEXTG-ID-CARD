@@ -31,6 +31,7 @@ import { generateExampleExcelBuffer, parseExcelBuffer } from "./excel";
 import { getAvailableDynamicFields } from "../shared/templateDesigner";
 import { DEFAULT_TEMPLATE_CARD_SIZE } from "../shared/printLayout";
 import { HOOK_TYPES, CARD_MATERIALS, ORDER_TYPES, PRINT_SIDES, ORDER_STATUSES, type OrderStatus } from "../shared/orders";
+import { processBulkPhotoUpload } from "./bulkPhotos";
 
 const router = Router();
 const adminRoles = new Set(["SUPER_ADMIN"]);
@@ -3639,6 +3640,63 @@ router.post("/id-card-requests/upload-excel", requireRole(schoolWriteRoles), asy
     fail(res, e);
   }
 });
+
+router.post(
+  ["/id-card-requests/bulk-upload-photos", "/id-cards/bulk-upload-photos"],
+  requireRole(schoolWriteRoles),
+  async (req, res) => {
+    try {
+      const user = currentUser(res);
+      const db = await getDb();
+      if (!db) return res.status(503).json({ error: "Database not available" });
+
+      // RBAC and multi-tenant isolation
+      let schoolId: number;
+      if (adminRoles.has(user.role)) {
+        schoolId = Number(req.body.schoolId);
+        if (!schoolId) {
+          return res.status(400).json({ error: "School ID is required for photo upload" });
+        }
+      } else {
+        if (!user.schoolId) {
+          return res.status(403).json({ error: "You are not assigned to a school" });
+        }
+        if (req.body.schoolId && Number(req.body.schoolId) !== user.schoolId) {
+          return res.status(403).json({ error: "Forbidden: You cannot upload photos for another school" });
+        }
+        schoolId = user.schoolId;
+      }
+
+      const school = (await db.select().from(schools).where(eq(schools.id, schoolId)))[0];
+      if (!school) {
+        return res.status(404).json({ error: "School not found" });
+      }
+      if (!school.isActive && !adminRoles.has(user.role)) {
+        return res.status(403).json({ error: "School is currently inactive" });
+      }
+
+      const result = await processBulkPhotoUpload(db, {
+        schoolId,
+        userId: user.id,
+        zipBase64: req.body.zipBase64,
+        images: req.body.images,
+        dryRun: Boolean(req.body.dryRun),
+      });
+
+      if (!req.body.dryRun) {
+        await audit(user, "BULK_UPLOAD_PHOTOS", "school", schoolId, schoolId, {
+          total: result.total,
+          matched: result.matched,
+          unmatched: result.unmatched,
+        });
+      }
+
+      res.json(result);
+    } catch (e: any) {
+      fail(res, e);
+    }
+  },
+);
 
 // ─── ORDERS MODULE ────────────────────────────────────────────────────────
 router.get("/orders/schools", requireRole(orderRoles), async (_req, res) => {

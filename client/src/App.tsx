@@ -89,6 +89,7 @@ function Router() {
       <Route path="/admin/notifications"><ProtectedPortal portal="admin" initialNav="Overview" /></Route>
       <Route path="/admin/audit-logs"><ProtectedPortal portal="admin" initialNav="Audit logs" /></Route>
       <Route path="/admin/about"><ProtectedPortal portal="admin" initialNav="About Us" /></Route>
+      <Route path="/admin/settings"><ProtectedPortal portal="admin" initialNav="Settings" /></Route>
       <Route path="/school"><ProtectedPortal portal="school" /></Route>
       <Route path="/school/orders/create"><ProtectedPortal portal="school" initialNav="Create Order" /></Route>
       <Route path="/school/orders"><ProtectedPortal portal="school" initialNav="Order List" /></Route>
@@ -98,10 +99,12 @@ function Router() {
       <Route path="/school/approved-cards"><ProtectedPortal portal="school" initialNav="Approved cards" /></Route>
       <Route path="/school/notifications"><ProtectedPortal portal="school" initialNav="Overview" /></Route>
       <Route path="/school/about"><ProtectedPortal portal="school" initialNav="About Us" /></Route>
+      <Route path="/school/settings"><ProtectedPortal portal="school" initialNav="Settings" /></Route>
       <Route path="/marketing"><ProtectedPortal portal="marketing" initialNav="Overview" /></Route>
       <Route path="/marketing/orders/create"><ProtectedPortal portal="marketing" initialNav="Create Order" /></Route>
       <Route path="/marketing/orders"><ProtectedPortal portal="marketing" initialNav="Order List" /></Route>
       <Route path="/marketing/notifications"><ProtectedPortal portal="marketing" initialNav="Notifications" /></Route>
+      <Route path="/marketing/settings"><ProtectedPortal portal="marketing" initialNav="Settings" /></Route>
       <Route path="/about"><ProtectedPortal portal="school" initialNav="About Us" /></Route>
       <Route path="/"><PortalRedirect /></Route>
       <Route><PortalRedirect /></Route>
@@ -124,5 +127,5 @@ function PortalRedirect() {
 }
 
 export default function App() {
-  return <ErrorBoundary><ThemeProvider defaultTheme="light"><TooltipProvider><Toaster /><Suspense fallback={<SchoolLoader />}><Router /></Suspense></TooltipProvider></ThemeProvider></ErrorBoundary>;
+  return <ErrorBoundary><ThemeProvider defaultPreference="light" switchable={true}><TooltipProvider><Toaster /><Suspense fallback={<SchoolLoader />}><Router /></Suspense></TooltipProvider></ThemeProvider></ErrorBoundary>;
 }

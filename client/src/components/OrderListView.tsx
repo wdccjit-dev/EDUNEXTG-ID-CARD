@@ -210,8 +210,8 @@ export default function OrderListView({
       {/* Top action header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-[#152e2c]">ID Card Orders</h1>
-          <p className="text-xs text-[#788784] mt-0.5">
+          <h1 className="text-2xl font-black text-foreground">ID Card Orders</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">
             {isSuperAdmin
               ? "All ID card batches across all partner schools and marketing reps"
               : isSchoolAdmin
@@ -221,14 +221,14 @@ export default function OrderListView({
         </div>
         <Button
           onClick={onCreateNew}
-          className="rounded-xl bg-[#0f7f79] hover:bg-[#0c6b66] text-white font-bold gap-2 shadow-2xs"
+          className="rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold gap-2 shadow-2xs"
         >
           <PlusCircle className="h-4 w-4" /> Create Order
         </Button>
       </div>
 
       {/* Filter Bar */}
-      <Card className="rounded-2xl border-[#e2e8e3] bg-white shadow-2xs p-4 space-y-3">
+      <Card className="rounded-2xl border-border bg-card text-card-foreground shadow-2xs p-4 space-y-3">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {/* Search */}
           <div className="relative">
@@ -313,8 +313,8 @@ export default function OrderListView({
         </div>
 
         {/* Date range filters */}
-        <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-gray-100 text-xs text-gray-500">
-          <span className="font-semibold text-gray-700">Date Range:</span>
+        <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-border text-xs text-muted-foreground">
+          <span className="font-semibold text-foreground">Date Range:</span>
           <div className="flex items-center gap-1.5">
             <span className="text-[11px]">From</span>
             <Input
@@ -347,7 +347,7 @@ export default function OrderListView({
                 setToDate("");
                 setPage(1);
               }}
-              className="h-8 text-xs font-semibold text-gray-500 hover:text-gray-900"
+              className="h-8 text-xs font-semibold text-muted-foreground hover:text-foreground"
             >
               <RotateCcw className="h-3 w-3 mr-1" /> Reset Filters
             </Button>
@@ -356,11 +356,11 @@ export default function OrderListView({
       </Card>
 
       {/* Orders Table */}
-      <Card className="rounded-2xl border-[#e2e8e3] bg-white shadow-2xs overflow-hidden">
+      <Card className="rounded-2xl border-border bg-card text-card-foreground shadow-2xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-[#edf0ed] bg-[#fbfdfb] text-[11px] font-extrabold uppercase tracking-wider text-[#637370]">
+              <tr className="border-b border-border bg-muted/30 text-[11px] font-extrabold uppercase tracking-wider text-muted-foreground">
                 <th className="py-3 px-4">Order No</th>
                 <th className="py-3 px-4">Date</th>
                 <th className="py-3 px-4">Placed By</th>
@@ -373,7 +373,7 @@ export default function OrderListView({
                 <th className="py-3 px-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#edf0ed] text-xs">
+            <tbody className="divide-y divide-border text-xs">
               {loading ? (
                 <tr>
                   <td colSpan={10} className="py-16 text-center text-gray-400">
@@ -397,23 +397,23 @@ export default function OrderListView({
                     <tr
                       key={ord.id}
                       onClick={() => handleOpenDetails(ord)}
-                      className="hover:bg-[#fbfdfb] transition-colors cursor-pointer"
+                      className="hover:bg-muted/40 transition-colors cursor-pointer"
                     >
-                      <td className="py-3 px-4 font-mono font-bold text-[#0f7f79]">
+                      <td className="py-3 px-4 font-mono font-bold text-primary">
                         {ord.orderNumber}
                       </td>
-                      <td className="py-3 px-4 text-[#526360] whitespace-nowrap">
+                      <td className="py-3 px-4 text-muted-foreground whitespace-nowrap">
                         {format(new Date(ord.createdAt), "dd MMM yyyy")}
                       </td>
                       <td className="py-3 px-4 whitespace-nowrap">
                         <div className="flex flex-col gap-0.5">
-                          <span className="font-semibold text-[#18312e]">
+                          <span className="font-semibold text-foreground">
                             {ord.placedByName || "Unknown"}
                           </span>
                           <div>{getRoleBadge(ord.placedByRole)}</div>
                         </div>
                       </td>
-                      <td className="py-3 px-4 font-medium text-[#18312e] max-w-[180px] truncate" title={ord.schoolName || undefined}>
+                      <td className="py-3 px-4 font-medium text-foreground max-w-[180px] truncate" title={ord.schoolName || undefined}>
                         {ord.schoolName || `School #${ord.schoolId}`}
                       </td>
                       <td className="py-3 px-4">
@@ -421,19 +421,19 @@ export default function OrderListView({
                           {ord.orderType}
                         </Badge>
                       </td>
-                      <td className="py-3 px-4 text-[#526360]">
+                      <td className="py-3 px-4 text-muted-foreground">
                         {ord.orderType === "STUDENT" ? (
                           `${ord.className || "-"} (${ord.section || "-"})`
                         ) : (
-                          <span className="text-gray-400">-</span>
+                          <span className="text-muted-foreground">-</span>
                         )}
                       </td>
-                      <td className="py-3 px-4 font-mono font-bold text-right text-[#18312e]">
+                      <td className="py-3 px-4 font-mono font-bold text-right text-foreground">
                         {ord.quantity.toLocaleString()}
                       </td>
-                      <td className="py-3 px-4 text-[#526360] text-[11px]">
+                      <td className="py-3 px-4 text-muted-foreground text-[11px]">
                         <div>{ord.hookType}</div>
-                        <div className="text-[10px] text-gray-400">Clip: {ord.clip ? "Yes" : "No"}</div>
+                        <div className="text-[10px] text-muted-foreground">Clip: {ord.clip ? "Yes" : "No"}</div>
                       </td>
                       <td className="py-3 px-4">
                         <Badge
@@ -477,8 +477,8 @@ export default function OrderListView({
         </div>
 
         {/* Pagination & Count */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-t border-[#edf0ed] bg-[#fbfdfb]">
-          <div className="flex items-center gap-3 text-xs text-[#788784]">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-t border-border bg-muted/20">
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
             <span>
               Showing <b>{orders.length}</b> of <b>{total}</b> orders
             </span>
@@ -506,7 +506,7 @@ export default function OrderListView({
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-xs text-[#788784] mr-2">
+            <span className="text-xs text-muted-foreground mr-2">
               Page {page} of {totalPages}
             </span>
             <Button
@@ -565,16 +565,16 @@ export default function OrderListView({
                 )}
 
                 {/* Primary info grid */}
-                <div className="grid grid-cols-2 gap-4 rounded-xl border border-gray-200 bg-gray-50/50 p-3.5">
+                <div className="grid grid-cols-2 gap-4 rounded-xl border border-border bg-muted/40 p-3.5">
                   <div>
-                    <span className="text-gray-400 font-semibold block text-[10px] uppercase">Placed By</span>
-                    <span className="font-bold text-gray-900 text-sm">{selectedOrder.placedByName}</span>
+                    <span className="text-muted-foreground font-semibold block text-[10px] uppercase">Placed By</span>
+                    <span className="font-bold text-foreground text-sm">{selectedOrder.placedByName}</span>
                     <div className="mt-0.5">{getRoleBadge(selectedOrder.placedByRole)}</div>
                   </div>
                   <div>
-                    <span className="text-gray-400 font-semibold block text-[10px] uppercase">School</span>
-                    <span className="font-bold text-gray-900 text-sm flex items-center gap-1">
-                      <Building2 className="h-3.5 w-3.5 text-teal-700" />
+                    <span className="text-muted-foreground font-semibold block text-[10px] uppercase">School</span>
+                    <span className="font-bold text-foreground text-sm flex items-center gap-1">
+                      <Building2 className="h-3.5 w-3.5 text-primary" />
                       {selectedOrder.schoolName || `School #${selectedOrder.schoolId}`}
                     </span>
                   </div>
@@ -582,83 +582,83 @@ export default function OrderListView({
 
                 {/* Specs */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  <div className="rounded-xl border border-gray-200 p-2.5">
-                    <span className="text-gray-400 font-semibold block text-[10px] uppercase">Order Type</span>
-                    <span className="font-bold text-gray-800">{selectedOrder.orderType}</span>
+                  <div className="rounded-xl border border-border p-2.5">
+                    <span className="text-muted-foreground font-semibold block text-[10px] uppercase">Order Type</span>
+                    <span className="font-bold text-foreground">{selectedOrder.orderType}</span>
                   </div>
-                  <div className="rounded-xl border border-gray-200 p-2.5">
-                    <span className="text-gray-400 font-semibold block text-[10px] uppercase">Quantity</span>
-                    <span className="font-bold text-gray-800 font-mono text-sm">{selectedOrder.quantity} cards</span>
+                  <div className="rounded-xl border border-border p-2.5">
+                    <span className="text-muted-foreground font-semibold block text-[10px] uppercase">Quantity</span>
+                    <span className="font-bold text-foreground font-mono text-sm">{selectedOrder.quantity} cards</span>
                   </div>
-                  <div className="rounded-xl border border-gray-200 p-2.5">
-                    <span className="text-gray-400 font-semibold block text-[10px] uppercase">Print Sides</span>
-                    <span className="font-bold text-gray-800">{selectedOrder.printSides === "SINGLE" ? "Single Sided" : "Double Sided"}</span>
+                  <div className="rounded-xl border border-border p-2.5">
+                    <span className="text-muted-foreground font-semibold block text-[10px] uppercase">Print Sides</span>
+                    <span className="font-bold text-foreground">{selectedOrder.printSides === "SINGLE" ? "Single Sided" : "Double Sided"}</span>
                   </div>
-                  <div className="rounded-xl border border-gray-200 p-2.5">
-                    <span className="text-gray-400 font-semibold block text-[10px] uppercase">Card Material</span>
-                    <span className="font-bold text-gray-800">{selectedOrder.cardMaterial === "PVC_PREMIUM" ? "PVC Premium" : "PVC Standard"}</span>
+                  <div className="rounded-xl border border-border p-2.5">
+                    <span className="text-muted-foreground font-semibold block text-[10px] uppercase">Card Material</span>
+                    <span className="font-bold text-foreground">{selectedOrder.cardMaterial === "PVC_PREMIUM" ? "PVC Premium" : "PVC Standard"}</span>
                   </div>
-                  <div className="rounded-xl border border-gray-200 p-2.5">
-                    <span className="text-gray-400 font-semibold block text-[10px] uppercase">Hook Type</span>
-                    <span className="font-bold text-gray-800">{selectedOrder.hookType}</span>
+                  <div className="rounded-xl border border-border p-2.5">
+                    <span className="text-muted-foreground font-semibold block text-[10px] uppercase">Hook Type</span>
+                    <span className="font-bold text-foreground">{selectedOrder.hookType}</span>
                   </div>
-                  <div className="rounded-xl border border-gray-200 p-2.5">
-                    <span className="text-gray-400 font-semibold block text-[10px] uppercase">Clip Included</span>
-                    <span className="font-bold text-gray-800">{selectedOrder.clip ? "Yes" : "No"}</span>
+                  <div className="rounded-xl border border-border p-2.5">
+                    <span className="text-muted-foreground font-semibold block text-[10px] uppercase">Clip Included</span>
+                    <span className="font-bold text-foreground">{selectedOrder.clip ? "Yes" : "No"}</span>
                   </div>
                 </div>
 
                 {/* Class & Section if Student */}
                 {selectedOrder.orderType === "STUDENT" && (
-                  <div className="grid grid-cols-2 gap-3 rounded-xl border border-gray-200 p-3 bg-white">
+                  <div className="grid grid-cols-2 gap-3 rounded-xl border border-border p-3 bg-card text-card-foreground">
                     <div>
-                      <span className="text-gray-400 font-semibold block text-[10px] uppercase">Class</span>
-                      <span className="font-bold text-gray-800">{selectedOrder.className || "-"}</span>
+                      <span className="text-muted-foreground font-semibold block text-[10px] uppercase">Class</span>
+                      <span className="font-bold text-foreground">{selectedOrder.className || "-"}</span>
                     </div>
                     <div>
-                      <span className="text-gray-400 font-semibold block text-[10px] uppercase">Section</span>
-                      <span className="font-bold text-gray-800">{selectedOrder.section || "-"}</span>
+                      <span className="text-muted-foreground font-semibold block text-[10px] uppercase">Section</span>
+                      <span className="font-bold text-foreground">{selectedOrder.section || "-"}</span>
                     </div>
                   </div>
                 )}
 
                 {/* Lanyard info */}
-                <div className="rounded-xl border border-gray-200 p-3 bg-white flex items-center justify-between">
+                <div className="rounded-xl border border-border p-3 bg-card text-card-foreground flex items-center justify-between">
                   <div>
-                    <span className="text-gray-400 font-semibold block text-[10px] uppercase">Lanyard</span>
-                    <span className="font-bold text-gray-800">
+                    <span className="text-muted-foreground font-semibold block text-[10px] uppercase">Lanyard</span>
+                    <span className="font-bold text-foreground">
                       {selectedOrder.lanyardIncluded ? `Included (${selectedOrder.lanyardColor || "Standard"})` : "Not Included"}
                     </span>
                   </div>
                   {selectedOrder.neededByDate && (
                     <div className="text-right">
-                      <span className="text-gray-400 font-semibold block text-[10px] uppercase">Needed By</span>
-                      <span className="font-bold text-gray-800">{selectedOrder.neededByDate}</span>
+                      <span className="text-muted-foreground font-semibold block text-[10px] uppercase">Needed By</span>
+                      <span className="font-bold text-foreground">{selectedOrder.neededByDate}</span>
                     </div>
                   )}
                 </div>
 
                 {/* Contact & Delivery */}
-                <div className="rounded-xl border border-gray-200 p-3.5 space-y-2 bg-gray-50/50">
+                <div className="rounded-xl border border-border p-3.5 space-y-2 bg-muted/40">
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-gray-800 flex items-center gap-1.5">
-                      <User className="h-3.5 w-3.5 text-teal-700" /> {selectedOrder.contactPerson}
+                    <span className="font-bold text-foreground flex items-center gap-1.5">
+                      <User className="h-3.5 w-3.5 text-primary" /> {selectedOrder.contactPerson}
                     </span>
-                    <span className="font-mono text-gray-700 flex items-center gap-1.5">
-                      <Phone className="h-3.5 w-3.5 text-teal-700" /> +91 {selectedOrder.contactPhone}
+                    <span className="font-mono text-foreground flex items-center gap-1.5">
+                      <Phone className="h-3.5 w-3.5 text-primary" /> +91 {selectedOrder.contactPhone}
                     </span>
                   </div>
-                  <div className="pt-2 border-t border-gray-200 text-gray-700">
-                    <span className="text-gray-400 font-semibold block text-[10px] uppercase">Delivery Address:</span>
+                  <div className="pt-2 border-t border-border text-foreground">
+                    <span className="text-muted-foreground font-semibold block text-[10px] uppercase">Delivery Address:</span>
                     <p className="mt-0.5 whitespace-pre-wrap">{selectedOrder.deliveryAddress}</p>
                   </div>
                 </div>
 
                 {/* Notes */}
                 {selectedOrder.notes && (
-                  <div className="rounded-xl border border-gray-200 p-3 bg-white">
-                    <span className="text-gray-400 font-semibold block text-[10px] uppercase">Production Notes:</span>
-                    <p className="mt-0.5 text-gray-700 whitespace-pre-wrap">{selectedOrder.notes}</p>
+                  <div className="rounded-xl border border-border p-3 bg-card text-card-foreground">
+                    <span className="text-muted-foreground font-semibold block text-[10px] uppercase">Production Notes:</span>
+                    <p className="mt-0.5 text-foreground whitespace-pre-wrap">{selectedOrder.notes}</p>
                   </div>
                 )}
               </div>
@@ -692,7 +692,7 @@ export default function OrderListView({
                         setStatusNote(selectedOrder.statusNote || "");
                         setStatusChangeOpen(true);
                       }}
-                      className="bg-[#0f7f79] hover:bg-[#0c6b66] text-white rounded-xl font-bold"
+                      className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl font-bold"
                     >
                       Update Status
                     </Button>
@@ -708,17 +708,17 @@ export default function OrderListView({
       <Dialog open={statusChangeOpen} onOpenChange={setStatusChangeOpen}>
         <DialogContent className="max-w-md rounded-2xl p-6">
           <DialogHeader>
-            <DialogTitle className="text-base font-bold text-[#152e2c]">
+            <DialogTitle className="text-base font-bold text-foreground">
               Update Order Status
             </DialogTitle>
-            <DialogDescription className="text-xs text-gray-500">
+            <DialogDescription className="text-xs text-muted-foreground">
               Change the production or delivery status for Order #{selectedOrder?.orderNumber}.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-2">
             <div>
-              <label className="text-xs font-bold text-gray-700 block mb-1">New Status</label>
+              <label className="text-xs font-bold text-foreground block mb-1">New Status</label>
               <Select value={newStatus} onValueChange={(val: OrderStatus) => setNewStatus(val)}>
                 <SelectTrigger className="text-xs rounded-xl h-10">
                   <SelectValue />
@@ -734,7 +734,7 @@ export default function OrderListView({
             </div>
 
             <div>
-              <label className="text-xs font-bold text-gray-700 block mb-1">
+              <label className="text-xs font-bold text-foreground block mb-1">
                 Status Note / Tracking ID (Optional)
               </label>
               <Textarea
@@ -759,7 +759,7 @@ export default function OrderListView({
             <Button
               onClick={handleUpdateStatus}
               disabled={updatingStatus}
-              className="bg-[#0f7f79] hover:bg-[#0c6b66] text-white rounded-xl font-bold gap-2"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl font-bold gap-2"
             >
               {updatingStatus ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Status"}
             </Button>
