@@ -7,7 +7,7 @@ import DeleteSchoolDialog from "@/components/DeleteSchoolDialog";
 import ExcelUploadModal from "@/components/ExcelUploadModal";
 import BulkImageUploadModal from "@/components/BulkImageUploadModal";
 import ApprovalTimeline from "@/components/ApprovalTimeline";
-import { DYNAMIC_FIELDS, SAMPLE_CARD_DATA, type DesignerElement } from "@shared/templateDesigner";
+import { DYNAMIC_FIELDS, SAMPLE_CARD_DATA, SAMPLE_STAFF_CARD_DATA, type DesignerElement } from "@shared/templateDesigner";
 import {
   type LucideIcon,
   AlertCircle,
@@ -195,61 +195,101 @@ function ToneIcon({
 function CardPreview({
   accent = "teal",
   mini = false,
+  cardType = "student",
+  templateName,
 }: {
   accent?: Tone;
   mini?: boolean;
+  cardType?: "student" | "staff";
+  templateName?: string;
 }) {
+  const isStaff = cardType === "staff" || (templateName && /staff|teacher|faculty|employee/i.test(templateName));
   const palette = {
-    teal: "#2aa89d",
-    coral: "#e78362",
-    indigo: "#6d75ce",
-    yellow: "#d7b545",
+    teal: isStaff ? "#1e5b53" : "#2aa89d",
+    coral: isStaff ? "#933924" : "#e78362",
+    indigo: isStaff ? "#373b75" : "#6d75ce",
+    yellow: isStaff ? "#785f1c" : "#d7b545",
   }[accent];
+
+  const bgGradient = isStaff
+    ? `linear-gradient(135deg, ${palette} 0%, #0d2222 55%, #081617 100%)`
+    : `linear-gradient(135deg, ${palette} 0%, #154847 66%, #123536 100%)`;
+
   return (
     <div
-      className={`relative overflow-hidden rounded-xl border border-white/50 shadow-[0_8px_25px_rgba(22,47,44,0.18)] ${mini ? "h-[94px] w-[150px]" : "h-[164px] w-[244px]"
-        }`}
+      className={`relative overflow-hidden rounded-xl border border-white/50 shadow-[0_8px_25px_rgba(22,47,44,0.18)] shrink-0 select-none ${
+        mini ? "h-[94px] w-[150px]" : "h-[164px] w-[244px]"
+      }`}
       style={{
-        background: `linear-gradient(135deg, ${palette} 0%, #154847 66%, #123536 100%)`,
+        background: bgGradient,
       }}
     >
-      <div className="absolute -right-12 -top-10 h-28 w-28 rounded-full border-[16px] border-white/10" />
-      <div className="absolute bottom-[-38px] left-[-15px] h-28 w-28 rounded-full border-[15px] border-white/10" />
-      <div className="relative flex h-full flex-col justify-between p-3 text-white">
-        <div className="flex items-center gap-2">
-          <span
-            className="flex h-7 w-7 items-center justify-center rounded-md bg-white/90 text-[9px] font-extrabold"
-            style={{ color: palette }}
-          >
-            LP
-          </span>
-          <div className="leading-[1.05]">
-            <div className="text-[8px] font-extrabold uppercase tracking-[0.16em]">
-              School
-            </div>
-            <div className="text-[6px] font-medium uppercase tracking-[0.12em] text-white/70">
-              ID Card
+      {/* Decorative accent geometry */}
+      {isStaff ? (
+        <>
+          <div className="absolute top-0 right-0 h-full w-1/3 bg-white/[0.04] transform -skew-x-12 pointer-events-none" />
+          <div className="absolute -top-6 -left-6 h-24 w-24 rounded-full border-[8px] border-white/10 pointer-events-none" />
+          <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-gradient-to-r from-amber-400 via-amber-200 to-amber-500 opacity-90 pointer-events-none" />
+        </>
+      ) : (
+        <>
+          <div className="absolute -right-12 -top-10 h-28 w-28 rounded-full border-[16px] border-white/10 pointer-events-none" />
+          <div className="absolute bottom-[-38px] left-[-15px] h-28 w-28 rounded-full border-[15px] border-white/10 pointer-events-none" />
+        </>
+      )}
+
+      <div className={`relative flex h-full flex-col justify-between text-white ${mini ? "p-2.5 pb-2" : "p-3 pb-2.5"}`}>
+        <div className="flex items-center justify-between gap-1.5">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span
+              className={`flex items-center justify-center font-extrabold ${
+                mini ? "h-5 w-5 text-[8px] rounded" : "h-7 w-7 rounded-md text-[9px]"
+              } ${isStaff ? "bg-amber-400 text-slate-900" : "bg-white/90"}`}
+              style={!isStaff ? { color: palette } : undefined}
+            >
+              LP
+            </span>
+            <div className="leading-tight min-w-0">
+              <div className={`font-extrabold uppercase tracking-[0.16em] truncate ${mini ? "text-[7px]" : "text-[8px]"}`}>
+                School
+              </div>
+              <div className={`font-medium uppercase tracking-[0.12em] text-white/70 ${mini ? "text-[5px]" : "text-[6px]"}`}>
+                {isStaff ? "Staff ID Card" : "Student ID Card"}
+              </div>
             </div>
           </div>
+          {isStaff && (
+            <span
+              className={`font-black uppercase tracking-wider rounded border border-amber-300/40 bg-amber-400/20 text-amber-200 ${
+                mini ? "px-1 py-0.2 text-[5px]" : "px-1.5 py-0.5 text-[7px]"
+              }`}
+            >
+              STAFF
+            </span>
+          )}
         </div>
-        <div className="flex items-end justify-between gap-2">
-          <div className="flex items-end gap-2">
+
+        <div className="flex items-end justify-between gap-1.5">
+          <div className="flex items-end gap-1.5 min-w-0">
             <div
-              className={`${mini ? "h-9 w-8" : "h-14 w-12"
-                } rounded-md border border-white/40 bg-white/25`}
+              className={`${
+                mini ? "h-8 w-7" : "h-14 w-12"
+              } rounded border ${isStaff ? "border-amber-300/40 bg-white/20" : "border-white/40 bg-white/25"} shrink-0`}
             />
-            <div>
-              <div className="text-[12px] font-extrabold">Student Name</div>
-              <div className="mt-1 text-[7px] uppercase tracking-[0.12em] text-white/65">
-                Student record
+            <div className="min-w-0 leading-tight">
+              <div className={`font-extrabold truncate ${mini ? "text-[9px]" : "text-[12px]"}`}>
+                {isStaff ? "Staff Name" : "Student Name"}
               </div>
-              <div className="mt-1 font-mono text-[7px] text-white/75">
-                CARD NUMBER
+              <div className={`uppercase tracking-[0.12em] ${isStaff ? "text-amber-200/80" : "text-white/65"} ${mini ? "mt-0.5 text-[6px]" : "mt-1 text-[7px]"}`}>
+                {isStaff ? "Employee ID" : "Student record"}
+              </div>
+              <div className={`font-mono ${isStaff ? "text-white/80" : "text-white/75"} ${mini ? "mt-0.5 text-[6px]" : "mt-1 text-[7px]"}`}>
+                {isStaff ? "EMP-2026-001" : "CARD NUMBER"}
               </div>
             </div>
           </div>
           <QrCode
-            className={mini ? "h-6 w-6 text-white/80" : "h-9 w-9 text-white/80"}
+            className={`shrink-0 ${isStaff ? "text-amber-200/90" : "text-white/80"} ${mini ? "h-5 w-5" : "h-9 w-9"}`}
             strokeWidth={1.5}
           />
         </div>
@@ -2107,7 +2147,12 @@ export default function Home({
                         key={template.name}
                         className="flex items-center gap-3 rounded-xl border border-border bg-muted/30 p-3"
                       >
-                        <CardPreview accent={template.accent as Tone} mini />
+                        <CardPreview
+                          accent={template.accent as Tone}
+                          mini
+                          cardType={template.cardType}
+                          templateName={template.name}
+                        />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
                             <div className="truncate text-xs font-extrabold text-foreground">
@@ -3377,7 +3422,11 @@ export default function Home({
                     sortOrder: el.sortOrder ?? i,
                   }))}
                   side={previewModalSide}
-                  cardData={SAMPLE_CARD_DATA}
+                  cardData={
+                    previewModalTemplate.cardType === "staff" || /staff|teacher|faculty|employee/i.test(previewModalTemplate.name)
+                      ? SAMPLE_STAFF_CARD_DATA
+                      : SAMPLE_CARD_DATA
+                  }
                   scale={Math.min(
                     1.75,
                     520 / (previewModalTemplate.cardWidth ?? 324),
@@ -3387,7 +3436,11 @@ export default function Home({
               </div>
               <div className="text-center text-xs text-muted-foreground">
                 {previewModalTemplate.elements && previewModalTemplate.elements.length > 0
-                  ? "Live preview with designer layout and realistic student data."
+                  ? `Live preview with designer layout and realistic ${
+                      previewModalTemplate.cardType === "staff" || /staff|teacher|faculty|employee/i.test(previewModalTemplate.name)
+                        ? "staff"
+                        : "student"
+                    } data.`
                   : "This template has no custom elements yet. Super Admins can open the designer to add layout elements."}
               </div>
             </div>
@@ -3967,7 +4020,11 @@ function ModuleView({
                   className="overflow-hidden rounded-2xl border-border bg-card shadow-[0_12px_35px_rgba(38,71,65,0.05)]"
                 >
                   <div className="flex h-44 items-center justify-center bg-muted/50">
-                    <CardPreview accent={template.accent as Tone} />
+                    <CardPreview
+                      accent={template.accent as Tone}
+                      cardType={template.cardType}
+                      templateName={template.name}
+                    />
                   </div>
                   <CardContent className="p-5">
                     <div className="flex items-center justify-between gap-2">
