@@ -95,7 +95,7 @@ export default function MarketingOverview({
         {/* Total Orders */}
         <Card className="rounded-2xl border-border bg-card text-card-foreground shadow-2xs">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+            <CardTitle className="text-xs font-bold text-foreground/80 dark:text-foreground/90 uppercase tracking-wider">
               Total Orders Placed
             </CardTitle>
             <div className="h-9 w-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
@@ -111,7 +111,7 @@ export default function MarketingOverview({
         {/* Total ID Cards Ordered */}
         <Card className="rounded-2xl border-border bg-card text-card-foreground shadow-2xs">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+            <CardTitle className="text-xs font-bold text-foreground/80 dark:text-foreground/90 uppercase tracking-wider">
               Total ID Cards Ordered
             </CardTitle>
             <div className="h-9 w-9 rounded-xl bg-[#fff0e8] dark:bg-[#3d1e16] text-[#c65c3d] dark:text-[#f28a63] flex items-center justify-center">
@@ -127,7 +127,7 @@ export default function MarketingOverview({
         {/* In Production */}
         <Card className="rounded-2xl border-border bg-card text-card-foreground shadow-2xs">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+            <CardTitle className="text-xs font-bold text-foreground/80 dark:text-foreground/90 uppercase tracking-wider">
               In Production
             </CardTitle>
             <div className="h-9 w-9 rounded-xl bg-[#e9ebfa] dark:bg-[#1e223d] text-[#5c64b7] dark:text-[#8a94e8] flex items-center justify-center">
@@ -145,7 +145,7 @@ export default function MarketingOverview({
         {/* Delivered / Dispatched */}
         <Card className="rounded-2xl border-border bg-card text-card-foreground shadow-2xs">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+            <CardTitle className="text-xs font-bold text-foreground/80 dark:text-foreground/90 uppercase tracking-wider">
               Delivered
             </CardTitle>
             <div className="h-9 w-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 flex items-center justify-center">

@@ -13,7 +13,8 @@
     "db:push": "drizzle-kit generate && drizzle-kit migrate",
     "db:migrate": "node scripts/migrate-database.mjs",
     "db:setup": "tsx scripts/setup-database.ts",
-    "db:seed-auth": "tsx scripts/seed-auth.ts"
+    "db:seed-auth": "tsx scripts/seed-auth.ts",
+    "db:clean": "tsx scripts/clean-test-data.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.693.0",

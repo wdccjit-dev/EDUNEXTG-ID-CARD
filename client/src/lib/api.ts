@@ -191,6 +191,7 @@ export type ApiRemovedCard = {
   removedByName?: string | null;
   removedByRole?: string | null;
   removedAt: string;
+  cardType?: "student" | "staff" | null;
 };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -415,11 +416,13 @@ export const api = {
       search?: string;
       from?: string;
       to?: string;
+      cardType?: "student" | "staff";
     }) => {
       const qs = new URLSearchParams();
       if (params?.page) qs.set("page", String(params.page));
       if (params?.pageSize) qs.set("pageSize", String(params.pageSize));
       if (params?.schoolId) qs.set("schoolId", String(params.schoolId));
+      if (params?.cardType) qs.set("cardType", params.cardType);
       if (params?.className && params.className !== "ALL") qs.set("className", params.className);
       if (params?.section && params.section !== "ALL") qs.set("section", params.section);
       if (params?.search) qs.set("search", params.search);
@@ -445,9 +448,11 @@ export const api = {
       search?: string;
       from?: string;
       to?: string;
+      cardType?: "student" | "staff";
     }) => {
       const qs = new URLSearchParams();
       if (params?.schoolId) qs.set("schoolId", String(params.schoolId));
+      if (params?.cardType) qs.set("cardType", params.cardType);
       if (params?.className && params.className !== "ALL") qs.set("className", params.className);
       if (params?.section && params.section !== "ALL") qs.set("section", params.section);
       if (params?.search) qs.set("search", params.search);

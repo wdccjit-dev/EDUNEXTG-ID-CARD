@@ -103,7 +103,7 @@ function Router() {
       <Route path="/marketing"><ProtectedPortal portal="marketing" initialNav="Overview" /></Route>
       <Route path="/marketing/orders/create"><ProtectedPortal portal="marketing" initialNav="Create Order" /></Route>
       <Route path="/marketing/orders"><ProtectedPortal portal="marketing" initialNav="Order List" /></Route>
-      <Route path="/marketing/notifications"><ProtectedPortal portal="marketing" initialNav="Notifications" /></Route>
+      <Route path="/marketing/notifications"><ProtectedPortal portal="marketing" initialNav="Overview" /></Route>
       <Route path="/marketing/settings"><ProtectedPortal portal="marketing" initialNav="Settings" /></Route>
       <Route path="/about"><ProtectedPortal portal="school" initialNav="About Us" /></Route>
       <Route path="/"><PortalRedirect /></Route>

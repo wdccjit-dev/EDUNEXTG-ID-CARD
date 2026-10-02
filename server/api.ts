@@ -2526,7 +2526,7 @@ router.post("/id-cards/bulk-remove-approved", requireRole(schoolManagerRoles), a
       return res.status(400).json({ error: "No valid card IDs provided" });
     }
 
-    // Fetch candidate cards with template names
+    // Fetch candidate cards with template names and cardType
     const candidateCards = await db
       .select({
         id: idCards.id,
@@ -2535,6 +2535,7 @@ router.post("/id-cards/bulk-remove-approved", requireRole(schoolManagerRoles), a
         status: idCards.status,
         templateId: idCards.templateId,
         templateName: idCardTemplates.name,
+        cardType: idCardTemplates.cardType,
       })
       .from(idCards)
       .leftJoin(idCardTemplates, eq(idCards.templateId, idCardTemplates.id))
@@ -2595,8 +2596,13 @@ router.post("/id-cards/bulk-remove-approved", requireRole(schoolManagerRoles), a
       // Insert snapshots into removed_cards_history
       for (const card of removableCards) {
         const cData = dataByCardId.get(card.id) || {};
-        const studentName = cData["studentname"] || cData["student_name"] || cData["name"] || "";
-        const className = cData["classname"] || cData["class_name"] || cData["class"] || "";
+        const isStaff = card.cardType === "staff" || Boolean(cData["employee_id"] || cData["employeeid"] || cData["staff_name"] || cData["staffname"]);
+        const studentName = isStaff
+          ? (cData["staff_name"] || cData["staffname"] || cData["name"] || cData["studentname"] || cData["student_name"] || "")
+          : (cData["studentname"] || cData["student_name"] || cData["name"] || "");
+        const className = isStaff
+          ? (cData["designation"] || cData["department"] || cData["dept"] || cData["classname"] || cData["class_name"] || cData["class"] || "")
+          : (cData["classname"] || cData["class_name"] || cData["class"] || "");
         const section = cData["section"] || "";
 
         await tx.insert(removedCardsHistory).values({
@@ -3169,6 +3175,14 @@ router.get("/reports/removed-cards", requireRole(schoolManagerRoles), async (req
       conditions.push(eq(removedCardsHistory.schoolId, user.schoolId));
     }
 
+    // Card Type scoping: 'student' or 'staff'
+    const cardTypeFilter = req.query.cardType === "staff" ? "staff" : req.query.cardType === "student" ? "student" : null;
+    if (cardTypeFilter === "staff") {
+      conditions.push(eq(idCardTemplates.cardType, "staff"));
+    } else if (cardTypeFilter === "student") {
+      conditions.push(or(eq(idCardTemplates.cardType, "student"), isNull(idCardTemplates.cardType)));
+    }
+
     if (req.query.className) {
       conditions.push(eq(removedCardsHistory.className, String(req.query.className).trim()));
     }
@@ -3205,6 +3219,8 @@ router.get("/reports/removed-cards", requireRole(schoolManagerRoles), async (req
     const [countResult] = await db
       .select({ total: sql<number>`count(*)` })
       .from(removedCardsHistory)
+      .leftJoin(idCards, eq(removedCardsHistory.idCardId, idCards.id))
+      .leftJoin(idCardTemplates, eq(idCards.templateId, idCardTemplates.id))
       .where(whereClause);
     const total = Number(countResult?.total ?? 0);
 
@@ -3224,31 +3240,52 @@ router.get("/reports/removed-cards", requireRole(schoolManagerRoles), async (req
         removedByName: removedCardsHistory.removedByName,
         removedByRole: removedCardsHistory.removedByRole,
         removedAt: removedCardsHistory.removedAt,
+        cardType: idCardTemplates.cardType,
       })
       .from(removedCardsHistory)
       .leftJoin(schools, eq(removedCardsHistory.schoolId, schools.id))
+      .leftJoin(idCards, eq(removedCardsHistory.idCardId, idCards.id))
+      .leftJoin(idCardTemplates, eq(idCards.templateId, idCardTemplates.id))
       .where(whereClause)
       .orderBy(desc(removedCardsHistory.removedAt));
 
     // CSV export
     if (req.query.export === "csv" || req.query.format === "csv") {
       const allRows = await baseQuery;
-      const headers = ["#", "Card No", "Student Name", "Class", "Section", "School", "Template", "Previous Status", "Removed By", "Removed On"];
-      const csvRows = allRows.map((r, i) => [
-        i + 1,
-        `"${(r.cardNumber || "").replace(/"/g, '""')}"`,
-        `"${(r.studentName || "").replace(/"/g, '""')}"`,
-        `"${(r.className || "").replace(/"/g, '""')}"`,
-        `"${(r.section || "").replace(/"/g, '""')}"`,
-        `"${(r.schoolName || "").replace(/"/g, '""')}"`,
-        `"${(r.templateName || "").replace(/"/g, '""')}"`,
-        `"${(r.previousStatus || "").replace(/"/g, '""')}"`,
-        `"${(r.removedByName || "").replace(/"/g, '""')}"`,
-        `"${r.removedAt ? new Date(r.removedAt).toISOString() : ""}"`,
-      ].join(","));
+      const isStaffCsv = cardTypeFilter === "staff";
+      const headers = isStaffCsv
+        ? ["#", "Card No", "Staff Name", "Designation/Department", "School", "Template", "Previous Status", "Removed By", "Removed On"]
+        : ["#", "Card No", "Student Name", "Class", "Section", "School", "Template", "Previous Status", "Removed By", "Removed On"];
+      const csvRows = allRows.map((r, i) => {
+        if (isStaffCsv) {
+          return [
+            i + 1,
+            `"${(r.cardNumber || "").replace(/"/g, '""')}"`,
+            `"${(r.studentName || "").replace(/"/g, '""')}"`,
+            `"${(r.className || "").replace(/"/g, '""')}"`,
+            `"${(r.schoolName || "").replace(/"/g, '""')}"`,
+            `"${(r.templateName || "").replace(/"/g, '""')}"`,
+            `"${(r.previousStatus || "").replace(/"/g, '""')}"`,
+            `"${(r.removedByName || "").replace(/"/g, '""')}"`,
+            `"${r.removedAt ? new Date(r.removedAt).toISOString() : ""}"`,
+          ].join(",");
+        }
+        return [
+          i + 1,
+          `"${(r.cardNumber || "").replace(/"/g, '""')}"`,
+          `"${(r.studentName || "").replace(/"/g, '""')}"`,
+          `"${(r.className || "").replace(/"/g, '""')}"`,
+          `"${(r.section || "").replace(/"/g, '""')}"`,
+          `"${(r.schoolName || "").replace(/"/g, '""')}"`,
+          `"${(r.templateName || "").replace(/"/g, '""')}"`,
+          `"${(r.previousStatus || "").replace(/"/g, '""')}"`,
+          `"${(r.removedByName || "").replace(/"/g, '""')}"`,
+          `"${r.removedAt ? new Date(r.removedAt).toISOString() : ""}"`,
+        ].join(",");
+      });
       const csvContent = [headers.join(","), ...csvRows].join("\n");
       res.setHeader("Content-Type", "text/csv; charset=utf-8");
-      res.setHeader("Content-Disposition", `attachment; filename="removed_cards_history_${Date.now()}.csv"`);
+      res.setHeader("Content-Disposition", `attachment; filename="removed_${cardTypeFilter || "all"}_cards_history_${Date.now()}.csv"`);
       return res.send(csvContent);
     }
 
@@ -3260,11 +3297,21 @@ router.get("/reports/removed-cards", requireRole(schoolManagerRoles), async (req
     const items = await baseQuery.limit(pageSize).offset(offset);
 
     // Summary strip counts
-    const summaryScope = adminRoles.has(user.role) && req.query.schoolId
-      ? eq(removedCardsHistory.schoolId, Number(req.query.schoolId))
-      : user.schoolId
-      ? eq(removedCardsHistory.schoolId, user.schoolId)
-      : undefined;
+    const summaryConditions: any[] = [];
+    if (adminRoles.has(user.role)) {
+      if (req.query.schoolId) {
+        summaryConditions.push(eq(removedCardsHistory.schoolId, Number(req.query.schoolId)));
+      }
+    } else if (user.schoolId) {
+      summaryConditions.push(eq(removedCardsHistory.schoolId, user.schoolId));
+    }
+    if (cardTypeFilter === "staff") {
+      summaryConditions.push(eq(idCardTemplates.cardType, "staff"));
+    } else if (cardTypeFilter === "student") {
+      summaryConditions.push(or(eq(idCardTemplates.cardType, "student"), isNull(idCardTemplates.cardType)));
+    }
+
+    const summaryWhere = summaryConditions.length > 0 ? and(...summaryConditions) : undefined;
 
     const summaryRows = await db
       .select({
@@ -3272,7 +3319,9 @@ router.get("/reports/removed-cards", requireRole(schoolManagerRoles), async (req
         section: removedCardsHistory.section,
       })
       .from(removedCardsHistory)
-      .where(summaryScope);
+      .leftJoin(idCards, eq(removedCardsHistory.idCardId, idCards.id))
+      .leftJoin(idCardTemplates, eq(idCards.templateId, idCardTemplates.id))
+      .where(summaryWhere);
 
     const classSet = new Set<string>();
     const sectionSet = new Set<string>();

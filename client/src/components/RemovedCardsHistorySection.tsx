@@ -22,6 +22,7 @@ import {
   Building2,
   Layers,
   GraduationCap,
+  Briefcase,
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -29,13 +30,16 @@ import { toast } from "sonner";
 interface RemovedCardsHistorySectionProps {
   user: ApiAuthUser;
   schools: ApiSchool[];
+  cardType?: "student" | "staff";
 }
 
 export default function RemovedCardsHistorySection({
   user,
   schools,
+  cardType = "student",
 }: RemovedCardsHistorySectionProps) {
   const isSuperAdmin = user.role === "SUPER_ADMIN";
+  const isStaff = cardType === "staff";
 
   const [cards, setCards] = useState<ApiRemovedCard[]>([]);
   const [total, setTotal] = useState(0);
@@ -88,6 +92,7 @@ export default function RemovedCardsHistorySection({
       .removedCards({
         page,
         pageSize,
+        cardType,
         schoolId: schoolFilter === "ALL" ? undefined : Number(schoolFilter),
         className: classFilter === "ALL" ? undefined : classFilter,
         section: sectionFilter === "ALL" ? undefined : sectionFilter,
@@ -102,7 +107,7 @@ export default function RemovedCardsHistorySection({
         setSectionCounts(normalizeCountMap(res.sectionCounts, "section"));
       })
       .catch((err) => {
-        toast.error("Failed to load removed cards history", {
+        toast.error(`Failed to load removed ${isStaff ? "staff" : "student"} cards history`, {
           description: err instanceof Error ? err.message : "Network error",
         });
       })
@@ -111,7 +116,7 @@ export default function RemovedCardsHistorySection({
 
   useEffect(() => {
     fetchHistory();
-  }, [page, pageSize, schoolFilter, classFilter, sectionFilter, fromDate, toDate]);
+  }, [page, pageSize, schoolFilter, classFilter, sectionFilter, fromDate, toDate, cardType]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -126,6 +131,7 @@ export default function RemovedCardsHistorySection({
   // Export CSV
   const handleExportCsv = () => {
     api.reports.exportRemovedCardsCsv({
+      cardType,
       schoolId: schoolFilter === "ALL" ? undefined : Number(schoolFilter),
       className: classFilter === "ALL" ? undefined : classFilter,
       section: sectionFilter === "ALL" ? undefined : sectionFilter,
@@ -133,7 +139,7 @@ export default function RemovedCardsHistorySection({
       from: fromDate || undefined,
       to: toDate || undefined,
     });
-    toast.success("Downloading removed cards history CSV...");
+    toast.success(`Downloading removed ${isStaff ? "staff" : "student"} cards history CSV...`);
   };
 
   const availableClasses = Object.keys(classCounts).sort();
@@ -142,20 +148,23 @@ export default function RemovedCardsHistorySection({
   return (
     <div className="space-y-5">
       {/* Group by Class / Section Summary Strip */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {/* Class Breakdown Strip */}
+      <div className={`grid grid-cols-1 gap-3 ${isStaff && availableSections.length === 0 ? "sm:grid-cols-1" : "sm:grid-cols-2"}`}>
+        {/* Class / Designation Breakdown Strip */}
         <div className="rounded-2xl border border-border bg-muted/30 p-3.5 space-y-2">
           <div className="flex items-center justify-between text-xs font-bold text-foreground">
             <span className="flex items-center gap-1.5 uppercase tracking-wider text-[11px] text-primary">
-              <GraduationCap className="h-4 w-4" /> Classwise Breakdown
+              {isStaff ? <Briefcase className="h-4 w-4" /> : <GraduationCap className="h-4 w-4" />}
+              {isStaff ? "Designation / Dept Breakdown" : "Classwise Breakdown"}
             </span>
             <span className="text-[11px] text-muted-foreground font-normal">
-              {availableClasses.length} distinct classes
+              {availableClasses.length} distinct {isStaff ? "designations" : "classes"}
             </span>
           </div>
           <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pt-1">
             {availableClasses.length === 0 ? (
-              <span className="text-xs text-muted-foreground">No class records available</span>
+              <span className="text-xs text-muted-foreground">
+                No {isStaff ? "designation" : "class"} records available
+              </span>
             ) : (
               availableClasses.map((cls) => (
                 <button
@@ -170,7 +179,7 @@ export default function RemovedCardsHistorySection({
                       : "bg-card border border-border text-foreground hover:bg-accent"
                   }`}
                 >
-                  <span>Class {cls}</span>
+                  <span>{isStaff ? cls : `Class ${cls}`}</span>
                   <Badge
                     variant="secondary"
                     className={`h-4 px-1 text-[10px] ${
@@ -185,58 +194,60 @@ export default function RemovedCardsHistorySection({
           </div>
         </div>
 
-        {/* Section Breakdown Strip */}
-        <div className="rounded-2xl border border-border bg-muted/30 p-3.5 space-y-2">
-          <div className="flex items-center justify-between text-xs font-bold text-foreground">
-            <span className="flex items-center gap-1.5 uppercase tracking-wider text-[11px] text-primary">
-              <Layers className="h-4 w-4" /> Sectionwise Breakdown
-            </span>
-            <span className="text-[11px] text-muted-foreground font-normal">
-              {availableSections.length} distinct sections
-            </span>
-          </div>
-          <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pt-1">
-            {availableSections.length === 0 ? (
-              <span className="text-xs text-muted-foreground">No section records available</span>
-            ) : (
-              availableSections.map((sec) => (
-                <button
-                  key={sec}
-                  onClick={() => {
-                    setSectionFilter((prev) => (prev === sec ? "ALL" : sec));
-                    setPage(1);
-                  }}
-                  className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
-                    sectionFilter === sec
-                      ? "bg-primary text-primary-foreground shadow-2xs"
-                      : "bg-card border border-border text-foreground hover:bg-accent"
-                  }`}
-                >
-                  <span>Sec {sec}</span>
-                  <Badge
-                    variant="secondary"
-                    className={`h-4 px-1 text-[10px] ${
-                      sectionFilter === sec ? "bg-primary-foreground/20 text-primary-foreground" : "bg-muted text-muted-foreground"
+        {/* Section Breakdown Strip (shown for students or if sections exist) */}
+        {(!isStaff || availableSections.length > 0) && (
+          <div className="rounded-2xl border border-border bg-muted/30 p-3.5 space-y-2">
+            <div className="flex items-center justify-between text-xs font-bold text-foreground">
+              <span className="flex items-center gap-1.5 uppercase tracking-wider text-[11px] text-primary">
+                <Layers className="h-4 w-4" /> Sectionwise Breakdown
+              </span>
+              <span className="text-[11px] text-muted-foreground font-normal">
+                {availableSections.length} distinct sections
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pt-1">
+              {availableSections.length === 0 ? (
+                <span className="text-xs text-muted-foreground">No section records available</span>
+              ) : (
+                availableSections.map((sec) => (
+                  <button
+                    key={sec}
+                    onClick={() => {
+                      setSectionFilter((prev) => (prev === sec ? "ALL" : sec));
+                      setPage(1);
+                    }}
+                    className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
+                      sectionFilter === sec
+                        ? "bg-primary text-primary-foreground shadow-2xs"
+                        : "bg-card border border-border text-foreground hover:bg-accent"
                     }`}
                   >
-                    {sectionCounts[sec]}
-                  </Badge>
-                </button>
-              ))
-            )}
+                    <span>Sec {sec}</span>
+                    <Badge
+                      variant="secondary"
+                      className={`h-4 px-1 text-[10px] ${
+                        sectionFilter === sec ? "bg-primary-foreground/20 text-primary-foreground" : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {sectionCounts[sec]}
+                    </Badge>
+                  </button>
+                ))
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Filter & Export Bar */}
       <Card className="rounded-2xl border border-border bg-card text-card-foreground shadow-2xs p-4 space-y-3">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <div className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${isStaff && availableSections.length === 0 ? "lg:grid-cols-4" : "lg:grid-cols-5"}`}>
           {/* Search */}
           <div className="relative lg:col-span-2">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               className="pl-9 text-xs rounded-xl h-9"
-              placeholder="Search card #, student name, template..."
+              placeholder={isStaff ? "Search card #, staff name, designation..." : "Search card #, student name, class..."}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -261,39 +272,41 @@ export default function RemovedCardsHistorySection({
             </div>
           )}
 
-          {/* Class Filter */}
+          {/* Class / Designation Filter */}
           <div>
             <Select value={classFilter} onValueChange={(val) => { setClassFilter(val); setPage(1); }}>
               <SelectTrigger className="text-xs rounded-xl h-9">
-                <SelectValue placeholder="All Classes" />
+                <SelectValue placeholder={isStaff ? "All Designations" : "All Classes"} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="ALL">All Classes</SelectItem>
+                <SelectItem value="ALL">{isStaff ? "All Designations" : "All Classes"}</SelectItem>
                 {availableClasses.map((cls) => (
                   <SelectItem key={cls} value={cls}>
-                    Class {cls} ({classCounts[cls]})
+                    {isStaff ? cls : `Class ${cls}`} ({classCounts[cls]})
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
-          {/* Section Filter */}
-          <div>
-            <Select value={sectionFilter} onValueChange={(val) => { setSectionFilter(val); setPage(1); }}>
-              <SelectTrigger className="text-xs rounded-xl h-9">
-                <SelectValue placeholder="All Sections" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All Sections</SelectItem>
-                {availableSections.map((sec) => (
-                  <SelectItem key={sec} value={sec}>
-                    Section {sec} ({sectionCounts[sec]})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Section Filter (only if student or sections exist) */}
+          {(!isStaff || availableSections.length > 0) && (
+            <div>
+              <Select value={sectionFilter} onValueChange={(val) => { setSectionFilter(val); setPage(1); }}>
+                <SelectTrigger className="text-xs rounded-xl h-9">
+                  <SelectValue placeholder="All Sections" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Sections</SelectItem>
+                  {availableSections.map((sec) => (
+                    <SelectItem key={sec} value={sec}>
+                      Section {sec} ({sectionCounts[sec]})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
 
         {/* Date range & CSV Export */}
@@ -345,7 +358,7 @@ export default function RemovedCardsHistorySection({
             disabled={total === 0}
             className="h-8 text-xs font-bold gap-1.5 rounded-xl border-primary text-primary hover:bg-primary/10"
           >
-            <Download className="h-3.5 w-3.5" /> Export CSV ({total})
+            <Download className="h-3.5 w-3.5" /> Export {isStaff ? "Staff " : "Student "}CSV ({total})
           </Button>
         </div>
       </Card>
@@ -358,9 +371,9 @@ export default function RemovedCardsHistorySection({
               <tr className="border-b border-border bg-muted/40 text-[11px] font-extrabold uppercase tracking-wider text-muted-foreground">
                 <th className="py-3 px-4 w-12">#</th>
                 <th className="py-3 px-4">Card No</th>
-                <th className="py-3 px-4">Student Name</th>
-                <th className="py-3 px-4">Class</th>
-                <th className="py-3 px-4">Section</th>
+                <th className="py-3 px-4">{isStaff ? "Staff Name" : "Student Name"}</th>
+                <th className="py-3 px-4">{isStaff ? "Designation / Dept" : "Class"}</th>
+                {!isStaff && <th className="py-3 px-4">Section</th>}
                 {isSuperAdmin && <th className="py-3 px-4">School</th>}
                 <th className="py-3 px-4">Template</th>
                 <th className="py-3 px-4">Previous Status</th>
@@ -371,15 +384,15 @@ export default function RemovedCardsHistorySection({
             <tbody className="divide-y divide-border text-xs">
               {loading ? (
                 <tr>
-                  <td colSpan={isSuperAdmin ? 10 : 9} className="py-16 text-center text-muted-foreground">
+                  <td colSpan={isSuperAdmin ? (isStaff ? 9 : 10) : (isStaff ? 8 : 9)} className="py-16 text-center text-muted-foreground">
                     <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2 text-primary" />
                     Loading history...
                   </td>
                 </tr>
               ) : cards.length === 0 ? (
                 <tr>
-                  <td colSpan={isSuperAdmin ? 10 : 9} className="py-16 text-center text-muted-foreground">
-                    No removed cards match your filter criteria.
+                  <td colSpan={isSuperAdmin ? (isStaff ? 9 : 10) : (isStaff ? 8 : 9)} className="py-16 text-center text-muted-foreground">
+                    No removed {isStaff ? "staff" : "student"} ID cards match your filter criteria.
                   </td>
                 </tr>
               ) : (
@@ -397,9 +410,11 @@ export default function RemovedCardsHistorySection({
                     <td className="py-3 px-4 font-semibold text-foreground">
                       {c.className || "-"}
                     </td>
-                    <td className="py-3 px-4 font-semibold text-foreground">
-                      {c.section || "-"}
-                    </td>
+                    {!isStaff && (
+                      <td className="py-3 px-4 font-semibold text-foreground">
+                        {c.section || "-"}
+                      </td>
+                    )}
                     {isSuperAdmin && (
                       <td className="py-3 px-4 text-muted-foreground font-medium">
                         School #{c.schoolId}

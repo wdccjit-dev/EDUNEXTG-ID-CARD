@@ -315,11 +315,15 @@ export default function Home({
     }
   }, [initialNav]);
 
-  // Guard for marketing admin: prevent viewing templates, requests, schools, etc.
+  // Guard for marketing admin & school portal navigation
   useEffect(() => {
     if (portal === "marketing") {
-      const allowed = ["Overview", "Orders", "Create Order", "Order List", "Notifications", "Settings", "About Us"];
+      const allowed = ["Overview", "Orders", "Create Order", "Order List", "Settings", "About Us"];
       if (!allowed.includes(activeNav)) {
+        setActiveNav("Overview");
+      }
+    } else if (portal === "school") {
+      if (activeNav === "Reports") {
         setActiveNav("Overview");
       }
     }
@@ -330,7 +334,6 @@ export default function Home({
       ? [
           { label: "Overview", icon: LayoutDashboard },
           { label: "Orders", icon: ShoppingCart },
-          { label: "Notifications", icon: Bell },
         ]
       : portal === "admin"
       ? navItems
@@ -341,7 +344,6 @@ export default function Home({
             "ID card requests",
             "Approved cards",
             "Orders",
-            "Reports",
           ].includes(label),
         );
   const [query, setQuery] = useState("");
@@ -1164,7 +1166,11 @@ export default function Home({
     const res = await api.idCards.bulkRemoveApproved(cardIds);
     setIdCards((prev) => prev.filter((c) => !cardIds.includes(c.id)));
     setSelectedApprovedCardIds((prev) => prev.filter((id) => !cardIds.includes(id)));
-    toast.success(`Removed ${res.removedCount} card(s) from Approved cards. Moved to Reports history.`);
+    toast.success(
+      portal === "admin"
+        ? `Removed ${res.removedCount} card(s) from Approved cards. Moved to Reports history.`
+        : `Removed ${res.removedCount} card(s) from Approved cards.`
+    );
   };
 
   const handleToggleSelectRequest = (cardId: number) => {
@@ -1609,15 +1615,17 @@ export default function Home({
             )}
 
             {/* School Users Indicator */}
-            {authenticatedUser.role !== "SUPER_ADMIN" && (
-              <div className="hidden items-center gap-2 rounded-xl border border-primary/20 bg-primary/10 px-3 py-1.5 text-xs font-extrabold text-primary sm:flex">
-                <Building2 className="h-3.5 w-3.5" />
-                <span>
-                  {authenticatedUser.schoolName ??
-                    `School #${authenticatedUser.schoolId}`}
-                </span>
-              </div>
-            )}
+            {portal !== "marketing" &&
+              authenticatedUser.role === "SCHOOL_ADMIN" &&
+              (authenticatedUser.schoolName || authenticatedUser.schoolId) && (
+                <div className="hidden items-center gap-2 rounded-xl border border-primary/20 bg-primary/10 px-3 py-1.5 text-xs font-extrabold text-primary sm:flex">
+                  <Building2 className="h-3.5 w-3.5" />
+                  <span>
+                    {authenticatedUser.schoolName ??
+                      `School #${authenticatedUser.schoolId}`}
+                  </span>
+                </div>
+              )}
 
 
             <div ref={profileMenuRef} className="relative">
@@ -2541,7 +2549,7 @@ export default function Home({
         if (!open) setEditingUser(null);
       }}>
         <DialogContent className="sm:max-w-md bg-card border-border">
-          <form onSubmit={handleUserSubmit} noValidate>
+          <form onSubmit={handleUserSubmit} noValidate autoComplete="off">
             <DialogHeader>
               <DialogTitle>{editingUser ? `Edit User: ${editingUser.name || editingUser.email || "User"}` : "Add New User"}</DialogTitle>
               <DialogDescription>
@@ -2565,6 +2573,7 @@ export default function Home({
                   }}
                   aria-invalid={Boolean(userFormErrors.name)}
                   aria-describedby={userFormErrors.name ? "user-name-error" : undefined}
+                  autoComplete="off"
                   autoFocus
                 />
                 {userFormErrors.name && (
@@ -2588,6 +2597,10 @@ export default function Home({
                   }}
                   aria-invalid={Boolean(userFormErrors.email)}
                   aria-describedby={userFormErrors.email ? "user-email-error" : undefined}
+                  autoComplete="off"
+                  name="user_email_no_autofill"
+                  data-lpignore="true"
+                  data-1p-ignore="true"
                 />
                 {userFormErrors.email && (
                   <p id="user-email-error" className="mt-1 text-xs font-medium text-red-600">
@@ -2610,6 +2623,10 @@ export default function Home({
                   }}
                   aria-invalid={Boolean(userFormErrors.password)}
                   aria-describedby={userFormErrors.password ? "user-password-error" : undefined}
+                  autoComplete="new-password"
+                  name="user_password_no_autofill"
+                  data-lpignore="true"
+                  data-1p-ignore="true"
                 />
                 {userFormErrors.password && (
                   <p id="user-password-error" className="mt-1 text-xs font-medium text-red-600">
@@ -3611,7 +3628,7 @@ function ModuleView({
   const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false);
   const [cardsPendingRemove, setCardsPendingRemove] = useState<number[]>([]);
   const [removingCards, setRemovingCards] = useState(false);
-  const [reportsTab, setReportsTab] = useState<"general" | "removed_history">("removed_history");
+  const [reportsTab, setReportsTab] = useState<"student_removed" | "staff_removed">("student_removed");
 
   const getSchoolLoginId = (school: ApiSchool) =>
     school.credentials?.loginId ??
@@ -3825,7 +3842,7 @@ function ModuleView({
               className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-4 text-xs font-bold text-primary shadow-sm transition-all hover:border-primary hover:bg-primary/15"
               data-testid="button-view-demo-templates"
             >
-              <FileText className="h-4 w-4" /> View Demo Templates
+              <FileText className="h-4 w-4" /> View Demo Templates and Lanyards
             </a>
           )}
 
@@ -4440,7 +4457,7 @@ function ModuleView({
                   Remove {cardsPendingRemove.length} card{cardsPendingRemove.length === 1 ? "" : "s"} from Approved cards?
                 </AlertDialogTitle>
                 <AlertDialogDescription>
-                  They will be moved to Reports as history.
+                  They will be archived from active approved cards into history.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -4792,9 +4809,9 @@ function ModuleView({
         <div className="space-y-4">
           <div className="flex items-center gap-2 border-b border-border pb-3">
             <button
-              onClick={() => setReportsTab("removed_history")}
+              onClick={() => setReportsTab("student_removed")}
               className={`rounded-xl px-4 py-2 text-xs font-bold transition-all ${
-                reportsTab === "removed_history"
+                reportsTab === "student_removed"
                   ? "bg-primary text-white shadow-2xs"
                   : "bg-card text-muted-foreground border border-border hover:bg-muted/50"
               }`}
@@ -4802,23 +4819,21 @@ function ModuleView({
               Removed Cards History
             </button>
             <button
-              onClick={() => setReportsTab("general")}
+              onClick={() => setReportsTab("staff_removed")}
               className={`rounded-xl px-4 py-2 text-xs font-bold transition-all ${
-                reportsTab === "general"
+                reportsTab === "staff_removed"
                   ? "bg-primary text-white shadow-2xs"
                   : "bg-card text-muted-foreground border border-border hover:bg-muted/50"
               }`}
             >
-              General Reports
+              Removed Cards History for staff id cards
             </button>
           </div>
 
-          {reportsTab === "removed_history" ? (
-            <RemovedCardsHistorySection user={authenticatedUser} schools={schools} />
+          {reportsTab === "student_removed" ? (
+            <RemovedCardsHistorySection user={authenticatedUser} schools={schools} cardType="student" />
           ) : (
-            <Card className="rounded-2xl border-border bg-card p-8 text-center text-xs text-muted-foreground shadow-2xs">
-              System analytics and card generation summary reports.
-            </Card>
+            <RemovedCardsHistorySection user={authenticatedUser} schools={schools} cardType="staff" />
           )}
         </div>
       )}

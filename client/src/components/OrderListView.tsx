@@ -539,7 +539,7 @@ export default function OrderListView({
               <DialogHeader className="border-b pb-3">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                   <div>
-                    <DialogTitle className="text-lg font-black text-[#152e2c] flex items-center gap-2">
+                    <DialogTitle className="text-lg font-black text-foreground flex items-center gap-2">
                       Order #{selectedOrder.orderNumber}
                       <Badge
                         variant="outline"
@@ -548,7 +548,7 @@ export default function OrderListView({
                         {getOrderStatusMeta(selectedOrder.status).label}
                       </Badge>
                     </DialogTitle>
-                    <p className="text-xs text-[#788784] mt-0.5">
+                    <p className="text-xs text-muted-foreground mt-0.5">
                       Placed on {format(new Date(selectedOrder.createdAt), "dd MMMM yyyy, hh:mm a")}
                     </p>
                   </div>
