@@ -244,37 +244,37 @@ export default function SuperAdminProfileDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl overflow-hidden rounded-3xl border border-[#dfe7e2] bg-[#fffefa] p-0 shadow-2xl">
+      <DialogContent className="max-w-xl overflow-hidden rounded-3xl border border-border bg-card text-card-foreground p-0 shadow-2xl">
         {/* Header */}
-        <div className="border-b border-[#e6ede8] bg-[#f7faf8] px-6 py-5">
+        <div className="border-b border-border bg-muted/40 px-6 py-5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#0f7f79] text-white shadow-md shadow-[#0f7f79]/20">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-md shadow-primary/20">
                 <ShieldCheck className="h-6 w-6" strokeWidth={2.2} />
               </div>
               <div>
-                <DialogTitle className="text-xl font-extrabold tracking-tight text-[#182326]">
+                <DialogTitle className="text-xl font-extrabold tracking-tight text-foreground">
                   Super Admin Profile
                 </DialogTitle>
-                <DialogDescription className="text-xs text-[#778381]">
+                <DialogDescription className="text-xs text-muted-foreground">
                   Manage your administrator credentials, personal information, and photo.
                 </DialogDescription>
               </div>
             </div>
-            <span className="rounded-full border border-[#b7e3d9] bg-[#dff3ee] px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider text-[#0b716b]">
+            <span className="rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider text-primary">
               Super Admin
             </span>
           </div>
 
           {/* Navigation Tabs */}
-          <div className="mt-5 flex gap-2 border-t border-[#e8efe9] pt-3">
+          <div className="mt-5 flex gap-2 border-t border-border pt-3">
             <button
               type="button"
               onClick={() => setActiveTab("details")}
               className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all ${
                 activeTab === "details"
-                  ? "bg-[#0f7f79] text-white shadow-sm"
-                  : "text-[#5e716e] hover:bg-[#eaf2ee] hover:text-[#182326]"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:bg-muted/80 hover:text-foreground"
               }`}
             >
               <User className="h-3.5 w-3.5" />
@@ -285,8 +285,8 @@ export default function SuperAdminProfileDialog({
               onClick={() => setActiveTab("security")}
               className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all ${
                 activeTab === "security"
-                  ? "bg-[#0f7f79] text-white shadow-sm"
-                  : "text-[#5e716e] hover:bg-[#eaf2ee] hover:text-[#182326]"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:bg-muted/80 hover:text-foreground"
               }`}
             >
               <KeyRound className="h-3.5 w-3.5" />
@@ -300,10 +300,10 @@ export default function SuperAdminProfileDialog({
           {activeTab === "details" ? (
             <div className="space-y-6">
               {/* Profile Picture Section */}
-              <div className="rounded-2xl border border-[#e5ece7] bg-[#f9fbf9] p-4">
+              <div className="rounded-2xl border border-border bg-muted/20 p-4">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
                   {/* Avatar Display */}
-                  <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-2 border-[#b7e3d9] bg-[#dff3ee] text-xl font-black text-[#0b716b] shadow-sm">
+                  <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-2 border-primary/30 bg-primary/10 text-xl font-black text-primary shadow-sm">
                     {displayAvatar ? (
                       <img
                         src={displayAvatar}
@@ -317,8 +317,8 @@ export default function SuperAdminProfileDialog({
 
                   {/* Actions */}
                   <div className="flex-1 space-y-2">
-                    <div className="text-xs font-extrabold text-[#203734]">Profile Picture</div>
-                    <p className="text-[11px] text-[#778381]">
+                    <div className="text-xs font-extrabold text-foreground">Profile Picture</div>
+                    <p className="text-[11px] text-muted-foreground">
                       Upload a square portrait photo (JPG, PNG, WebP up to 5MB).
                     </p>
 
@@ -337,9 +337,9 @@ export default function SuperAdminProfileDialog({
                         variant="outline"
                         onClick={() => fileInputRef.current?.click()}
                         disabled={savingPicture}
-                        className="h-8 rounded-xl border-[#cfdcd6] bg-white text-xs font-bold text-[#203734] hover:bg-[#edf5f0]"
+                        className="h-8 rounded-xl border-border bg-card text-xs font-bold text-foreground hover:bg-accent"
                       >
-                        <Upload className="mr-1.5 h-3.5 w-3.5 text-[#0f7f79]" />
+                        <Upload className="mr-1.5 h-3.5 w-3.5 text-primary" />
                         {displayAvatar ? "Change Picture" : "Upload Picture"}
                       </Button>
 
@@ -349,7 +349,7 @@ export default function SuperAdminProfileDialog({
                           size="sm"
                           onClick={handleSavePicture}
                           disabled={savingPicture}
-                          className="h-8 rounded-xl bg-[#0f7f79] text-xs font-bold text-white hover:bg-[#096c67]"
+                          className="h-8 rounded-xl bg-primary text-xs font-bold text-primary-foreground hover:bg-primary/90"
                         >
                           {savingPicture ? (
                             <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
@@ -367,7 +367,7 @@ export default function SuperAdminProfileDialog({
                           variant="outline"
                           onClick={handleRemovePicture}
                           disabled={savingPicture}
-                          className="h-8 rounded-xl border-[#fcd5ce] bg-white text-xs font-bold text-[#b91c1c] hover:bg-[#fff1f0]"
+                          className="h-8 rounded-xl border-destructive/30 bg-card text-xs font-bold text-destructive hover:bg-destructive/10"
                         >
                           <Trash2 className="mr-1.5 h-3.5 w-3.5" />
                           Remove Photo
@@ -380,7 +380,7 @@ export default function SuperAdminProfileDialog({
                           size="sm"
                           variant="ghost"
                           onClick={() => setPendingAvatarPreview(null)}
-                          className="h-8 rounded-xl text-xs font-semibold text-[#778381]"
+                          className="h-8 rounded-xl text-xs font-semibold text-muted-foreground"
                         >
                           Cancel
                         </Button>
@@ -393,11 +393,11 @@ export default function SuperAdminProfileDialog({
               {/* General Details Form */}
               <form onSubmit={handleSaveDetails} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-bold text-[#38514e]">
+                  <label className="block text-xs font-bold text-foreground">
                     Full Name <span className="text-red-500">*</span>
                   </label>
                   <div className="relative mt-1.5">
-                    <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8fa09d]" />
+                    <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
                       type="text"
                       value={name}
@@ -410,11 +410,11 @@ export default function SuperAdminProfileDialog({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-[#38514e]">
+                  <label className="block text-xs font-bold text-foreground">
                     Email Address <span className="text-red-500">*</span>
                   </label>
                   <div className="relative mt-1.5">
-                    <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8fa09d]" />
+                    <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
                       type="email"
                       value={email}
@@ -424,21 +424,21 @@ export default function SuperAdminProfileDialog({
                       required
                     />
                   </div>
-                  <p className="mt-1 text-[10px] text-[#8fa09d]">
+                  <p className="mt-1 text-[10px] text-muted-foreground">
                     Used for administrator login and system notifications.
                   </p>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-[#38514e]">
+                  <label className="block text-xs font-bold text-foreground">
                     Phone / Mobile Number
                   </label>
                   <div className="mt-1.5 flex items-center gap-1.5">
-                    <div className="h-10 w-14 flex items-center justify-center rounded-xl border border-[#d2dbd8] bg-[#f5f8f7] text-xs font-bold text-[#2a4541] select-none shrink-0">
+                    <div className="h-10 w-14 flex items-center justify-center rounded-xl border border-border bg-muted/40 text-xs font-bold text-muted-foreground select-none shrink-0">
                       +91
                     </div>
                     <div className="flex-1 relative">
-                      <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8fa09d]" />
+                      <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                       <Input
                         type="tel"
                         inputMode="numeric"
@@ -451,14 +451,14 @@ export default function SuperAdminProfileDialog({
                         placeholder={INDIAN_MOBILE_PLACEHOLDER}
                         className={`h-10 rounded-xl pl-9 text-xs transition-colors ${
                           phone.length > 0 && phone.length < 10
-                            ? "border-red-500 bg-red-50/15 text-red-900 focus-visible:ring-red-400 focus-visible:border-red-500"
+                            ? "border-destructive bg-destructive/10 text-destructive focus-visible:ring-destructive"
                             : ""
                         }`}
                       />
                     </div>
                   </div>
                   {phone.length > 0 && phone.length < 10 && (
-                    <p className="mt-1 text-[11px] font-medium text-red-500">
+                    <p className="mt-1 text-[11px] font-medium text-destructive">
                       Phone number must be 10 digits ({phone.length}/10)
                     </p>
                   )}
@@ -468,7 +468,7 @@ export default function SuperAdminProfileDialog({
                   <Button
                     type="submit"
                     disabled={savingDetails}
-                    className="h-10 rounded-xl bg-[#0f7f79] px-6 text-xs font-bold text-white hover:bg-[#096c67]"
+                    className="h-10 rounded-xl bg-primary px-6 text-xs font-bold text-primary-foreground hover:bg-primary/90"
                   >
                     {savingDetails ? (
                       <>
@@ -484,21 +484,21 @@ export default function SuperAdminProfileDialog({
           ) : (
             /* Security & Password Form */
             <form onSubmit={handleChangePassword} className="space-y-4">
-              <div className="rounded-2xl border border-[#b7e3d9] bg-[#dff3ee]/40 p-3 text-xs text-[#123b3b]">
-                <div className="flex items-center gap-2 font-bold text-[#0b716b]">
+              <div className="rounded-2xl border border-primary/20 bg-primary/10 p-3 text-xs text-foreground">
+                <div className="flex items-center gap-2 font-bold text-primary">
                   <Lock className="h-4 w-4" /> Strong Password Protection
                 </div>
-                <p className="mt-1 text-[11px] leading-relaxed text-[#41625d]">
+                <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
                   Ensure your administrator password has at least 8 characters. You will need to provide your existing password to verify this update.
                 </p>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#38514e]">
+                <label className="block text-xs font-bold text-foreground">
                   Current Password <span className="text-red-500">*</span>
                 </label>
                 <div className="relative mt-1.5">
-                  <KeyRound className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8fa09d]" />
+                  <KeyRound className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     type="password"
                     value={currentPassword}
@@ -512,11 +512,11 @@ export default function SuperAdminProfileDialog({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#38514e]">
+                <label className="block text-xs font-bold text-foreground">
                   New Password <span className="text-red-500">*</span>
                 </label>
                 <div className="relative mt-1.5">
-                  <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8fa09d]" />
+                  <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     type="password"
                     value={newPassword}
@@ -530,11 +530,11 @@ export default function SuperAdminProfileDialog({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#38514e]">
+                <label className="block text-xs font-bold text-foreground">
                   Confirm New Password <span className="text-red-500">*</span>
                 </label>
                 <div className="relative mt-1.5">
-                  <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8fa09d]" />
+                  <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     type="password"
                     value={confirmNewPassword}
@@ -546,7 +546,7 @@ export default function SuperAdminProfileDialog({
                   />
                 </div>
                 {newPassword && confirmNewPassword && newPassword !== confirmNewPassword && (
-                  <p className="mt-1 text-[11px] font-semibold text-red-600">
+                  <p className="mt-1 text-[11px] font-semibold text-destructive">
                     Passwords do not match.
                   </p>
                 )}
@@ -556,7 +556,7 @@ export default function SuperAdminProfileDialog({
                 <Button
                   type="submit"
                   disabled={changingPassword}
-                  className="h-10 rounded-xl bg-[#0f7f79] px-6 text-xs font-bold text-white hover:bg-[#096c67]"
+                  className="h-10 rounded-xl bg-primary px-6 text-xs font-bold text-primary-foreground hover:bg-primary/90"
                 >
                   {changingPassword ? (
                     <>

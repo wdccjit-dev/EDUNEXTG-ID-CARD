@@ -35,6 +35,7 @@ export type ApiTemplate = {
   status: string;
   accent: "teal" | "coral" | "indigo" | "yellow";
   orientation?: "portrait" | "landscape";
+  cardType?: "student" | "staff";
   cardWidth?: number;
   cardHeight?: number;
   elements?: ApiTemplateElement[];
@@ -190,6 +191,7 @@ export type ApiRemovedCard = {
   removedByName?: string | null;
   removedByRole?: string | null;
   removedAt: string;
+  cardType?: "student" | "staff" | null;
 };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -227,7 +229,7 @@ export const api = {
     list: () => request<ApiUser[]>("/api/users"),
     create: (body: Partial<ApiUser> & { openId?: string; password?: string }) => request<ApiUser>("/api/users", json(body)),
     update: (id: number, body: Partial<ApiUser>) => request<ApiUser>(`/api/users/${id}`, put(body)),
-    setStatus: (id: number, isActive: boolean) => request<void>(`/api/users/${id}/status`, json({ isActive })),
+    delete: (id: number) => request<void>(`/api/users/${id}`, { method: "DELETE" }),
   },
   templates: {
     list: () => request<ApiTemplate[]>("/api/templates"),
@@ -292,10 +294,11 @@ export const api = {
     },
   },
   requests: {
-    downloadExampleExcel: async (params?: { schoolId?: number; templateId?: number }) => {
+    downloadExampleExcel: async (params?: { schoolId?: number; templateId?: number; cardType?: string }) => {
       const sp = new URLSearchParams();
       if (params?.schoolId) sp.set("schoolId", String(params.schoolId));
       if (params?.templateId) sp.set("templateId", String(params.templateId));
+      if (params?.cardType) sp.set("cardType", params.cardType);
       const qs = sp.toString();
       const res = await fetch(`/api/id-card-requests/example-excel${qs ? `?${qs}` : ""}`, {
         credentials: "include",
@@ -311,6 +314,29 @@ export const api = {
         total: number;
         errors?: Array<{ rowNumber: number; reason: string }>;
       }>("/api/id-card-requests/upload-excel", json(body)),
+    bulkUploadPhotos: (body: {
+      schoolId?: number;
+      zipBase64?: string;
+      images?: Array<{ filename: string; dataBase64: string; contentType?: string }>;
+      dryRun?: boolean;
+    }) =>
+      request<{
+        success: true;
+        total: number;
+        matched: number;
+        unmatched: number;
+        results: Array<{
+          filename: string;
+          identifier: string;
+          matched: boolean;
+          cardId?: number;
+          cardNumber?: string;
+          name?: string;
+          isStaff?: boolean;
+          photoUrl?: string;
+          reason?: string;
+        }>;
+      }>("/api/id-card-requests/bulk-upload-photos", json(body)),
   },
   approvals: {
     list: (params?: { status?: string }) => {
@@ -390,11 +416,13 @@ export const api = {
       search?: string;
       from?: string;
       to?: string;
+      cardType?: "student" | "staff";
     }) => {
       const qs = new URLSearchParams();
       if (params?.page) qs.set("page", String(params.page));
       if (params?.pageSize) qs.set("pageSize", String(params.pageSize));
       if (params?.schoolId) qs.set("schoolId", String(params.schoolId));
+      if (params?.cardType) qs.set("cardType", params.cardType);
       if (params?.className && params.className !== "ALL") qs.set("className", params.className);
       if (params?.section && params.section !== "ALL") qs.set("section", params.section);
       if (params?.search) qs.set("search", params.search);
@@ -407,8 +435,10 @@ export const api = {
         page: number;
         pageSize: number;
         totalPages: number;
-        classCounts: Record<string, number>;
-        sectionCounts: Record<string, number>;
+        classCounts?: Record<string, number> | Array<{ className: string; count: number }>;
+        sectionCounts?: Record<string, number> | Array<{ section: string; count: number }>;
+        classes?: string[];
+        sections?: string[];
       }>(`/api/reports/removed-cards${q ? `?${q}` : ""}`);
     },
     exportRemovedCardsCsv: (params?: {
@@ -418,9 +448,11 @@ export const api = {
       search?: string;
       from?: string;
       to?: string;
+      cardType?: "student" | "staff";
     }) => {
       const qs = new URLSearchParams();
       if (params?.schoolId) qs.set("schoolId", String(params.schoolId));
+      if (params?.cardType) qs.set("cardType", params.cardType);
       if (params?.className && params.className !== "ALL") qs.set("className", params.className);
       if (params?.section && params.section !== "ALL") qs.set("section", params.section);
       if (params?.search) qs.set("search", params.search);

@@ -1,7 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-@custom-variant dark (&:is(.dark *));
+@custom-variant dark (&:is(.dark, .dark *));
 
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
@@ -40,6 +40,13 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-text-strong: var(--text-strong);
+  --color-text-muted: var(--text-muted);
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-danger: var(--danger);
 }
 
 :root {
@@ -76,9 +83,18 @@
   --sidebar-accent-foreground: #ffffff;
   --sidebar-border: #294344;
   --sidebar-ring: #43b9ad;
+  --surface: #fffefa;
+  --surface-muted: #f7f6f2;
+  --text-strong: #182326;
+  --text-muted: #72807e;
+  --brand: #0f7f79;
+  --brand-hover: #096c67;
+  --danger: #c9554e;
 }
 
 .dark {
+  --primary: #25a89f;
+  --primary-foreground: #ffffff;
   --background: #102728;
   --foreground: #eaf4f0;
   --card: #173534;
@@ -100,6 +116,13 @@
   --sidebar-accent-foreground: #ffffff;
   --sidebar-border: #294344;
   --sidebar-ring: #43b9ad;
+  --surface: #173534;
+  --surface-muted: #102728;
+  --text-strong: #eaf4f0;
+  --text-muted: #a6c0bb;
+  --brand: #40c8bb;
+  --brand-hover: #2db3a6;
+  --danger: #e06c65;
 }
 
 @layer base {
@@ -143,4 +166,79 @@ button:active:not(:disabled) { transform: scale(0.97); }
   [data-slot="dialog-content"] { max-height: calc(100dvh - 1rem); border-radius: 1rem; }
   [data-slot="dialog-footer"] { flex-direction: column-reverse; align-items: stretch; }
   [data-slot="dialog-footer"] > button { width: 100%; }
+}
+
+/* Explicit high-contrast order status badges for dark and light mode */
+.status-badge-placed {
+  background-color: #eff6ff;
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+}
+.dark .status-badge-placed,
+.dark-theme .status-badge-placed {
+  background-color: rgba(30, 58, 138, 0.45) !important;
+  color: #93c5fd !important;
+  border-color: rgba(59, 130, 246, 0.5) !important;
+}
+
+.status-badge-confirmed {
+  background-color: #faf5ff;
+  color: #7e22ce;
+  border-color: #e9d5ff;
+}
+.dark .status-badge-confirmed,
+.dark-theme .status-badge-confirmed {
+  background-color: rgba(88, 28, 135, 0.45) !important;
+  color: #d8b4fe !important;
+  border-color: rgba(168, 85, 247, 0.5) !important;
+}
+
+.status-badge-in_production {
+  background-color: #fffbeb;
+  color: #b45309;
+  border-color: #fde68a;
+}
+.dark .status-badge-in_production,
+.dark-theme .status-badge-in_production {
+  background-color: rgba(120, 53, 15, 0.5) !important;
+  color: #fcd34d !important;
+  border-color: rgba(245, 158, 11, 0.55) !important;
+  font-weight: 700 !important;
+}
+
+.status-badge-dispatched {
+  background-color: #eef2ff;
+  color: #4338ca;
+  border-color: #c7d2fe;
+}
+.dark .status-badge-dispatched,
+.dark-theme .status-badge-dispatched {
+  background-color: rgba(49, 46, 129, 0.45) !important;
+  color: #a5b4fc !important;
+  border-color: rgba(99, 102, 241, 0.5) !important;
+}
+
+.status-badge-delivered {
+  background-color: #ecfdf5;
+  color: #047857;
+  border-color: #a7f3d0;
+}
+.dark .status-badge-delivered,
+.dark-theme .status-badge-delivered {
+  background-color: rgba(6, 78, 59, 0.45) !important;
+  color: #6ee7b7 !important;
+  border-color: rgba(16, 185, 129, 0.5) !important;
+}
+
+.status-badge-cancelled {
+  background-color: #fef2f2;
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+.dark .status-badge-cancelled,
+.dark-theme .status-badge-cancelled {
+  background-color: rgba(136, 19, 55, 0.5) !important;
+  color: #fda4af !important;
+  border-color: rgba(244, 63, 94, 0.55) !important;
+  font-weight: 700 !important;
 }

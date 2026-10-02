@@ -11,29 +11,35 @@ import {
   Braces,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import type { DesignerElementType } from "@shared/templateDesigner";
+import type { DesignerElementType, CardType } from "@shared/templateDesigner";
 import type { DesignerAction } from "./useDesignerState";
 
-const elementItems: { type: DesignerElementType; label: string; icon: typeof Type; group: string }[] = [
-  { type: "TEXT", label: "Text", icon: Type, group: "Content" },
-  { type: "DYNAMIC_FIELD", label: "Dynamic Field", icon: Braces, group: "Content" },
-  { type: "IMAGE", label: "Image", icon: Image, group: "Media" },
-  { type: "PHOTO", label: "Student Photo", icon: Camera, group: "Media" },
-  { type: "LOGO", label: "School Logo", icon: School, group: "Media" },
-  { type: "SIGNATURE", label: "Signature", icon: PenTool, group: "Media" },
-  { type: "QR_CODE", label: "QR Code", icon: QrCode, group: "Codes" },
-  { type: "BARCODE", label: "Barcode", icon: Barcode, group: "Codes" },
-  { type: "RECTANGLE", label: "Rectangle", icon: Square, group: "Shapes" },
-  { type: "LINE", label: "Line", icon: Minus, group: "Shapes" },
-];
+function getElementItems(cardType: CardType): { type: DesignerElementType; label: string; icon: typeof Type; group: string }[] {
+  const isStaff = cardType === "staff";
+  return [
+    { type: "TEXT", label: "Text", icon: Type, group: "Content" },
+    { type: "DYNAMIC_FIELD", label: "Dynamic Field", icon: Braces, group: "Content" },
+    { type: "IMAGE", label: "Image", icon: Image, group: "Media" },
+    { type: "PHOTO", label: isStaff ? "Staff Photo" : "Student Photo", icon: Camera, group: "Media" },
+    { type: "LOGO", label: isStaff ? "Institution Logo" : "School Logo", icon: School, group: "Media" },
+    { type: "SIGNATURE", label: "Signature", icon: PenTool, group: "Media" },
+    { type: "QR_CODE", label: "QR Code", icon: QrCode, group: "Codes" },
+    { type: "BARCODE", label: "Barcode", icon: Barcode, group: "Codes" },
+    { type: "RECTANGLE", label: "Rectangle", icon: Square, group: "Shapes" },
+    { type: "LINE", label: "Line", icon: Minus, group: "Shapes" },
+  ];
+}
 
 const groups = ["Content", "Media", "Codes", "Shapes"] as const;
 
 interface ElementPaletteProps {
   dispatch: React.Dispatch<DesignerAction>;
+  cardType?: CardType;
 }
 
-export default function ElementPalette({ dispatch }: ElementPaletteProps) {
+export default function ElementPalette({ dispatch, cardType = "student" }: ElementPaletteProps) {
+  const elementItems = getElementItems(cardType);
+
   return (
     <div className="flex w-[72px] flex-col border-r border-[#e0e6e1] bg-[#fafaf8]">
       <div className="px-2 pb-1 pt-3 text-center text-[9px] font-bold uppercase tracking-[0.14em] text-[#98a4a1]">

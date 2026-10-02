@@ -564,4 +564,79 @@ describe("EDUNEXTG ID Card Updates End-to-End Suite", () => {
       expect(updatedCard.printedAt).toBeDefined();
     });
   });
+
+  describe("6. Student vs Staff Templates & Excel Workflows", () => {
+    it("provides distinct dynamic fields for student vs staff card types", () => {
+      const studentFields = getAvailableDynamicFields([], "student");
+      const staffFields = getAvailableDynamicFields([], "staff");
+
+      const studentKeys = studentFields.map((f) => f.key);
+      const staffKeys = staffFields.map((f) => f.key);
+
+      expect(studentKeys).toContain("student_name");
+      expect(studentKeys).toContain("admission_number");
+      expect(studentKeys).not.toContain("department");
+      expect(studentKeys).not.toContain("designation");
+
+      expect(staffKeys).toContain("staff_name");
+      expect(staffKeys).toContain("employee_id");
+      expect(staffKeys).toContain("department");
+      expect(staffKeys).toContain("designation");
+    });
+
+    it("downloads student example excel with student columns via API", async () => {
+      const res = await fetch(`${baseUrl}/api/id-card-requests/example-excel?cardType=student`, {
+        headers: { Authorization: `Bearer ${adminToken}` },
+      });
+      expect(res.status).toBe(200);
+      const disposition = res.headers.get("content-disposition");
+      expect(disposition).toContain("student");
+
+      const buf = Buffer.from(await res.arrayBuffer());
+      const wb = xlsx.read(buf, { type: "buffer" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows: any[][] = xlsx.utils.sheet_to_json(ws, { header: 1 });
+      const headers = rows[0] as string[];
+      expect(headers).toContain("Student Name");
+      expect(headers).toContain("Admission Number");
+    });
+
+    it("downloads staff example excel with staff columns via API", async () => {
+      const res = await fetch(`${baseUrl}/api/id-card-requests/example-excel?cardType=staff`, {
+        headers: { Authorization: `Bearer ${adminToken}` },
+      });
+      expect(res.status).toBe(200);
+      const disposition = res.headers.get("content-disposition");
+      expect(disposition).toContain("staff");
+
+      const buf = Buffer.from(await res.arrayBuffer());
+      const wb = xlsx.read(buf, { type: "buffer" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows: any[][] = xlsx.utils.sheet_to_json(ws, { header: 1 });
+      const headers = rows[0] as string[];
+      expect(headers).toContain("Staff Name");
+      expect(headers).toContain("Department");
+      expect(headers).toContain("Designation");
+      expect(headers).toContain("Employee ID");
+    });
+
+    it("successfully parses staff Excel data with Department and Designation", () => {
+      const staffFields = getAvailableDynamicFields([], "staff");
+      const wb = xlsx.utils.book_new();
+      const ws = xlsx.utils.aoa_to_sheet([
+        ["Staff Name", "Employee ID", "Department", "Designation", "Phone"],
+        ["Dr. Priya Sharma", "EMP-1001", "Mathematics", "Senior Professor", "9876543210"],
+      ]);
+      xlsx.utils.book_append_sheet(wb, ws, "Staff");
+      const buf = xlsx.write(wb, { type: "buffer", bookType: "xlsx" });
+
+      const parsed = parseExcelBuffer(buf, staffFields);
+      expect(parsed.errors).toHaveLength(0);
+      expect(parsed.rows).toHaveLength(1);
+      expect(parsed.rows[0].studentName).toBe("Dr. Priya Sharma");
+      expect(parsed.rows[0].admissionCode).toBe("EMP-1001");
+      expect(parsed.rows[0].data["department"]).toBe("Mathematics");
+      expect(parsed.rows[0].data["designation"]).toBe("Senior Professor");
+    });
+  });
 });

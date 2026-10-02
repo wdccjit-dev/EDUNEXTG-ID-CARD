@@ -1,0 +1,1 @@
+ALTER TABLE `idCardTemplates` ADD `cardType` enum('student','staff') DEFAULT 'student' NOT NULL;

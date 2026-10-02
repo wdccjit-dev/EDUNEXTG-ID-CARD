@@ -52,6 +52,25 @@ export default function DesignerToolbar({ state, dispatch, onSave, onPreview, on
 
         <div className="h-6 w-px bg-[#e0e6e1]" />
 
+        {/* Card type toggle — Student / Staff */}
+        <div className="flex rounded-lg border border-[#e0e6e1] bg-[#f7f6f2] p-0.5">
+          {(["student", "staff"] as const).map((ct) => (
+            <button
+              key={ct}
+              onClick={() => dispatch({ type: "UPDATE_TEMPLATE", changes: { cardType: ct } })}
+              className={`capitalize rounded-md px-3 py-1 text-xs font-bold transition-all ${
+                state.template.cardType === ct
+                  ? "bg-[#6d28d9] text-white shadow-sm"
+                  : "text-[#778381] hover:text-[#1f3733]"
+              }`}
+            >
+              {ct}
+            </button>
+          ))}
+        </div>
+
+        <div className="h-6 w-px bg-[#e0e6e1]" />
+
         {/* Orientation toggle */}
         <div className="flex rounded-lg border border-[#e0e6e1] bg-[#f7f6f2] p-0.5">
           {(["landscape", "portrait"] as const).map((orient) => (

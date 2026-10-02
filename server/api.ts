@@ -1,6 +1,6 @@
 import path from "node:path";
 import { Router, type NextFunction, type Request, type Response } from "express";
-import { and, desc, eq, gte, inArray, isNull, like, lte, ne, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, like, lte, ne, or, sql } from "drizzle-orm";
 import {
   approvalHistory,
   auditLogs,
@@ -23,6 +23,7 @@ import {
 } from "../drizzle/schema";
 import { getDb } from "./db";
 import { ENV } from "./_core/env";
+import { checkAccountLockout, recordAccountLoginFailure, resetAccountLoginFailure } from "./_core/rateLimit";
 import { authenticateApplicationRequest, clearApplicationSession, createPasswordReset, hashPassword, loginUser, resetPassword, setApplicationSession, signApplicationSession, verifyPassword } from "./appAuth";
 import { generateSingleCardPdf, generateBulkCardPdf, type CardPdfData, type PrintPdfOptions } from "./pdf";
 import { isValidIndianMobileNumber, INDIAN_MOBILE_ERROR_MESSAGE } from "../shared/types";
@@ -30,6 +31,7 @@ import { generateExampleExcelBuffer, parseExcelBuffer } from "./excel";
 import { getAvailableDynamicFields } from "../shared/templateDesigner";
 import { DEFAULT_TEMPLATE_CARD_SIZE } from "../shared/printLayout";
 import { HOOK_TYPES, CARD_MATERIALS, ORDER_TYPES, PRINT_SIDES, ORDER_STATUSES, type OrderStatus } from "../shared/orders";
+import { processBulkPhotoUpload } from "./bulkPhotos";
 
 const router = Router();
 const adminRoles = new Set(["SUPER_ADMIN"]);
@@ -195,8 +197,19 @@ router.post("/auth/login", async (req, res) => {
     const identifier = String(req.body.username ?? req.body.email ?? "").trim();
     const password = String(req.body.password ?? "");
     if (!identifier || password.length < 8) return res.status(400).json({ error: "Valid username/email and password are required" });
+
+    const lockout = checkAccountLockout(identifier);
+    if (lockout.locked) {
+      res.setHeader("Retry-After", lockout.retryAfterSeconds);
+      return res.status(429).json({ error: "Too many requests. Please try again later." });
+    }
+
     const result = await loginUser(identifier, password);
-    if (!result) return res.status(401).json({ error: "Invalid username or password" });
+    if (!result) {
+      recordAccountLoginFailure(identifier);
+      return res.status(401).json({ error: "Invalid username or password" });
+    }
+    resetAccountLoginFailure(identifier);
     setApplicationSession(res, result.token);
     const { passwordHash: _passwordHash, ...safeUser } = result.user;
     const db = await getDb();
@@ -899,9 +912,22 @@ router.put("/users/:id", requireRole(adminRoles), async (req, res) => {
     const id = Number(req.params.id);
     const target = (await db.select().from(users).where(eq(users.id, id)))[0];
     if (!target) return res.status(404).json({ error: "User not found" });
+
     const nextSchoolId = req.body.schoolId !== undefined ? (req.body.schoolId ? Number(req.body.schoolId) : null) : target.schoolId;
-    await db.update(users).set({ name: req.body.name, email: req.body.email, role: req.body.role, schoolId: nextSchoolId }).where(eq(users.id, id));
-    await audit(actor, "UPDATE_USER", "user", id, target.schoolId, req.body);
+    const updateData: Record<string, any> = {
+      name: req.body.name,
+      email: req.body.email,
+      role: req.body.role,
+      schoolId: nextSchoolId,
+      updatedAt: new Date(),
+    };
+
+    if (req.body.password && String(req.body.password).trim().length >= 8) {
+      updateData.passwordHash = await hashPassword(String(req.body.password).trim());
+    }
+
+    await db.update(users).set(updateData).where(eq(users.id, id));
+    await audit(actor, "UPDATE_USER", "user", id, target.schoolId, { ...req.body, password: req.body.password ? "[REDACTED]" : undefined });
     res.json(safeUser((await db.select().from(users).where(eq(users.id, id)))[0]));
   } catch (e) { fail(res, e); }
 });
@@ -926,10 +952,19 @@ router.delete("/users/:id", requireRole(adminRoles), async (req, res) => {
     const db = await getDb();
     if (!db) return res.status(503).json({ error: "Database not available" });
     const id = Number(req.params.id);
+
+    if (actor.id === id) {
+      return res.status(400).json({ error: "You cannot delete your own account." });
+    }
+
     const target = (await db.select().from(users).where(eq(users.id, id)))[0];
     if (!target) return res.status(404).json({ error: "User not found" });
+
+    // Clean up dependent records referencing this user before deleting
+    await db.delete(notifications).where(eq(notifications.userId, id));
+    await db.delete(auditLogs).where(eq(auditLogs.userId, id));
     await db.delete(users).where(eq(users.id, id));
-    await audit(actor, "DELETE_USER", "user", id, target.schoolId);
+    await audit(actor, "DELETE_USER", "user", id, target.schoolId, { openId: target.openId, name: target.name, role: target.role });
     res.status(204).end();
   } catch (e) { fail(res, e); }
 });
@@ -972,6 +1007,7 @@ router.post("/templates", requireRole(adminRoles), async (req, res) => {
       status: req.body.status ?? "DRAFT",
       accent: req.body.accent ?? "teal",
       orientation: req.body.orientation ?? "portrait",
+      cardType: req.body.cardType ?? "student",
       cardWidth: req.body.cardWidth ? Number(req.body.cardWidth) : DEFAULT_TEMPLATE_CARD_SIZE.width,
       cardHeight: req.body.cardHeight ? Number(req.body.cardHeight) : DEFAULT_TEMPLATE_CARD_SIZE.height,
       createdByUserId: currentUser(res).id,
@@ -1044,6 +1080,7 @@ router.put("/templates/:id", requireRole(adminRoles), async (req, res) => {
     if (req.body.accent !== undefined) updateSet.accent = req.body.accent;
     if (req.body.status !== undefined) updateSet.status = req.body.status;
     if (req.body.orientation !== undefined) updateSet.orientation = req.body.orientation;
+    if (req.body.cardType !== undefined) updateSet.cardType = req.body.cardType;
     if (req.body.cardWidth !== undefined) updateSet.cardWidth = Number(req.body.cardWidth);
     if (req.body.cardHeight !== undefined) updateSet.cardHeight = Number(req.body.cardHeight);
     if (Object.keys(updateSet).length) await db.update(idCardTemplates).set(updateSet).where(eq(idCardTemplates.id, id));
@@ -1659,7 +1696,7 @@ router.get("/id-cards/:id", async (req, res) => {
         .from(approvalHistory)
         .leftJoin(users, eq(approvalHistory.actedByUserId, users.id))
         .where(eq(approvalHistory.idCardId, card.id))
-        .orderBy(desc(approvalHistory.createdAt));
+        .orderBy(asc(approvalHistory.id));
     }
 
     const dataMap: Record<string, string> = {};
@@ -2489,7 +2526,7 @@ router.post("/id-cards/bulk-remove-approved", requireRole(schoolManagerRoles), a
       return res.status(400).json({ error: "No valid card IDs provided" });
     }
 
-    // Fetch candidate cards with template names
+    // Fetch candidate cards with template names and cardType
     const candidateCards = await db
       .select({
         id: idCards.id,
@@ -2498,6 +2535,7 @@ router.post("/id-cards/bulk-remove-approved", requireRole(schoolManagerRoles), a
         status: idCards.status,
         templateId: idCards.templateId,
         templateName: idCardTemplates.name,
+        cardType: idCardTemplates.cardType,
       })
       .from(idCards)
       .leftJoin(idCardTemplates, eq(idCards.templateId, idCardTemplates.id))
@@ -2558,8 +2596,13 @@ router.post("/id-cards/bulk-remove-approved", requireRole(schoolManagerRoles), a
       // Insert snapshots into removed_cards_history
       for (const card of removableCards) {
         const cData = dataByCardId.get(card.id) || {};
-        const studentName = cData["studentname"] || cData["student_name"] || cData["name"] || "";
-        const className = cData["classname"] || cData["class_name"] || cData["class"] || "";
+        const isStaff = card.cardType === "staff" || Boolean(cData["employee_id"] || cData["employeeid"] || cData["staff_name"] || cData["staffname"]);
+        const studentName = isStaff
+          ? (cData["staff_name"] || cData["staffname"] || cData["name"] || cData["studentname"] || cData["student_name"] || "")
+          : (cData["studentname"] || cData["student_name"] || cData["name"] || "");
+        const className = isStaff
+          ? (cData["designation"] || cData["department"] || cData["dept"] || cData["classname"] || cData["class_name"] || cData["class"] || "")
+          : (cData["classname"] || cData["class_name"] || cData["class"] || "");
         const section = cData["section"] || "";
 
         await tx.insert(removedCardsHistory).values({
@@ -3132,6 +3175,14 @@ router.get("/reports/removed-cards", requireRole(schoolManagerRoles), async (req
       conditions.push(eq(removedCardsHistory.schoolId, user.schoolId));
     }
 
+    // Card Type scoping: 'student' or 'staff'
+    const cardTypeFilter = req.query.cardType === "staff" ? "staff" : req.query.cardType === "student" ? "student" : null;
+    if (cardTypeFilter === "staff") {
+      conditions.push(eq(idCardTemplates.cardType, "staff"));
+    } else if (cardTypeFilter === "student") {
+      conditions.push(or(eq(idCardTemplates.cardType, "student"), isNull(idCardTemplates.cardType)));
+    }
+
     if (req.query.className) {
       conditions.push(eq(removedCardsHistory.className, String(req.query.className).trim()));
     }
@@ -3168,6 +3219,8 @@ router.get("/reports/removed-cards", requireRole(schoolManagerRoles), async (req
     const [countResult] = await db
       .select({ total: sql<number>`count(*)` })
       .from(removedCardsHistory)
+      .leftJoin(idCards, eq(removedCardsHistory.idCardId, idCards.id))
+      .leftJoin(idCardTemplates, eq(idCards.templateId, idCardTemplates.id))
       .where(whereClause);
     const total = Number(countResult?.total ?? 0);
 
@@ -3187,31 +3240,52 @@ router.get("/reports/removed-cards", requireRole(schoolManagerRoles), async (req
         removedByName: removedCardsHistory.removedByName,
         removedByRole: removedCardsHistory.removedByRole,
         removedAt: removedCardsHistory.removedAt,
+        cardType: idCardTemplates.cardType,
       })
       .from(removedCardsHistory)
       .leftJoin(schools, eq(removedCardsHistory.schoolId, schools.id))
+      .leftJoin(idCards, eq(removedCardsHistory.idCardId, idCards.id))
+      .leftJoin(idCardTemplates, eq(idCards.templateId, idCardTemplates.id))
       .where(whereClause)
       .orderBy(desc(removedCardsHistory.removedAt));
 
     // CSV export
     if (req.query.export === "csv" || req.query.format === "csv") {
       const allRows = await baseQuery;
-      const headers = ["#", "Card No", "Student Name", "Class", "Section", "School", "Template", "Previous Status", "Removed By", "Removed On"];
-      const csvRows = allRows.map((r, i) => [
-        i + 1,
-        `"${(r.cardNumber || "").replace(/"/g, '""')}"`,
-        `"${(r.studentName || "").replace(/"/g, '""')}"`,
-        `"${(r.className || "").replace(/"/g, '""')}"`,
-        `"${(r.section || "").replace(/"/g, '""')}"`,
-        `"${(r.schoolName || "").replace(/"/g, '""')}"`,
-        `"${(r.templateName || "").replace(/"/g, '""')}"`,
-        `"${(r.previousStatus || "").replace(/"/g, '""')}"`,
-        `"${(r.removedByName || "").replace(/"/g, '""')}"`,
-        `"${r.removedAt ? new Date(r.removedAt).toISOString() : ""}"`,
-      ].join(","));
+      const isStaffCsv = cardTypeFilter === "staff";
+      const headers = isStaffCsv
+        ? ["#", "Card No", "Staff Name", "Designation/Department", "School", "Template", "Previous Status", "Removed By", "Removed On"]
+        : ["#", "Card No", "Student Name", "Class", "Section", "School", "Template", "Previous Status", "Removed By", "Removed On"];
+      const csvRows = allRows.map((r, i) => {
+        if (isStaffCsv) {
+          return [
+            i + 1,
+            `"${(r.cardNumber || "").replace(/"/g, '""')}"`,
+            `"${(r.studentName || "").replace(/"/g, '""')}"`,
+            `"${(r.className || "").replace(/"/g, '""')}"`,
+            `"${(r.schoolName || "").replace(/"/g, '""')}"`,
+            `"${(r.templateName || "").replace(/"/g, '""')}"`,
+            `"${(r.previousStatus || "").replace(/"/g, '""')}"`,
+            `"${(r.removedByName || "").replace(/"/g, '""')}"`,
+            `"${r.removedAt ? new Date(r.removedAt).toISOString() : ""}"`,
+          ].join(",");
+        }
+        return [
+          i + 1,
+          `"${(r.cardNumber || "").replace(/"/g, '""')}"`,
+          `"${(r.studentName || "").replace(/"/g, '""')}"`,
+          `"${(r.className || "").replace(/"/g, '""')}"`,
+          `"${(r.section || "").replace(/"/g, '""')}"`,
+          `"${(r.schoolName || "").replace(/"/g, '""')}"`,
+          `"${(r.templateName || "").replace(/"/g, '""')}"`,
+          `"${(r.previousStatus || "").replace(/"/g, '""')}"`,
+          `"${(r.removedByName || "").replace(/"/g, '""')}"`,
+          `"${r.removedAt ? new Date(r.removedAt).toISOString() : ""}"`,
+        ].join(",");
+      });
       const csvContent = [headers.join(","), ...csvRows].join("\n");
       res.setHeader("Content-Type", "text/csv; charset=utf-8");
-      res.setHeader("Content-Disposition", `attachment; filename="removed_cards_history_${Date.now()}.csv"`);
+      res.setHeader("Content-Disposition", `attachment; filename="removed_${cardTypeFilter || "all"}_cards_history_${Date.now()}.csv"`);
       return res.send(csvContent);
     }
 
@@ -3223,11 +3297,21 @@ router.get("/reports/removed-cards", requireRole(schoolManagerRoles), async (req
     const items = await baseQuery.limit(pageSize).offset(offset);
 
     // Summary strip counts
-    const summaryScope = adminRoles.has(user.role) && req.query.schoolId
-      ? eq(removedCardsHistory.schoolId, Number(req.query.schoolId))
-      : user.schoolId
-      ? eq(removedCardsHistory.schoolId, user.schoolId)
-      : undefined;
+    const summaryConditions: any[] = [];
+    if (adminRoles.has(user.role)) {
+      if (req.query.schoolId) {
+        summaryConditions.push(eq(removedCardsHistory.schoolId, Number(req.query.schoolId)));
+      }
+    } else if (user.schoolId) {
+      summaryConditions.push(eq(removedCardsHistory.schoolId, user.schoolId));
+    }
+    if (cardTypeFilter === "staff") {
+      summaryConditions.push(eq(idCardTemplates.cardType, "staff"));
+    } else if (cardTypeFilter === "student") {
+      summaryConditions.push(or(eq(idCardTemplates.cardType, "student"), isNull(idCardTemplates.cardType)));
+    }
+
+    const summaryWhere = summaryConditions.length > 0 ? and(...summaryConditions) : undefined;
 
     const summaryRows = await db
       .select({
@@ -3235,7 +3319,9 @@ router.get("/reports/removed-cards", requireRole(schoolManagerRoles), async (req
         section: removedCardsHistory.section,
       })
       .from(removedCardsHistory)
-      .where(summaryScope);
+      .leftJoin(idCards, eq(removedCardsHistory.idCardId, idCards.id))
+      .leftJoin(idCardTemplates, eq(idCards.templateId, idCardTemplates.id))
+      .where(summaryWhere);
 
     const classSet = new Set<string>();
     const sectionSet = new Set<string>();
@@ -3387,12 +3473,20 @@ router.get("/id-card-requests/example-excel", async (req, res) => {
       }
     }
 
+    // Determine cardType: from query param, template, or default
+    let cardType: "student" | "staff" = (req.query.cardType as string) === "staff" ? "staff" : "student";
+    if (!req.query.cardType && templateId) {
+      const tmplRow = (await db.select().from(idCardTemplates).where(eq(idCardTemplates.id, templateId)))[0] as any;
+      if (tmplRow?.cardType === "staff") cardType = "staff";
+    }
+
     // Dynamic field list driven by designer/template configuration
-    const availableFields = getAvailableDynamicFields(elements);
+    const availableFields = getAvailableDynamicFields(elements, cardType);
     const excelBuffer = generateExampleExcelBuffer(availableFields);
 
+    const fileLabel = cardType === "staff" ? "staff" : "student";
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-    res.setHeader("Content-Disposition", `attachment; filename="id_card_requests_template.xlsx"`);
+    res.setHeader("Content-Disposition", `attachment; filename="id_card_requests_${fileLabel}_template.xlsx"`);
     res.setHeader("Content-Length", excelBuffer.length);
     res.end(excelBuffer);
   } catch (e) {
@@ -3461,7 +3555,7 @@ router.post("/id-card-requests/upload-excel", requireRole(schoolWriteRoles), asy
     }
 
     const tmplElements = await db.select().from(templateElements).where(eq(templateElements.templateId, templateId));
-    const availableFields = getAvailableDynamicFields(tmplElements);
+    const availableFields = getAvailableDynamicFields(tmplElements, (template as any)?.cardType || "student");
 
     // Decode base64 buffer
     let fileBuffer: Buffer;
@@ -3595,6 +3689,63 @@ router.post("/id-card-requests/upload-excel", requireRole(schoolWriteRoles), asy
     fail(res, e);
   }
 });
+
+router.post(
+  ["/id-card-requests/bulk-upload-photos", "/id-cards/bulk-upload-photos"],
+  requireRole(schoolWriteRoles),
+  async (req, res) => {
+    try {
+      const user = currentUser(res);
+      const db = await getDb();
+      if (!db) return res.status(503).json({ error: "Database not available" });
+
+      // RBAC and multi-tenant isolation
+      let schoolId: number;
+      if (adminRoles.has(user.role)) {
+        schoolId = Number(req.body.schoolId);
+        if (!schoolId) {
+          return res.status(400).json({ error: "School ID is required for photo upload" });
+        }
+      } else {
+        if (!user.schoolId) {
+          return res.status(403).json({ error: "You are not assigned to a school" });
+        }
+        if (req.body.schoolId && Number(req.body.schoolId) !== user.schoolId) {
+          return res.status(403).json({ error: "Forbidden: You cannot upload photos for another school" });
+        }
+        schoolId = user.schoolId;
+      }
+
+      const school = (await db.select().from(schools).where(eq(schools.id, schoolId)))[0];
+      if (!school) {
+        return res.status(404).json({ error: "School not found" });
+      }
+      if (!school.isActive && !adminRoles.has(user.role)) {
+        return res.status(403).json({ error: "School is currently inactive" });
+      }
+
+      const result = await processBulkPhotoUpload(db, {
+        schoolId,
+        userId: user.id,
+        zipBase64: req.body.zipBase64,
+        images: req.body.images,
+        dryRun: Boolean(req.body.dryRun),
+      });
+
+      if (!req.body.dryRun) {
+        await audit(user, "BULK_UPLOAD_PHOTOS", "school", schoolId, schoolId, {
+          total: result.total,
+          matched: result.matched,
+          unmatched: result.unmatched,
+        });
+      }
+
+      res.json(result);
+    } catch (e: any) {
+      fail(res, e);
+    }
+  },
+);
 
 // ─── ORDERS MODULE ────────────────────────────────────────────────────────
 router.get("/orders/schools", requireRole(orderRoles), async (_req, res) => {

@@ -271,15 +271,15 @@ export default function AuditLogsSection({
   return (
     <div className="space-y-4">
       {/* Main Filter & Action Bar */}
-      <Card className="rounded-2xl border-[#e2e8e3] bg-[#fffefa] shadow-[0_12px_35px_rgba(38,71,65,0.05)] overflow-hidden">
-        <div className="p-4 sm:p-5 border-b border-[#edf0ed] space-y-3">
+      <Card className="rounded-2xl border-border bg-card text-card-foreground shadow-[0_12px_35px_rgba(38,71,65,0.05)] overflow-hidden">
+        <div className="p-4 sm:p-5 border-b border-border space-y-3">
           {/* Top Row: School Logs <-> Admin Logs Slider Toggle + Actions */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             {/* School Logs vs Admin Logs Toggle Slider */}
             <div
               role="radiogroup"
               aria-label="Audit Log Scope Selector"
-              className="relative flex items-center p-1 rounded-2xl bg-[#e3eae5] border border-[#cbd8d0] shadow-inner max-w-full overflow-x-auto [scrollbar-width:none]"
+              className="relative flex items-center p-1 rounded-2xl bg-muted border border-border shadow-inner max-w-full overflow-x-auto [scrollbar-width:none]"
             >
               {/* School Logs Button */}
               <button
@@ -290,15 +290,15 @@ export default function AuditLogsSection({
                 }}
                 className={`relative z-10 flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
                   activeMode === "school"
-                    ? "bg-[#0f7f79] text-white shadow-md font-extrabold scale-[1.02]"
-                    : "text-[#475753] hover:text-[#182326] hover:bg-black/5"
+                    ? "bg-primary text-primary-foreground shadow-md font-extrabold scale-[1.02]"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/80"
                 }`}
               >
                 <Building2 className="h-3.5 w-3.5" />
                 <span>School Logs</span>
                 <span
                   className={`ml-1 rounded-full px-2 py-0.5 text-[10px] font-mono font-bold ${
-                    activeMode === "school" ? "bg-white/25 text-white" : "bg-[#cfdbd3] text-[#34423f]"
+                    activeMode === "school" ? "bg-white/25 text-white" : "bg-muted-foreground/20 text-foreground"
                   }`}
                 >
                   {schoolLogs.length}
@@ -314,15 +314,15 @@ export default function AuditLogsSection({
                 }}
                 className={`relative z-10 flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
                   activeMode === "admin"
-                    ? "bg-[#0f7f79] text-white shadow-md font-extrabold scale-[1.02]"
-                    : "text-[#475753] hover:text-[#182326] hover:bg-black/5"
+                    ? "bg-primary text-primary-foreground shadow-md font-extrabold scale-[1.02]"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/80"
                 }`}
               >
                 <ShieldCheck className="h-3.5 w-3.5" />
                 <span>Admin Logs</span>
                 <span
                   className={`ml-1 rounded-full px-2 py-0.5 text-[10px] font-mono font-bold ${
-                    activeMode === "admin" ? "bg-white/25 text-white" : "bg-[#cfdbd3] text-[#34423f]"
+                    activeMode === "admin" ? "bg-white/25 text-white" : "bg-muted-foreground/20 text-foreground"
                   }`}
                 >
                   {adminLogs.length}
@@ -333,8 +333,8 @@ export default function AuditLogsSection({
             {/* Top Action Buttons: Marketing toggle, Export CSV & Clear logs */}
             <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
               {isAdmin && (
-                <div className="flex items-center gap-2 rounded-xl border border-[#dfe7e2] bg-[#f8faf9] px-3 py-1.5 shadow-2xs">
-                  <span className="text-xs font-bold text-[#344441]">Marketing logs</span>
+                <div className="flex items-center gap-2 rounded-xl border border-border bg-muted/40 px-3 py-1.5 shadow-2xs">
+                  <span className="text-xs font-bold text-foreground">Marketing logs</span>
                   <button
                     type="button"
                     role="switch"
@@ -344,7 +344,7 @@ export default function AuditLogsSection({
                       setPage(1);
                     }}
                     className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                      marketingOnly ? "bg-[#0f7f79]" : "bg-gray-200"
+                      marketingOnly ? "bg-primary" : "bg-muted"
                     }`}
                   >
                     <span
@@ -359,10 +359,10 @@ export default function AuditLogsSection({
               <button
                 type="button"
                 onClick={handleExportCSV}
-                className="flex items-center gap-1.5 rounded-xl border border-[#d2ddd5] bg-white px-3 py-2 text-xs font-bold text-[#445652] hover:bg-[#f6f9f7] transition-all cursor-pointer shadow-2xs"
+                className="flex items-center gap-1.5 rounded-xl border border-border bg-card px-3 py-2 text-xs font-bold text-foreground hover:bg-accent transition-all cursor-pointer shadow-2xs"
                 title="Export filtered logs to CSV"
               >
-                <Download className="h-3.5 w-3.5 text-[#0f7f79]" />
+                <Download className="h-3.5 w-3.5 text-primary" />
                 <span>Export CSV</span>
               </button>
 
@@ -381,9 +381,9 @@ export default function AuditLogsSection({
           </div>
 
           {/* Search Row */}
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pt-1 border-t border-[#f0f4f1]">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pt-1 border-t border-border">
             <div className="relative w-full sm:max-w-md">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#98a4a1]" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder={
                   activeMode === "school"
@@ -395,24 +395,24 @@ export default function AuditLogsSection({
                   setSearchQuery(e.target.value);
                   setPage(1);
                 }}
-                className="h-10 rounded-xl border-[#dce5e0] pl-9 text-xs shadow-none focus-visible:ring-1 focus-visible:ring-[#0f7f79]"
+                className="h-10 rounded-xl border-border pl-9 text-xs shadow-none focus-visible:ring-1 focus-visible:ring-primary"
               />
             </div>
           </div>
 
           {/* Filter Pills row */}
-          <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-[#f0f4f1]">
+          <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-border">
             {/* School selector dropdown for Admin viewing School Logs */}
             {isAdmin && activeMode === "school" && schools.length > 0 && (
               <div className="flex items-center gap-1.5 mr-2">
-                <span className="text-xs font-bold text-[#4e5c59]">School:</span>
+                <span className="text-xs font-bold text-foreground">School:</span>
                 <select
                   value={schoolFilter}
                   onChange={(e) => {
                     setSchoolFilter(e.target.value);
                     setPage(1);
                   }}
-                  className="h-8 rounded-lg border border-[#dce5e0] bg-white px-2.5 text-xs font-medium text-[#2d3b38] focus:outline-none focus:ring-1 focus:ring-[#0f7f79]"
+                  className="h-8 rounded-lg border border-border bg-card px-2.5 text-xs font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                 >
                   <option value="ALL">All Schools ({schools.length})</option>
                   {schools.map((s) => (
@@ -427,7 +427,7 @@ export default function AuditLogsSection({
             {/* School Activity Filter Pills */}
             {activeMode === "school" ? (
               <div className="flex flex-wrap items-center gap-1.5">
-                <span className="text-xs font-bold text-[#4e5c59] mr-1">Activity:</span>
+                <span className="text-xs font-bold text-foreground mr-1">Activity:</span>
                 {[
                   { key: "ALL", label: "All Activities" },
                   { key: "TEMPLATE_SELECTION", label: "Template Selected / Changed" },
@@ -445,8 +445,8 @@ export default function AuditLogsSection({
                     }}
                     className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-all cursor-pointer ${
                       schoolActionFilter === item.key
-                        ? "bg-[#0f7f79] text-white shadow-xs"
-                        : "bg-[#eef3f0] text-[#55605d] hover:bg-[#e2ebe6]"
+                        ? "bg-primary text-primary-foreground shadow-xs"
+                        : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
                     }`}
                   >
                     {item.label}
@@ -456,7 +456,7 @@ export default function AuditLogsSection({
             ) : (
               /* Admin Activity Filter Pills */
               <div className="flex flex-wrap items-center gap-1.5">
-                <span className="text-xs font-bold text-[#4e5c59] mr-1">Admin Domain:</span>
+                <span className="text-xs font-bold text-foreground mr-1">Admin Domain:</span>
                 {[
                   { key: "ALL", label: "All Admin Activity" },
                   { key: "TEMPLATES", label: "Templates" },
@@ -474,8 +474,8 @@ export default function AuditLogsSection({
                     }}
                     className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-all cursor-pointer ${
                       adminActionFilter === item.key
-                        ? "bg-[#0f7f79] text-white shadow-xs"
-                        : "bg-[#eef3f0] text-[#55605d] hover:bg-[#e2ebe6]"
+                        ? "bg-primary text-primary-foreground shadow-xs"
+                        : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
                     }`}
                   >
                     {item.label}
@@ -487,7 +487,7 @@ export default function AuditLogsSection({
         </div>
 
         {/* Audit Log Entries List */}
-        <div className="divide-y divide-[#edf0ed]">
+        <div className="divide-y divide-border">
           {paginatedLogs.length === 0 ? (
             <div className="px-5 py-16 text-center text-[#98a4a1]">
               <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#f4f7f5] text-[#718580]">
@@ -503,7 +503,7 @@ export default function AuditLogsSection({
               return (
                 <div
                   key={log.id}
-                  className="p-4 sm:p-4.5 hover:bg-[#fafbfa] transition-colors duration-150 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                  className="p-4 sm:p-4.5 hover:bg-muted/30 transition-colors duration-150 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                 >
                   {/* Left: Icon, Action Title & Clear Simple Details */}
                   <div className="flex items-start gap-3 min-w-0 flex-1">
@@ -513,44 +513,44 @@ export default function AuditLogsSection({
 
                     <div className="min-w-0 flex-1 space-y-1">
                       {/* Main readable statement */}
-                      <div className="text-xs sm:text-[13px] font-semibold text-[#1f2d2a] leading-snug">
+                      <div className="text-xs sm:text-[13px] font-semibold text-foreground leading-snug">
                         <RenderActionNarrative log={log} />
                       </div>
 
                       {/* Comment / Reason if available */}
                       {(nv.comment || nv.reason || nv.reviewNote) && (
-                        <div className="inline-block mt-1 text-[11px] text-[#475753] bg-[#f0f4f1] border border-[#dce5e0] px-2.5 py-0.5 rounded-md italic">
+                        <div className="inline-block mt-1 text-[11px] text-foreground bg-muted/60 border border-border px-2.5 py-0.5 rounded-md italic">
                           "{nv.comment || nv.reason || nv.reviewNote}"
                         </div>
                       )}
 
                       {/* Actor & School metadata tags */}
-                      <div className="flex flex-wrap items-center gap-2 pt-0.5 text-[11px] text-[#788884]">
+                      <div className="flex flex-wrap items-center gap-2 pt-0.5 text-[11px] text-muted-foreground">
                         {log.schoolName && (
-                          <span className="font-semibold text-[#0f7f79]">
+                          <span className="font-semibold text-primary">
                             {log.schoolName}
                           </span>
                         )}
                         {log.schoolName && <span>•</span>}
                         <span>By {log.userName || "System"}</span>
                         {log.userRole && (
-                          <span className="text-[#95a3a0]">({log.userRole.replace("_", " ")})</span>
+                          <span className="text-muted-foreground">({log.userRole.replace("_", " ")})</span>
                         )}
                       </div>
                     </div>
                   </div>
 
                   {/* Right: Clean Timestamp & Badges */}
-                  <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-1.5 shrink-0 pt-2 sm:pt-0 border-t sm:border-0 border-[#f2f4f2]">
+                  <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-1.5 shrink-0 pt-2 sm:pt-0 border-t sm:border-0 border-border">
                     <div className="flex items-center gap-1.5 flex-wrap justify-end">
                       {(log.isMarketing || log.actorRole === "MARKETING_ADMIN" || log.userRole === "MARKETING_ADMIN" || Boolean((log.newValues as any)?.placedByRole === "MARKETING_ADMIN")) && (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#e6f4f2] text-[#0f7f79] border border-[#b8dfda]">
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-primary/10 text-primary border border-primary/20">
                           Marketing
                         </span>
                       )}
                       <RenderActionBadge action={log.action} />
                     </div>
-                    <span className="text-[11px] text-[#849490] font-medium whitespace-nowrap">
+                    <span className="text-[11px] text-muted-foreground font-medium whitespace-nowrap">
                       {formatDistanceToNow(new Date(log.createdAt), { addSuffix: true })}
                     </span>
                   </div>
@@ -562,7 +562,7 @@ export default function AuditLogsSection({
 
         {/* Pagination footer */}
         {totalPages > 1 && (
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[#edf0ed] px-4 sm:px-5 py-3 text-xs text-[#637571]">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-border px-4 sm:px-5 py-3 text-xs text-muted-foreground">
             <div>
               Showing <b>{(currentPage - 1) * pageSize + 1}</b> to{" "}
               <b>{Math.min(currentPage * pageSize, filteredDataset.length)}</b> of{" "}
@@ -573,7 +573,7 @@ export default function AuditLogsSection({
                 type="button"
                 disabled={currentPage <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="rounded-lg border border-[#dce5e0] px-3 py-1 font-bold text-[#354643] hover:bg-[#f2f7f4] disabled:opacity-40 disabled:cursor-not-allowed"
+                className="rounded-lg border border-border px-3 py-1 font-bold text-foreground hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Previous
               </button>
@@ -584,7 +584,7 @@ export default function AuditLogsSection({
                 type="button"
                 disabled={currentPage >= totalPages}
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                className="rounded-lg border border-[#dce5e0] px-3 py-1 font-bold text-[#354643] hover:bg-[#f2f7f4] disabled:opacity-40 disabled:cursor-not-allowed"
+                className="rounded-lg border border-border px-3 py-1 font-bold text-foreground hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Next
               </button>

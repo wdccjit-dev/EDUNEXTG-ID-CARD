@@ -2,12 +2,16 @@ import { useEffect, useState } from "react";
 import { api, type ApiAuthUser, type ApiSchool } from "@/lib/api";
 import {
   HOOK_TYPES,
+  HOLDER_TYPES,
+  LANYARD_SIZES,
   CARD_MATERIALS,
   ORDER_TYPES,
   PRINT_SIDES,
   type OrderType,
   type PrintSides,
   type CardMaterial,
+  type HolderType,
+  type LanyardSize,
 } from "@shared/orders";
 import { isValidIndianMobileNumber } from "@shared/phoneValidation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -64,6 +68,7 @@ export default function CreateOrderView({
     isSchoolAdmin ? user.schoolId || null : null,
   );
   const [hookType, setHookType] = useState<string>("Lanyard hook");
+  const [holderType, setHolderType] = useState<HolderType>("5pp (Plastic)");
   const [clip, setClip] = useState<boolean>(true);
   const [className, setClassName] = useState<string>("");
   const [section, setSection] = useState<string>("");
@@ -72,6 +77,7 @@ export default function CreateOrderView({
   const [cardMaterial, setCardMaterial] = useState<CardMaterial>("PVC_STANDARD");
   const [lanyardIncluded, setLanyardIncluded] = useState<boolean>(true);
   const [lanyardColor, setLanyardColor] = useState<string>("Navy Blue");
+  const [lanyardSize, setLanyardSize] = useState<LanyardSize>("16mm");
   const [neededByDate, setNeededByDate] = useState<string>("");
   const [deliveryAddress, setDeliveryAddress] = useState<string>("");
   const [contactPerson, setContactPerson] = useState<string>(user.name || "");
@@ -169,7 +175,13 @@ export default function CreateOrderView({
         deliveryAddress: deliveryAddress.trim(),
         contactPerson: contactPerson.trim(),
         contactPhone: cleanPhone,
-        notes: notes.trim() || null,
+        notes: [
+          `Holder Type: ${holderType}`,
+          lanyardIncluded ? `Lanyard Width: ${lanyardSize}` : null,
+          notes.trim() || null,
+        ]
+          .filter(Boolean)
+          .join(" | "),
       });
 
       toast.success(`Order #${res.orderNumber} created successfully!`, {
@@ -200,8 +212,8 @@ export default function CreateOrderView({
             <ArrowLeft className="h-4 w-4 mr-1" /> Back
           </Button>
           <div>
-            <h1 className="text-2xl font-black text-[#152e2c]">Create New ID Card Order</h1>
-            <p className="text-xs text-[#788784] mt-0.5">
+            <h1 className="text-2xl font-black text-foreground">Create New ID Card Order</h1>
+            <p className="text-xs text-muted-foreground mt-0.5">
               Submit requirements for student or staff ID card batch printing & accessories
             </p>
           </div>
@@ -210,17 +222,17 @@ export default function CreateOrderView({
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Section 1: Order Type & School */}
-        <Card className="rounded-2xl border-[#e2e8e3] bg-white shadow-2xs">
-          <CardHeader className="border-b border-[#edf0ed] pb-3">
-            <CardTitle className="text-sm font-bold text-[#1f3634] flex items-center gap-2">
-              <Building2 className="h-4 w-4 text-[#0f7f79]" /> Order Scope & Organization
+        <Card className="rounded-2xl border-border bg-card text-card-foreground shadow-2xs">
+          <CardHeader className="border-b border-border pb-3">
+            <CardTitle className="text-sm font-bold text-foreground flex items-center gap-2">
+              <Building2 className="h-4 w-4 text-primary" /> Order Scope & Organization
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-4 space-y-4">
             {/* Segmented Control for Order Type */}
             <div>
-              <Label className="text-xs font-bold text-gray-700">Order Type *</Label>
-              <div className="grid grid-cols-2 gap-2 mt-1.5 p-1 bg-gray-100 rounded-xl max-w-sm">
+              <Label className="text-xs font-bold text-foreground">Order Type *</Label>
+              <div className="grid grid-cols-2 gap-2 mt-1.5 p-1 bg-muted rounded-xl max-w-sm">
                 {ORDER_TYPES.map((t) => (
                   <button
                     key={t.value}
@@ -234,8 +246,8 @@ export default function CreateOrderView({
                     }}
                     className={`py-2 text-xs font-bold rounded-lg transition-all ${
                       orderType === t.value
-                        ? "bg-white text-[#0f7f79] shadow-xs"
-                        : "text-gray-500 hover:text-gray-900"
+                        ? "bg-card text-primary shadow-xs"
+                        : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
                     {t.label}
@@ -246,12 +258,12 @@ export default function CreateOrderView({
 
             {/* School selection */}
             <div>
-              <Label className="text-xs font-bold text-gray-700">Target School *</Label>
+              <Label className="text-xs font-bold text-foreground">Target School *</Label>
               {isSchoolAdmin ? (
-                <div className="mt-1 flex items-center gap-2 p-2.5 rounded-xl border border-gray-200 bg-gray-50 text-xs font-bold text-gray-800">
-                  <Building2 className="h-4 w-4 text-teal-700" />
+                <div className="mt-1 flex items-center gap-2 p-2.5 rounded-xl border border-border bg-muted/40 text-xs font-bold text-foreground">
+                  <Building2 className="h-4 w-4 text-primary" />
                   {schoolDisplay}
-                  <span className="text-[10px] text-gray-400 font-normal ml-auto">(Assigned School)</span>
+                  <span className="text-[10px] text-muted-foreground font-normal ml-auto">(Assigned School)</span>
                 </div>
               ) : (
                 <div className="mt-1">
@@ -280,9 +292,9 @@ export default function CreateOrderView({
 
             {/* Class & Section (Student Only) */}
             {orderType === "STUDENT" && (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 pt-2 border-t border-gray-100">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 pt-2 border-t border-border">
                 <div>
-                  <Label className="text-xs font-bold text-gray-700">Class *</Label>
+                  <Label className="text-xs font-bold text-foreground">Class *</Label>
                   <Input
                     className="mt-1 text-xs rounded-xl"
                     placeholder="e.g. 10th or Grade 5"
@@ -294,7 +306,7 @@ export default function CreateOrderView({
                   )}
                 </div>
                 <div>
-                  <Label className="text-xs font-bold text-gray-700">Section *</Label>
+                  <Label className="text-xs font-bold text-foreground">Section *</Label>
                   <Input
                     className="mt-1 text-xs rounded-xl"
                     placeholder="e.g. A or Science"
@@ -311,17 +323,17 @@ export default function CreateOrderView({
         </Card>
 
         {/* Section 2: Card Specifications & Accessories */}
-        <Card className="rounded-2xl border-[#e2e8e3] bg-white shadow-2xs">
-          <CardHeader className="border-b border-[#edf0ed] pb-3">
-            <CardTitle className="text-sm font-bold text-[#1f3634] flex items-center gap-2">
-              <CreditCard className="h-4 w-4 text-[#0f7f79]" /> Card Specifications & Accessories
+        <Card className="rounded-2xl border-border bg-card text-card-foreground shadow-2xs">
+          <CardHeader className="border-b border-border pb-3">
+            <CardTitle className="text-sm font-bold text-foreground flex items-center gap-2">
+              <CreditCard className="h-4 w-4 text-primary" /> Card Specifications & Accessories
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-4 space-y-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               {/* Quantity */}
               <div>
-                <Label className="text-xs font-bold text-gray-700">Number of ID Cards *</Label>
+                <Label className="text-xs font-bold text-foreground">Number of ID Cards *</Label>
                 <Input
                   type="number"
                   min={1}
@@ -337,7 +349,7 @@ export default function CreateOrderView({
 
               {/* Print Sides */}
               <div>
-                <Label className="text-xs font-bold text-gray-700">Print Sides *</Label>
+                <Label className="text-xs font-bold text-foreground">Print Sides *</Label>
                 <Select
                   value={printSides}
                   onValueChange={(val: PrintSides) => setPrintSides(val)}
@@ -357,7 +369,7 @@ export default function CreateOrderView({
 
               {/* Card Material */}
               <div>
-                <Label className="text-xs font-bold text-gray-700">Card Material *</Label>
+                <Label className="text-xs font-bold text-foreground">Card Material *</Label>
                 <Select
                   value={cardMaterial}
                   onValueChange={(val: CardMaterial) => setCardMaterial(val)}
@@ -376,10 +388,27 @@ export default function CreateOrderView({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 pt-2 border-t border-gray-100">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 pt-2 border-t border-border">
+              {/* Holder Type */}
+              <div>
+                <Label className="text-xs font-bold text-foreground">Holder Type *</Label>
+                <Select value={holderType} onValueChange={(val: HolderType) => setHolderType(val)}>
+                  <SelectTrigger className="mt-1 h-10 text-xs rounded-xl">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {HOLDER_TYPES.map((ht) => (
+                      <SelectItem key={ht} value={ht}>
+                        {ht}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               {/* Hook Type */}
               <div>
-                <Label className="text-xs font-bold text-gray-700">Hook Type *</Label>
+                <Label className="text-xs font-bold text-foreground">Hook Type *</Label>
                 <Select value={hookType} onValueChange={setHookType}>
                   <SelectTrigger className="mt-1 h-10 text-xs rounded-xl">
                     <SelectValue />
@@ -395,40 +424,57 @@ export default function CreateOrderView({
               </div>
 
               {/* Clip Toggle */}
-              <div className="flex items-center justify-between rounded-xl border border-gray-200 p-3 bg-gray-50/50 mt-1">
+              <div className="flex items-center justify-between rounded-xl border border-border p-3 bg-muted/40 mt-1">
                 <div>
-                  <Label className="text-xs font-bold text-gray-800">Clip Included</Label>
-                  <p className="text-[11px] text-gray-500">Attach crocodile clip to holder</p>
+                  <Label className="text-xs font-bold text-foreground">Clip Included</Label>
+                  <p className="text-[11px] text-muted-foreground">Attach crocodile clip to holder</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-gray-600">{clip ? "Yes" : "No"}</span>
+                  <span className="text-xs font-bold text-muted-foreground">{clip ? "Yes" : "No"}</span>
                   <Switch checked={clip} onCheckedChange={setClip} />
                 </div>
               </div>
             </div>
 
             {/* Lanyard Options */}
-            <div className="rounded-xl border border-gray-200 p-3 bg-gray-50/50 space-y-3">
+            <div className="rounded-xl border border-border p-3 bg-muted/40 space-y-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <Label className="text-xs font-bold text-gray-800">Lanyard Included</Label>
-                  <p className="text-[11px] text-gray-500">Provide customized neck lanyards</p>
+                  <Label className="text-xs font-bold text-foreground">Lanyard Included</Label>
+                  <p className="text-[11px] text-muted-foreground">Provide customized neck lanyards</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-gray-600">{lanyardIncluded ? "Yes" : "No"}</span>
+                  <span className="text-xs font-bold text-muted-foreground">{lanyardIncluded ? "Yes" : "No"}</span>
                   <Switch checked={lanyardIncluded} onCheckedChange={setLanyardIncluded} />
                 </div>
               </div>
 
               {lanyardIncluded && (
-                <div className="pt-2 border-t border-gray-200">
-                  <Label className="text-xs font-bold text-gray-700">Lanyard Color</Label>
-                  <Input
-                    className="mt-1 text-xs rounded-xl bg-white"
-                    placeholder="e.g. Navy Blue, Maroon, Dark Green"
-                    value={lanyardColor}
-                    onChange={(e) => setLanyardColor(e.target.value)}
-                  />
+                <div className="pt-2 border-t border-border grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs font-bold text-foreground">Lanyard Width *</Label>
+                    <Select value={lanyardSize} onValueChange={(val: LanyardSize) => setLanyardSize(val)}>
+                      <SelectTrigger className="mt-1 h-10 text-xs rounded-xl">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {LANYARD_SIZES.map((size) => (
+                          <SelectItem key={size} value={size}>
+                            {size}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs font-bold text-foreground">Lanyard Color</Label>
+                    <Input
+                      className="mt-1 text-xs rounded-xl h-10"
+                      placeholder="e.g. Navy Blue, Maroon, Dark Green"
+                      value={lanyardColor}
+                      onChange={(e) => setLanyardColor(e.target.value)}
+                    />
+                  </div>
                 </div>
               )}
             </div>
@@ -436,17 +482,17 @@ export default function CreateOrderView({
         </Card>
 
         {/* Section 3: Delivery & Contact */}
-        <Card className="rounded-2xl border-[#e2e8e3] bg-white shadow-2xs">
-          <CardHeader className="border-b border-[#edf0ed] pb-3">
-            <CardTitle className="text-sm font-bold text-[#1f3634] flex items-center gap-2">
-              <MapPin className="h-4 w-4 text-[#0f7f79]" /> Delivery & Contact Details
+        <Card className="rounded-2xl border-border bg-card text-card-foreground shadow-2xs">
+          <CardHeader className="border-b border-border pb-3">
+            <CardTitle className="text-sm font-bold text-foreground flex items-center gap-2">
+              <MapPin className="h-4 w-4 text-primary" /> Delivery & Contact Details
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-4 space-y-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               {/* Contact Person */}
               <div>
-                <Label className="text-xs font-bold text-gray-700">Contact Person *</Label>
+                <Label className="text-xs font-bold text-foreground">Contact Person *</Label>
                 <Input
                   className="mt-1 text-xs rounded-xl"
                   placeholder="Full name"
@@ -460,9 +506,9 @@ export default function CreateOrderView({
 
               {/* Contact Phone */}
               <div>
-                <Label className="text-xs font-bold text-gray-700">Contact Phone *</Label>
+                <Label className="text-xs font-bold text-foreground">Contact Phone *</Label>
                 <div className="mt-1 flex items-center gap-1.5">
-                  <div className="h-10 w-12 flex items-center justify-center rounded-xl border border-gray-300 bg-gray-50 text-xs font-bold text-gray-600 select-none shrink-0">
+                  <div className="h-10 w-12 flex items-center justify-center rounded-xl border border-border bg-muted/40 text-xs font-bold text-muted-foreground select-none shrink-0">
                     +91
                   </div>
                   <div className="flex-1">
@@ -487,7 +533,7 @@ export default function CreateOrderView({
 
               {/* Needed By Date */}
               <div>
-                <Label className="text-xs font-bold text-gray-700">Needed By Date (Optional)</Label>
+                <Label className="text-xs font-bold text-foreground">Needed By Date (Optional)</Label>
                 <Input
                   type="date"
                   className="mt-1 text-xs rounded-xl h-10"
@@ -499,7 +545,7 @@ export default function CreateOrderView({
 
             {/* Delivery Address */}
             <div>
-              <Label className="text-xs font-bold text-gray-700">Delivery Address *</Label>
+              <Label className="text-xs font-bold text-foreground">Delivery Address *</Label>
               <Textarea
                 rows={2}
                 className="mt-1 text-xs rounded-xl"
@@ -514,7 +560,7 @@ export default function CreateOrderView({
 
             {/* Notes */}
             <div>
-              <Label className="text-xs font-bold text-gray-700">Notes / Production Instructions (Optional)</Label>
+              <Label className="text-xs font-bold text-foreground">Notes / Production Instructions (Optional)</Label>
               <Textarea
                 rows={2}
                 className="mt-1 text-xs rounded-xl"
@@ -540,7 +586,7 @@ export default function CreateOrderView({
           <Button
             type="submit"
             disabled={submitting}
-            className="rounded-xl px-6 bg-[#0f7f79] hover:bg-[#0c6b66] text-white font-bold gap-2 shadow-sm"
+            className="rounded-xl px-6 bg-primary hover:bg-primary/90 text-primary-foreground font-bold gap-2 shadow-sm"
           >
             {submitting ? (
               <>

@@ -15,12 +15,12 @@ export function ForgotPassword() {
       subtitle="Please contact your system administrator to recover or reset your account credentials."
     >
       <div className="space-y-5">
-        <div className="rounded-2xl border border-[#d6e5de] bg-[#f4f8f6] p-5 text-center">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#e1f3ed] text-[#0f7f79]">
+        <div className="rounded-2xl border border-border bg-muted/40 p-5 text-center">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
             <ShieldAlert className="h-6 w-6" />
           </div>
-          <h3 className="text-sm font-bold text-[#1f3733]">Contact Administrator</h3>
-          <p className="mt-2 text-xs leading-5 text-[#5e716e]">
+          <h3 className="text-sm font-bold text-foreground">Contact Administrator</h3>
+          <p className="mt-2 text-xs leading-5 text-muted-foreground">
             Self-service password reset is disabled. For security and credential management,
             please reach out directly to your <strong>Super Administrator</strong> to reset your login ID or password.
           </p>
@@ -29,7 +29,7 @@ export function ForgotPassword() {
         <Button
           type="button"
           onClick={() => navigate("/login")}
-          className="h-11 w-full rounded-xl bg-[#0f7f79] font-bold text-white hover:bg-[#096c67] cursor-pointer"
+          className="h-11 w-full rounded-xl bg-primary font-bold text-primary-foreground hover:bg-primary/90 cursor-pointer"
         >
           Return to Login
         </Button>
@@ -59,16 +59,16 @@ export function ResetPassword() {
   }
 
   return <AuthShell title="Reset password" subtitle={done ? "Your password has been changed." : "Choose a new password for your application account."}>
-    {done ? <Button onClick={() => navigate("/login")} className="h-11 w-full rounded-xl bg-[#0f7f79] font-bold hover:bg-[#096c67] cursor-pointer">Return to login</Button> : <form onSubmit={submit} className="space-y-4"><label className="block text-xs font-bold text-[#38514e]">Reset token<Input value={token} onChange={(event) => setToken(event.target.value)} className="mt-2 h-11 rounded-xl" /></label><label className="block text-xs font-bold text-[#38514e]">New password<Input type="password" value={password} onChange={(event) => setPassword(event.target.value)} className="mt-2 h-11 rounded-xl" autoComplete="new-password" /></label><label className="block text-xs font-bold text-[#38514e]">Confirm password<Input type="password" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} className="mt-2 h-11 rounded-xl" autoComplete="new-password" /></label><p className="text-[11px] text-[#82908e]">Use at least 8 characters. Confirmation must match.</p><Button disabled={busy} className="h-11 w-full rounded-xl bg-[#0f7f79] font-bold hover:bg-[#096c67] cursor-pointer">{busy ? "Saving…" : "Change password"}</Button></form>}
+    {done ? <Button onClick={() => navigate("/login")} className="h-11 w-full rounded-xl bg-primary font-bold text-primary-foreground hover:bg-primary/90 cursor-pointer">Return to login</Button> : <form onSubmit={submit} className="space-y-4"><label className="block text-xs font-bold text-foreground">Reset token<Input value={token} onChange={(event) => setToken(event.target.value)} className="mt-2 h-11 rounded-xl" /></label><label className="block text-xs font-bold text-foreground">New password<Input type="password" value={password} onChange={(event) => setPassword(event.target.value)} className="mt-2 h-11 rounded-xl" autoComplete="new-password" /></label><label className="block text-xs font-bold text-foreground">Confirm password<Input type="password" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} className="mt-2 h-11 rounded-xl" autoComplete="new-password" /></label><p className="text-[11px] text-muted-foreground">Use at least 8 characters. Confirmation must match.</p><Button disabled={busy} className="h-11 w-full rounded-xl bg-primary font-bold text-primary-foreground hover:bg-primary/90 cursor-pointer">{busy ? "Saving…" : "Change password"}</Button></form>}
   </AuthShell>;
 }
 
 function AuthShell({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#eef4f1] px-4 py-6 sm:px-5">
-      <section className="w-full max-w-md rounded-3xl border border-[#dfe7e2] bg-[#fffefa] p-6 shadow-[0_18px_50px_rgba(38,71,65,0.10)] sm:p-8">
+    <main className="flex min-h-screen items-center justify-center bg-background px-4 py-6 sm:px-5">
+      <section className="w-full max-w-md rounded-3xl border border-border bg-card p-6 shadow-[0_18px_50px_rgba(38,71,65,0.10)] sm:p-8 text-card-foreground">
         <div className="mb-8 flex items-center gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white p-1 shadow-sm border border-[#dfe7e2]">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-card p-1 shadow-sm border border-border">
             <img
               src="/insight-education-logo.png"
               alt="Insight Education"
@@ -76,16 +76,16 @@ function AuthShell({ title, subtitle, children }: { title: string; subtitle: str
             />
           </div>
           <div>
-            <div className="font-extrabold text-[#182326]">
-              Insight <span className="text-[#0f7f79]">Education</span>
+            <div className="font-extrabold text-foreground">
+              Insight <span className="text-primary">Education</span>
             </div>
-            <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#82908e]">
+            <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
               account security
             </div>
           </div>
         </div>
-        <h1 className="text-2xl font-extrabold tracking-[-0.05em] text-[#203734]">{title}</h1>
-        <p className="mt-2 text-sm text-[#778381]">{subtitle}</p>
+        <h1 className="text-2xl font-extrabold tracking-[-0.05em] text-foreground">{title}</h1>
+        <p className="mt-2 text-sm text-muted-foreground">{subtitle}</p>
         <div className="mt-7">{children}</div>
       </section>
     </main>

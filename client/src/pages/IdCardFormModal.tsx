@@ -474,8 +474,8 @@ export default function IdCardFormModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[96vw] max-w-[96vw] sm:max-w-[96vw] md:max-w-[94vw] lg:max-w-[92vw] xl:max-w-[1450px] 2xl:max-w-[1600px] max-h-[92vh] h-[92vh] flex flex-col gap-0 p-4 sm:p-6 sm:rounded-2xl">
-        <DialogHeader className="border-b pb-3 shrink-0">
+      <DialogContent className="w-[96vw] max-w-[96vw] sm:max-w-[96vw] md:max-w-[94vw] lg:max-w-[92vw] xl:max-w-[1450px] 2xl:max-w-[1600px] max-h-[92vh] h-[92vh] flex flex-col gap-0 p-4 sm:p-6 sm:rounded-2xl border-border bg-card text-card-foreground">
+        <DialogHeader className="border-b border-border pb-3 shrink-0">
           <div className="flex flex-col items-start justify-between gap-3 pr-2 sm:flex-row sm:items-center sm:pr-6">
             <div>
               <DialogTitle className="text-xl font-bold flex items-center gap-2">
@@ -485,12 +485,12 @@ export default function IdCardFormModal({
                     : "Edit ID Card"
                   : "New ID Card Draft"}
                 {isLockedTemplate && (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-teal-800 bg-teal-50 border border-teal-200 px-2 py-0.5 rounded-md">
+                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-md">
                     <Lock className="h-3 w-3" /> Locked Template
                   </span>
                 )}
               </DialogTitle>
-              <div className="text-xs text-gray-500 mt-0.5">
+              <div className="text-xs text-muted-foreground mt-0.5">
                 School: <strong>{effectiveSchool?.name || schoolName || `School #${currentSchoolId}`}</strong> · Form is dynamically driven by the selected template.
               </div>
             </div>
@@ -504,7 +504,7 @@ export default function IdCardFormModal({
                     onValueChange={(val) => handleSchoolChange(Number(val))}
                   >
                     <SelectTrigger className="h-8 text-xs font-semibold">
-                      <Building2 className="h-3.5 w-3.5 mr-1 text-[#0f7f79]" />
+                      <Building2 className="h-3.5 w-3.5 mr-1 text-primary" />
                       <SelectValue placeholder="Select target school" />
                     </SelectTrigger>
                     <SelectContent>
@@ -547,25 +547,25 @@ export default function IdCardFormModal({
           {/* LEFT: Dynamic Template-Driven Form */}
           <div className="min-h-0 overflow-y-auto pr-1 space-y-5 sm:pr-4 lg:col-span-7">
             {loadingTemplate ? (
-              <div className="flex items-center justify-center py-16 text-sm text-gray-400">
+              <div className="flex items-center justify-center py-16 text-sm text-muted-foreground">
                 <Loader2 className="h-5 w-5 animate-spin mr-2" /> Loading template fields…
               </div>
             ) : (
               <>
                 {/* Photo & Signature Section */}
-                <div className="grid grid-cols-1 gap-4 rounded-xl border border-[#dfe7e2] bg-[#f7faf8] p-4 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-4 rounded-xl border border-border bg-muted/30 p-4 sm:grid-cols-2">
                   {/* Student Photo */}
                   <div className="space-y-2">
-                    <Label className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
-                      <Camera className="h-3.5 w-3.5 text-teal-600" />
+                    <Label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                      <Camera className="h-3.5 w-3.5 text-primary" />
                       Student Photo {templateHasPhoto && <span className="text-red-500">*</span>}
                     </Label>
                     <div className="flex items-center gap-3">
-                      <div className="relative h-16 w-14 rounded-lg border border-gray-300 bg-white overflow-hidden flex items-center justify-center shadow-2xs">
+                      <div className="relative h-16 w-14 rounded-lg border border-border bg-card overflow-hidden flex items-center justify-center shadow-2xs">
                         {photoUrl ? (
                           <img src={photoUrl} alt="Photo" className="h-full w-full object-cover" />
                         ) : (
-                          <span className="text-[10px] text-gray-400 font-medium">Photo</span>
+                          <span className="text-[10px] text-muted-foreground font-medium">Photo</span>
                         )}
                         {uploadingPhoto && (
                           <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center p-1 text-center">
@@ -575,7 +575,7 @@ export default function IdCardFormModal({
                         )}
                       </div>
                       <div className="flex flex-col gap-1">
-                        <label className="cursor-pointer inline-flex items-center rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 shadow-2xs w-fit">
+                        <label className="cursor-pointer inline-flex items-center rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-accent shadow-2xs w-fit">
                           Upload
                           <input
                             type="file"
@@ -588,11 +588,11 @@ export default function IdCardFormModal({
                           />
                         </label>
                         {uploadingPhoto ? (
-                          <span className="flex items-center gap-1 text-[11px] font-medium text-teal-700">
+                          <span className="flex items-center gap-1 text-[11px] font-medium text-primary">
                             <Loader2 className="h-3 w-3 animate-spin" /> Optimizing photo...
                           </span>
                         ) : photoOptNote ? (
-                          <span className="text-[11px] font-medium text-emerald-700">{photoOptNote}</span>
+                          <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">{photoOptNote}</span>
                         ) : null}
                       </div>
                     </div>
@@ -600,16 +600,16 @@ export default function IdCardFormModal({
 
                   {/* Signature */}
                   <div className="space-y-2">
-                    <Label className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
-                      <FileSignature className="h-3.5 w-3.5 text-teal-600" />
-                      Signature {templateHasSignature && <span className="text-gray-400 font-normal">(Optional)</span>}
+                    <Label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                      <FileSignature className="h-3.5 w-3.5 text-primary" />
+                      Signature {templateHasSignature && <span className="text-muted-foreground font-normal">(Optional)</span>}
                     </Label>
                     <div className="flex items-center gap-3">
-                      <div className="relative h-16 w-20 rounded-lg border border-gray-300 bg-white overflow-hidden flex items-center justify-center shadow-2xs">
+                      <div className="relative h-16 w-20 rounded-lg border border-border bg-card overflow-hidden flex items-center justify-center shadow-2xs">
                         {signatureUrl ? (
                           <img src={signatureUrl} alt="Signature" className="h-full w-full object-contain p-1" />
                         ) : (
-                          <span className="text-[10px] text-gray-400 font-medium">Signature</span>
+                          <span className="text-[10px] text-muted-foreground font-medium">Signature</span>
                         )}
                         {uploadingSig && (
                           <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center p-1 text-center">
@@ -619,7 +619,7 @@ export default function IdCardFormModal({
                         )}
                       </div>
                       <div className="flex flex-col gap-1">
-                        <label className="cursor-pointer inline-flex items-center rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 shadow-2xs w-fit">
+                        <label className="cursor-pointer inline-flex items-center rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-accent shadow-2xs w-fit">
                           Upload
                           <input
                             type="file"
@@ -632,11 +632,11 @@ export default function IdCardFormModal({
                           />
                         </label>
                         {uploadingSig ? (
-                          <span className="flex items-center gap-1 text-[11px] font-medium text-teal-700">
+                          <span className="flex items-center gap-1 text-[11px] font-medium text-primary">
                             <Loader2 className="h-3 w-3 animate-spin" /> Optimizing signature...
                           </span>
                         ) : sigOptNote ? (
-                          <span className="text-[11px] font-medium text-emerald-700">{sigOptNote}</span>
+                          <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">{sigOptNote}</span>
                         ) : null}
                       </div>
                     </div>
@@ -646,21 +646,21 @@ export default function IdCardFormModal({
                 {/* Card Number */}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
-                    <Label className="text-xs font-bold text-gray-700">Card Number</Label>
+                    <Label className="text-xs font-bold text-foreground">Card Number</Label>
                     <Input
                       disabled={!!initialCard}
-                      className="mt-1 font-mono text-xs bg-gray-50"
+                      className="mt-1 font-mono text-xs bg-muted/40"
                       placeholder="Auto-generated (e.g. IDC-2026-000001)"
                       value={cardNumber}
                       onChange={(e) => setCardNumber(e.target.value)}
                     />
-                    <span className="text-[10px] text-gray-400">
+                    <span className="text-[10px] text-muted-foreground">
                       {initialCard ? "Persistent ID card identifier." : "Leave blank to auto-generate."}
                     </span>
                   </div>
 
                   <div>
-                    <Label className="text-xs font-bold text-gray-700">
+                    <Label className="text-xs font-bold text-foreground">
                       Admission Code / Number {(requiredDynamicFields.includes("admission_number") || requiredDynamicFields.includes("admission_no")) && <span className="text-red-500">*</span>}
                     </Label>
                     <Input
@@ -674,12 +674,12 @@ export default function IdCardFormModal({
 
                 {/* Student Details Section */}
                 <div className="space-y-3">
-                  <div className="text-xs font-bold uppercase tracking-wider text-teal-800 border-b pb-1">
+                  <div className="text-xs font-bold uppercase tracking-wider text-primary border-b border-border pb-1">
                     Student Details
                   </div>
                   <div className="space-y-3">
                     <div>
-                      <Label className="text-xs font-bold text-gray-700">
+                      <Label className="text-xs font-bold text-foreground">
                         Student Full Name {requiredDynamicFields.includes("student_name") && <span className="text-red-500">*</span>}
                       </Label>
                       <Input
@@ -692,7 +692,7 @@ export default function IdCardFormModal({
 
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                       <div>
-                        <Label className="text-xs font-bold text-gray-700">
+                        <Label className="text-xs font-bold text-foreground">
                           Class {requiredDynamicFields.includes("class") && <span className="text-red-500">*</span>}
                         </Label>
                         <Input
@@ -704,7 +704,7 @@ export default function IdCardFormModal({
                       </div>
 
                       <div>
-                        <Label className="text-xs font-bold text-gray-700">
+                        <Label className="text-xs font-bold text-foreground">
                           Section {requiredDynamicFields.includes("section") && <span className="text-red-500">*</span>}
                         </Label>
                         <Input
@@ -716,7 +716,7 @@ export default function IdCardFormModal({
                       </div>
 
                       <div>
-                        <Label className="text-xs font-bold text-gray-700">
+                        <Label className="text-xs font-bold text-foreground">
                           Roll Number {(requiredDynamicFields.includes("roll_number") || requiredDynamicFields.includes("roll_no")) && <span className="text-red-500">*</span>}
                         </Label>
                         <Input
@@ -730,7 +730,7 @@ export default function IdCardFormModal({
 
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                       <div>
-                        <Label className="text-xs font-bold text-gray-700">Date of Birth</Label>
+                        <Label className="text-xs font-bold text-foreground">Date of Birth</Label>
                         <Input
                           className="mt-1 text-xs"
                           placeholder="DD/MM/YYYY"
@@ -740,7 +740,7 @@ export default function IdCardFormModal({
                       </div>
 
                       <div>
-                        <Label className="text-xs font-bold text-gray-700">Gender</Label>
+                        <Label className="text-xs font-bold text-foreground">Gender</Label>
                         <Select
                           value={formData.gender || "Male"}
                           onValueChange={(val) => handleFieldChange("gender", val)}
@@ -757,7 +757,7 @@ export default function IdCardFormModal({
                       </div>
 
                       <div>
-                        <Label className="text-xs font-bold text-gray-700">Blood Group</Label>
+                        <Label className="text-xs font-bold text-foreground">Blood Group</Label>
                         <Select
                           value={formData.blood_group || "B+"}
                           onValueChange={(val) => handleFieldChange("blood_group", val)}
@@ -780,12 +780,12 @@ export default function IdCardFormModal({
 
                 {/* Family & Contact Section */}
                 <div className="space-y-3">
-                  <div className="text-xs font-bold uppercase tracking-wider text-teal-800 border-b pb-1">
+                  <div className="text-xs font-bold uppercase tracking-wider text-primary border-b border-border pb-1">
                     Family & Contact
                   </div>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
-                      <Label className="text-xs font-bold text-gray-700">Father's Name</Label>
+                      <Label className="text-xs font-bold text-foreground">Father's Name</Label>
                       <Input
                         className="mt-1 text-xs"
                         placeholder="e.g. Suresh Kumar"
@@ -795,7 +795,7 @@ export default function IdCardFormModal({
                     </div>
 
                     <div>
-                      <Label className="text-xs font-bold text-gray-700">Mother's Name</Label>
+                      <Label className="text-xs font-bold text-foreground">Mother's Name</Label>
                       <Input
                         className="mt-1 text-xs"
                         placeholder="e.g. Anita Devi"
@@ -805,7 +805,7 @@ export default function IdCardFormModal({
                     </div>
 
                     <div>
-                      <Label className="text-xs font-bold text-gray-700">Guardian Name</Label>
+                      <Label className="text-xs font-bold text-foreground">Guardian Name</Label>
                       <Input
                         className="mt-1 text-xs"
                         placeholder="Guardian name"
@@ -815,9 +815,9 @@ export default function IdCardFormModal({
                     </div>
 
                     <div>
-                      <Label className="text-xs font-bold text-gray-700">Contact Phone</Label>
+                      <Label className="text-xs font-bold text-foreground">Contact Phone</Label>
                       <div className="mt-1 flex items-center gap-1.5">
-                        <div className="h-9 w-12 flex items-center justify-center rounded-lg border border-gray-300 bg-gray-50 text-xs font-bold text-gray-600 select-none shrink-0">
+                        <div className="h-9 w-12 flex items-center justify-center rounded-lg border border-border bg-muted text-xs font-bold text-muted-foreground select-none shrink-0">
                           +91
                         </div>
                         <div className="flex-1">
@@ -827,7 +827,7 @@ export default function IdCardFormModal({
                             maxLength={10}
                             className={`text-xs transition-colors ${
                               formData.phone && formData.phone.length > 0 && formData.phone.length < 10
-                                ? "border-red-500 bg-red-50/15 text-red-900 focus-visible:ring-red-400 focus-visible:border-red-500"
+                                ? "border-red-500 bg-red-50/15 text-red-900 dark:text-red-200 focus-visible:ring-red-400 focus-visible:border-red-500"
                                 : ""
                             }`}
                             placeholder="9876543210"
@@ -847,7 +847,7 @@ export default function IdCardFormModal({
                     </div>
 
                     <div className="col-span-2">
-                      <Label className="text-xs font-bold text-gray-700">Residential Address</Label>
+                      <Label className="text-xs font-bold text-foreground">Residential Address</Label>
                       <Textarea
                         rows={2}
                         className="mt-1 text-xs"
@@ -891,7 +891,7 @@ export default function IdCardFormModal({
                   if (extraFields.length === 0) return null;
                   return (
                     <div className="space-y-3">
-                      <div className="text-xs font-bold uppercase tracking-wider text-teal-800 border-b pb-1">
+                      <div className="text-xs font-bold uppercase tracking-wider text-primary border-b border-border pb-1">
                         Additional Template Fields
                       </div>
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -907,13 +907,13 @@ export default function IdCardFormModal({
 
                           return (
                             <div key={customField} className="space-y-1">
-                              <Label className="text-xs font-bold text-gray-700 capitalize">
+                              <Label className="text-xs font-bold text-foreground capitalize">
                                 {customField.replaceAll("_", " ")} <span className="text-red-500">*</span>
                               </Label>
                               {isPhoneField ? (
                                 <div>
                                   <div className="flex items-center gap-1.5">
-                                    <div className="h-9 w-12 flex items-center justify-center rounded-lg border border-gray-300 bg-gray-50 text-xs font-bold text-gray-600 select-none shrink-0">
+                                    <div className="h-9 w-12 flex items-center justify-center rounded-lg border border-border bg-muted text-xs font-bold text-muted-foreground select-none shrink-0">
                                       +91
                                     </div>
                                     <div className="flex-1">
@@ -924,7 +924,7 @@ export default function IdCardFormModal({
                                         placeholder="9876543210"
                                         className={`text-xs transition-colors ${
                                           currentVal.length > 0 && currentVal.length < 10
-                                            ? "border-red-500 bg-red-50/15 text-red-900 focus-visible:ring-red-400 focus-visible:border-red-500"
+                                            ? "border-red-500 bg-red-50/15 text-red-900 dark:text-red-200 focus-visible:ring-red-400 focus-visible:border-red-500"
                                             : ""
                                         }`}
                                         value={currentVal}
@@ -943,11 +943,11 @@ export default function IdCardFormModal({
                                 </div>
                               ) : isPhotoField ? (
                                 <div className="flex items-center gap-3">
-                                  <div className="relative h-14 w-14 rounded-lg border border-gray-300 bg-white overflow-hidden flex items-center justify-center shadow-2xs">
+                                  <div className="relative h-14 w-14 rounded-lg border border-border bg-card overflow-hidden flex items-center justify-center shadow-2xs">
                                     {currentVal ? (
                                       <img src={currentVal} alt={customField} className="h-full w-full object-cover" />
                                     ) : (
-                                      <span className="text-[10px] text-gray-400 font-medium">Image</span>
+                                      <span className="text-[10px] text-muted-foreground font-medium">Image</span>
                                     )}
                                     {customOptimizing[customField] && (
                                       <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center p-1 text-center">
@@ -957,7 +957,7 @@ export default function IdCardFormModal({
                                     )}
                                   </div>
                                   <div className="flex flex-col gap-1">
-                                    <label className="cursor-pointer inline-flex items-center rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 shadow-2xs w-fit">
+                                    <label className="cursor-pointer inline-flex items-center rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-accent shadow-2xs w-fit">
                                       Upload
                                       <input
                                         type="file"
@@ -970,11 +970,11 @@ export default function IdCardFormModal({
                                       />
                                     </label>
                                     {customOptimizing[customField] ? (
-                                      <span className="flex items-center gap-1 text-[11px] font-medium text-teal-700">
+                                      <span className="flex items-center gap-1 text-[11px] font-medium text-primary">
                                         <Loader2 className="h-3 w-3 animate-spin" /> Optimizing photo...
                                       </span>
                                     ) : customOptNotes[customField] ? (
-                                      <span className="text-[11px] font-medium text-emerald-700">{customOptNotes[customField]}</span>
+                                      <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">{customOptNotes[customField]}</span>
                                     ) : null}
                                   </div>
                                 </div>
@@ -997,11 +997,11 @@ export default function IdCardFormModal({
           </div>
 
           {/* RIGHT: Live Interactive CardRenderer Preview */}
-          <div className="lg:col-span-5 bg-gray-100/70 rounded-2xl p-4 flex flex-col items-center justify-between border border-gray-200">
+          <div className="lg:col-span-5 bg-muted/40 rounded-2xl p-4 flex flex-col items-center justify-between border border-border">
             {/* Toolbar */}
-            <div className="w-full flex items-center justify-between pb-3 border-b border-gray-200">
+            <div className="w-full flex items-center justify-between pb-3 border-b border-border">
               {/* Side toggle */}
-              <div className="flex gap-1 bg-white p-1 rounded-lg border shadow-2xs">
+              <div className="flex gap-1 bg-card p-1 rounded-lg border border-border shadow-2xs">
                 {(["FRONT", "BACK"] as const).map((side) => (
                   <button
                     key={side}
@@ -1009,8 +1009,8 @@ export default function IdCardFormModal({
                     onClick={() => setActiveSide(side)}
                     className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
                       activeSide === side
-                        ? "bg-[#0f7f79] text-white"
-                        : "text-gray-500 hover:text-gray-900"
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
                     {side}
@@ -1029,7 +1029,7 @@ export default function IdCardFormModal({
                 >
                   <ZoomOut className="h-3.5 w-3.5" />
                 </Button>
-                <span className="text-[11px] font-mono font-medium text-gray-500 w-12 text-center">
+                <span className="text-[11px] font-mono font-medium text-muted-foreground w-12 text-center">
                   {Math.round(zoomScale * 100)}%
                 </span>
                 <Button
@@ -1045,7 +1045,7 @@ export default function IdCardFormModal({
                   type="button"
                   size="sm"
                   variant="ghost"
-                  className="h-7 w-7 p-0 text-gray-400"
+                  className="h-7 w-7 p-0 text-muted-foreground"
                   onClick={() => setZoomScale(1)}
                   title="Reset Zoom"
                 >
@@ -1080,19 +1080,19 @@ export default function IdCardFormModal({
                   />
                 </div>
               ) : (
-                <div className="text-xs text-gray-400">Select a template to view card preview.</div>
+                <div className="text-xs text-muted-foreground">Select a template to view card preview.</div>
               )}
             </div>
 
             {/* Live Indicator */}
-            <div className="w-full text-center text-[11px] text-gray-400 pt-2 border-t border-gray-200">
+            <div className="w-full text-center text-[11px] text-muted-foreground pt-2 border-t border-border">
               Live CardRenderer output. Updates instantly as you type.
             </div>
           </div>
         </div>
 
         {/* Footer Actions */}
-        <DialogFooter className="border-t pt-3 sm:pt-4 mt-2 shrink-0 w-full flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+        <DialogFooter className="border-t border-border pt-3 sm:pt-4 mt-2 shrink-0 w-full flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
           <Button
             type="button"
             variant="outline"
@@ -1118,7 +1118,7 @@ export default function IdCardFormModal({
               type="button"
               onClick={() => handleSave(true)}
               disabled={saving || submitting}
-              className="gap-2 bg-[#0f7f79] hover:bg-[#0b6560] text-white font-semibold w-full sm:w-auto"
+              className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold w-full sm:w-auto"
             >
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               Submit for Approval

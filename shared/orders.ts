@@ -8,6 +8,26 @@ export const HOOK_TYPES = [
 
 export type HookType = (typeof HOOK_TYPES)[number];
 
+export const HOLDER_TYPES = [
+  "5pp (Plastic)",
+  "5pc (Plastic Transparent)",
+  "White (Plastic)",
+  "Metal Silver",
+  "Metal Gold",
+  "Transparent (Both side cover)",
+] as const;
+
+export type HolderType = (typeof HOLDER_TYPES)[number];
+
+export const LANYARD_SIZES = [
+  "16mm",
+  "18mm",
+  "20mm",
+] as const;
+
+export type LanyardSize = (typeof LANYARD_SIZES)[number];
+
+
 export const CARD_MATERIALS = [
   { value: "PVC_STANDARD", label: "PVC Standard" },
   { value: "PVC_PREMIUM", label: "PVC Premium" },
@@ -33,32 +53,32 @@ export const ORDER_STATUSES = [
   {
     value: "PLACED",
     label: "Placed",
-    badgeClass: "bg-blue-50 text-blue-700 border-blue-200",
+    badgeClass: "status-badge-placed font-bold",
   },
   {
     value: "CONFIRMED",
     label: "Confirmed",
-    badgeClass: "bg-purple-50 text-purple-700 border-purple-200",
+    badgeClass: "status-badge-confirmed font-bold",
   },
   {
     value: "IN_PRODUCTION",
     label: "In Production",
-    badgeClass: "bg-amber-50 text-amber-700 border-amber-200",
+    badgeClass: "status-badge-in_production font-bold",
   },
   {
     value: "DISPATCHED",
     label: "Dispatched",
-    badgeClass: "bg-indigo-50 text-indigo-700 border-indigo-200",
+    badgeClass: "status-badge-dispatched font-bold",
   },
   {
     value: "DELIVERED",
     label: "Delivered",
-    badgeClass: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    badgeClass: "status-badge-delivered font-bold",
   },
   {
     value: "CANCELLED",
     label: "Cancelled",
-    badgeClass: "bg-red-50 text-red-700 border-red-200",
+    badgeClass: "status-badge-cancelled font-bold",
   },
 ] as const;
 
@@ -75,8 +95,8 @@ export function getOrderStatusConfig(status: string) {
   return {
     value: status,
     label: status,
-    badgeClass: "bg-gray-100 text-gray-700 border-gray-200",
-    badgeColor: "bg-gray-100 text-gray-700 border-gray-200",
+    badgeClass: "bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700",
+    badgeColor: "bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700",
   };
 }
 

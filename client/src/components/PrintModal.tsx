@@ -359,33 +359,33 @@ export default function PrintModal({ open, onOpenChange, cards, onPrinted }: Pri
       )}
 
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="w-[98vw] sm:max-w-5xl xl:max-w-6xl max-h-[94vh] flex flex-col rounded-2xl border border-[#e2e8e3] bg-[#fffefa] p-4 shadow-xl sm:p-6">
+        <DialogContent className="w-[98vw] sm:max-w-5xl xl:max-w-6xl max-h-[94vh] flex flex-col rounded-2xl border border-border bg-card text-card-foreground p-4 shadow-xl sm:p-6">
           <DialogHeader>
             <div className="flex flex-col gap-4">
               <div className="flex flex-wrap items-start justify-between gap-3 pr-2 sm:pr-6">
                 <div>
-                  <DialogTitle className="flex items-center gap-2 text-lg font-extrabold text-[#182326] sm:text-xl">
+                  <DialogTitle className="flex items-center gap-2 text-lg font-extrabold text-foreground sm:text-xl">
                     <span>Print Preview</span>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-[#eef7f4] text-[#0f7f79] font-semibold">
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-semibold">
                       {orderedCards.length} {orderedCards.length === 1 ? "Card" : "Cards"} · {pageCount}{" "}
                       {pageCount === 1 ? "Page" : "Pages"}
                     </span>
                   </DialogTitle>
-                  <div className="mt-1 text-xs text-[#84918e]">
+                  <div className="mt-1 text-xs text-muted-foreground">
                     A4 landscape · 5 columns × 2 rows · 2 mm gap · cards stay in the same slots on both sides.
                   </div>
                 </div>
 
-                <div className="flex shrink-0 items-center gap-1 rounded-xl border border-[#e4e9e5] bg-[#f8faf8] p-1 text-xs font-semibold">
+                <div className="flex shrink-0 items-center gap-1 rounded-xl border border-border bg-muted/40 p-1 text-xs font-semibold">
                   {(["FRONT", "BACK"] as const).map((side) => (
                     <button
                       key={side}
                       type="button"
                       onClick={() => setPreviewSide(side)}
-                      className={`cursor-pointer rounded-lg px-3 py-1.5 text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7f79] focus-visible:ring-offset-1 ${
+                      className={`cursor-pointer rounded-lg px-3 py-1.5 text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 ${
                         previewSide === side
-                          ? "bg-white text-[#0f7f79] shadow-sm"
-                          : "text-[#8a9793] hover:text-[#55605d]"
+                          ? "bg-card text-primary shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
                       }`}
                     >
                       {side === "FRONT" ? "Front" : "Back"}
@@ -395,12 +395,12 @@ export default function PrintModal({ open, onOpenChange, cards, onPrinted }: Pri
               </div>
 
               <div className="flex flex-wrap items-end gap-3 text-xs">
-                <label className="flex flex-col gap-1 font-semibold text-[#45544f]">
+                <label className="flex flex-col gap-1 font-semibold text-foreground">
                   Print mode
                   <select
                     value={printMode}
                     onChange={(event) => setPrintMode(event.target.value as PrintMode)}
-                    className="h-9 min-w-48 cursor-pointer rounded-xl border border-[#d3ded8] bg-white px-2.5 text-xs font-bold text-[#304541] shadow-sm hover:border-[#0f7f79] focus:outline-none focus:ring-1 focus:ring-[#0f7f79]"
+                    className="h-9 min-w-48 cursor-pointer rounded-xl border border-border bg-card px-2.5 text-xs font-bold text-foreground shadow-sm hover:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                   >
                     <option value="FRONT_ONLY">Front only</option>
                     <option value="BACK_ONLY">Back only</option>
@@ -409,12 +409,12 @@ export default function PrintModal({ open, onOpenChange, cards, onPrinted }: Pri
                 </label>
 
                 {printMode === "DUPLEX" && (
-                  <label className="flex h-9 cursor-pointer items-center gap-2 rounded-xl border border-[#dfe6e1] bg-white px-3 text-xs font-bold text-[#38514e] shadow-sm transition-colors hover:border-[#0f7f79]">
+                  <label className="flex h-9 cursor-pointer items-center gap-2 rounded-xl border border-border bg-card px-3 text-xs font-bold text-foreground shadow-sm transition-colors hover:border-primary">
                     <input
                       type="checkbox"
                       checked={separateFiles}
                       onChange={(event) => setSeparateFiles(event.target.checked)}
-                      className="accent-[#0f7f79]"
+                      className="accent-primary"
                     />
                     Separate files
                   </label>
@@ -425,18 +425,18 @@ export default function PrintModal({ open, onOpenChange, cards, onPrinted }: Pri
 
           <div
             id="print-area"
-            className="max-h-[62vh] flex-1 space-y-8 overflow-y-auto rounded-2xl border border-[#e2e8e3] bg-[#f7f6f2] p-3 sm:p-5"
+            className="max-h-[62vh] flex-1 space-y-8 overflow-y-auto rounded-2xl border border-border bg-muted/30 p-3 sm:p-5"
           >
             {batches.map((batch, index) => renderPage(batch, index, previewSide, false))}
             {orderedCards.length === 0 && (
-              <div className="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-500">
+              <div className="rounded-xl border border-dashed border-border bg-card p-8 text-center text-sm text-muted-foreground">
                 No cards selected for printing.
               </div>
             )}
           </div>
 
-          <DialogFooter className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 pt-3 border-t border-[#edf0ed]">
-            <div className="text-[11px] text-[#84918e]">
+          <DialogFooter className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 pt-3 border-t border-border">
+            <div className="text-[11px] text-muted-foreground">
               Only approved cards are eligible for printing. Status updates to <strong>PRINTED</strong> when you print.
             </div>
 
@@ -446,7 +446,7 @@ export default function PrintModal({ open, onOpenChange, cards, onPrinted }: Pri
                 type="button"
                 onClick={handleDownloadPdf}
                 disabled={downloading || orderedCards.length === 0}
-                className="h-10 rounded-xl border-[#dce5df] bg-white px-4 text-xs font-bold text-[#38514e] shadow-sm hover:bg-[#edf5f0]"
+                className="h-10 rounded-xl border-border bg-card px-4 text-xs font-bold text-foreground shadow-sm hover:bg-accent"
               >
                 {downloading ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Download className="h-4 w-4 mr-1.5" />}
                 {downloading ? "Preparing PDF…" : separateFiles && printMode === "DUPLEX" ? "Download PDFs" : "Download PDF"}
@@ -456,7 +456,7 @@ export default function PrintModal({ open, onOpenChange, cards, onPrinted }: Pri
                 type="button"
                 onClick={executePrint}
                 disabled={printing || orderedCards.length === 0}
-                className="h-10 rounded-xl bg-[#0f7f79] px-4 text-xs font-bold text-white shadow-[0_8px_18px_rgba(15,127,121,0.18)] hover:bg-[#096c67]"
+                className="h-10 rounded-xl bg-primary px-4 text-xs font-bold text-primary-foreground shadow-sm hover:bg-primary/90"
               >
                 {printing ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Printer className="h-4 w-4 mr-1.5" />}
                 {printing ? "Preparing…" : printMode === "FRONT_ONLY" ? "Print Front" : printMode === "BACK_ONLY" ? "Print Back" : "Print Duplex"}

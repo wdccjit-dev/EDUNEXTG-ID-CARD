@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { api } from "@/lib/api";
 import CardRenderer from "@/components/CardRenderer";
-import { SAMPLE_CARD_DATA } from "@shared/templateDesigner";
+import { getSampleCardData } from "@shared/templateDesigner";
 import type { DesignerElement, ElementConfig } from "@shared/templateDesigner";
 import { DEFAULT_TEMPLATE_CARD_SIZE } from "@shared/printLayout";
 import { useDesignerState, type TemplateMeta } from "./designer/useDesignerState";
@@ -23,6 +23,7 @@ const DEFAULT_TEMPLATE: TemplateMeta = {
   name: "New Template",
   description: null,
   orientation: "portrait",
+  cardType: "student",
   cardWidth: DEFAULT_TEMPLATE_CARD_SIZE.width,
   cardHeight: DEFAULT_TEMPLATE_CARD_SIZE.height,
   status: "DRAFT",
@@ -58,6 +59,7 @@ export default function TemplateDesigner() {
           name: tmpl.name,
           description: tmpl.description,
           orientation: tmpl.orientation ?? "portrait",
+          cardType: (tmpl as any).cardType ?? "student",
           cardWidth: tmpl.cardWidth ?? DEFAULT_TEMPLATE_CARD_SIZE.width,
           cardHeight: tmpl.cardHeight ?? DEFAULT_TEMPLATE_CARD_SIZE.height,
           status: (tmpl.status as TemplateMeta["status"]) ?? "DRAFT",
@@ -206,6 +208,7 @@ export default function TemplateDesigner() {
         name: t.name,
         description: t.description,
         orientation: t.orientation,
+        cardType: t.cardType,
         cardWidth: t.cardWidth,
         cardHeight: t.cardHeight,
         status: t.status,
@@ -260,7 +263,7 @@ export default function TemplateDesigner() {
       {/* Main area */}
       <div className="flex flex-1 overflow-hidden min-w-0">
         {/* Left — Element palette */}
-        <ElementPalette dispatch={dispatch} />
+        <ElementPalette dispatch={dispatch} cardType={state.template.cardType} />
 
         {/* Center — Canvas */}
         <DesignerCanvas state={state} dispatch={dispatch} visibleElements={visibleElements} />
@@ -297,7 +300,7 @@ export default function TemplateDesigner() {
                 cardHeight={state.template.cardHeight}
                 elements={state.elements}
                 side={previewSide}
-                cardData={SAMPLE_CARD_DATA}
+                cardData={getSampleCardData(state.template.cardType)}
                 scale={Math.min(
                   1.75,
                   520 / (state.template.cardWidth || 324),
