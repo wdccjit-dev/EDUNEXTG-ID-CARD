@@ -662,11 +662,14 @@ export default function Home({
   const logout = async () => {
     try {
       await api.auth.logout();
-      window.location.href = "/login";
     } catch (error) {
-      toast.error("Could not sign out", {
-        description: error instanceof Error ? error.message : "Request failed",
-      });
+      console.error("Logout error", error);
+    } finally {
+      try {
+        sessionStorage.clear();
+        localStorage.clear();
+      } catch {}
+      window.location.replace("/login");
     }
   };
 
@@ -2185,30 +2188,128 @@ export default function Home({
                   </CardContent>
                 </Card>
 
-                <Card className="relative overflow-hidden rounded-2xl border-0 bg-[#163b3a] text-white shadow-[0_14px_40px_rgba(15,72,67,0.14)]">
-                  <div className="absolute -right-14 -top-20 h-56 w-56 rounded-full border-[28px] border-[#3aa99b]/20" />
-                  <div className="absolute bottom-[-90px] right-[20%] h-48 w-48 rounded-full border-[24px] border-[#f2c94c]/10" />
-                  <CardContent className="relative flex h-full min-h-[248px] flex-col justify-between p-6 sm:p-7">
-                    <div>
-                      <div className="mb-4 flex h-9 w-9 items-center justify-center rounded-xl bg-[#40c8bb] text-[#0a4542]">
-                        <QrCode className="h-5 w-5" />
-                      </div>
-                      <div className="max-w-md text-xl font-extrabold leading-tight tracking-[-0.04em]">
-                        Every approved card has a story. Make it easy to verify.
-                      </div>
-                      <p className="mt-2 max-w-sm text-xs leading-5 text-[#a5cfca]">
-                        QR verification keeps schools, families, and staff confident
-                        that every card is authentic and current.
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => toast("Verification settings opened")}
-                      className="mt-7 flex w-fit items-center gap-2 rounded-xl bg-white/10 px-3.5 py-2.5 text-[11px] font-extrabold text-white transition-colors hover:bg-white/20"
-                    >
-                      Explore verification <ArrowUpRight className="h-3.5 w-3.5" />
-                    </button>
-                  </CardContent>
-                </Card>
+                {(() => {
+                  const approved = schoolApprovals.filter((r) => r.status === "APPROVED").length;
+                  const pending = schoolApprovals.filter((r) => r.status === "SUBMITTED" || r.status === "UNDER_REVIEW" || r.status === "RESUBMITTED").length;
+                  const changesReq = schoolApprovals.filter((r) => r.status === "CHANGES_REQUIRED").length;
+                  const rejected = schoolApprovals.filter((r) => r.status === "REJECTED").length;
+                  const printed = schoolApprovals.filter((r) => r.status === "PRINTED").length;
+                  const total = approved + pending + changesReq + rejected + printed;
+
+                  const segments = [
+                    { label: "Approved", value: approved, color: "#40c8bb" },
+                    { label: "Pending", value: pending, color: "#f2c94c" },
+                    { label: "Changes Req.", value: changesReq, color: "#f28a63" },
+                    { label: "Rejected", value: rejected, color: "#e55c5c" },
+                    ...(printed > 0 ? [{ label: "Printed", value: printed, color: "#8a94e8" }] : []),
+                  ].filter((s) => s.value > 0);
+
+                  const radius = 54;
+                  const stroke = 14;
+                  const circumference = 2 * Math.PI * radius;
+                  let cumulative = 0;
+
+                  return (
+                    <Card className="ui-card rounded-2xl border-border bg-card text-card-foreground shadow-[0_14px_40px_rgba(38,71,65,0.05)]">
+                      <CardHeader className="flex flex-row items-center justify-between px-6 pb-2 pt-6">
+                        <div>
+                          <CardTitle className="text-[15px] font-extrabold tracking-[-0.02em]">
+                            Overall report
+                          </CardTitle>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Card status breakdown
+                          </p>
+                        </div>
+                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                          <Grid2X2 className="h-5 w-5" />
+                        </div>
+                      </CardHeader>
+                      <CardContent className="flex flex-col items-center gap-5 px-6 pb-6 pt-2">
+                        {/* Donut Chart */}
+                        <div className="relative">
+                          <svg width="148" height="148" viewBox="0 0 148 148" className="drop-shadow-sm">
+                            {/* Background track */}
+                            <circle
+                              cx="74"
+                              cy="74"
+                              r={radius}
+                              fill="none"
+                              stroke="currentColor"
+                              className="text-muted/30"
+                              strokeWidth={stroke}
+                            />
+                            {total > 0 ? (
+                              segments.map((seg) => {
+                                const pct = seg.value / total;
+                                const dashLen = pct * circumference;
+                                const dashGap = circumference - dashLen;
+                                const offset = -(cumulative / total) * circumference;
+                                cumulative += seg.value;
+                                return (
+                                  <circle
+                                    key={seg.label}
+                                    cx="74"
+                                    cy="74"
+                                    r={radius}
+                                    fill="none"
+                                    stroke={seg.color}
+                                    strokeWidth={stroke}
+                                    strokeDasharray={`${dashLen} ${dashGap}`}
+                                    strokeDashoffset={offset}
+                                    strokeLinecap="round"
+                                    className="transition-all duration-500 hover:opacity-80"
+                                    style={{ transform: "rotate(-90deg)", transformOrigin: "74px 74px" }}
+                                  />
+                                );
+                              })
+                            ) : (
+                              <circle
+                                cx="74"
+                                cy="74"
+                                r={radius}
+                                fill="none"
+                                stroke="currentColor"
+                                className="text-muted-foreground/20"
+                                strokeWidth={stroke}
+                              />
+                            )}
+                          </svg>
+                          {/* Center label */}
+                          <div className="absolute inset-0 flex flex-col items-center justify-center">
+                            <span className="text-2xl font-extrabold tracking-[-0.04em] text-foreground">
+                              {total}
+                            </span>
+                            <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+                              Total
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Legend */}
+                        <div className="grid w-full grid-cols-2 gap-x-4 gap-y-2.5">
+                          {[
+                            { label: "Approved", value: approved, color: "#40c8bb" },
+                            { label: "Pending", value: pending, color: "#f2c94c" },
+                            { label: "Changes Req.", value: changesReq, color: "#f28a63" },
+                            { label: "Rejected", value: rejected, color: "#e55c5c" },
+                            ...(printed > 0 ? [{ label: "Printed", value: printed, color: "#8a94e8" }] : []),
+                          ].map((item) => (
+                            <div key={item.label} className="flex items-center gap-2">
+                              <span
+                                className="h-2.5 w-2.5 shrink-0 rounded-full"
+                                style={{ backgroundColor: item.color }}
+                              />
+                              <span className="text-[11px] font-bold text-foreground">{item.label}</span>
+                              <span className="ml-auto font-mono text-[10px] font-bold text-muted-foreground">
+                                {item.value}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })()}
 
                 {authenticatedUser.role === "SUPER_ADMIN" && (
                   <Card className="ui-card xl:col-span-2 rounded-2xl border-border bg-card text-card-foreground shadow-[0_14px_40px_rgba(38,71,65,0.05)]">

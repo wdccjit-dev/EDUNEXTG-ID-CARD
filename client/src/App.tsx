@@ -16,6 +16,11 @@ const ForgotPassword = lazy(() =>
 const ResetPassword = lazy(() =>
   import("./pages/PasswordReset").then((module) => ({ default: module.ResetPassword })),
 );
+const Landing = lazy(() => import("./pages/Landing"));
+const AboutUsPage = lazy(() => import("./pages/AboutUsPage"));
+const ProductsPage = lazy(() => import("./pages/ProductsPage"));
+const NoticePage = lazy(() => import("./pages/NoticePage"));
+const ContactUsPage = lazy(() => import("./pages/ContactUsPage"));
 
 function getPortalForRole(role: string): "admin" | "school" | "marketing" {
   if (role === "SUPER_ADMIN") return "admin";
@@ -27,20 +32,51 @@ function ProtectedPortal({ portal, initialNav }: { portal: "admin" | "school" | 
   const [, navigate] = useLocation();
   const [user, setUser] = useState<ApiAuthUser | null>(null);
   const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    api.auth
-      .me()
-      .then((nextUser) => {
-        const correctPortal = getPortalForRole(nextUser.role);
-        if (portal !== correctPortal) {
-          navigate(correctPortal === "admin" ? "/admin" : correctPortal === "marketing" ? "/marketing" : "/school");
-          return;
-        }
-        setUser(nextUser);
-      })
-      .catch(() => navigate(portal === "marketing" ? "/marketing/login" : "/login"))
-      .finally(() => setLoading(false));
+    let isMounted = true;
+
+    const checkAuth = () => {
+      api.auth
+        .me()
+        .then((nextUser) => {
+          if (!isMounted) return;
+          const correctPortal = getPortalForRole(nextUser.role);
+          if (portal !== correctPortal) {
+            navigate(correctPortal === "admin" ? "/admin" : correctPortal === "marketing" ? "/marketing" : "/school");
+            return;
+          }
+          setUser(nextUser);
+          setLoading(false);
+        })
+        .catch(() => {
+          if (!isMounted) return;
+          window.location.replace(portal === "marketing" ? "/marketing/login" : "/login");
+        });
+    };
+
+    checkAuth();
+
+    // Catch Back/Forward cache (bfcache) restore or back/forward navigation
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        checkAuth();
+      }
+    };
+    const handlePopState = () => {
+      checkAuth();
+    };
+
+    window.addEventListener("pageshow", handlePageShow);
+    window.addEventListener("popstate", handlePopState);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener("pageshow", handlePageShow);
+      window.removeEventListener("popstate", handlePopState);
+    };
   }, [navigate, portal]);
+
   if (loading) return <SchoolLoader label="Preparing your school workspace…" />;
   return user ? <Home authenticatedUser={user} portal={portal} initialNav={initialNav} /> : null;
 }
@@ -49,20 +85,50 @@ function ProtectedDesigner() {
   const [, navigate] = useLocation();
   const [authed, setAuthed] = useState(false);
   const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    api.auth
-      .me()
-      .then((u) => {
-        if (u.role !== "SUPER_ADMIN") {
-          const correctPortal = getPortalForRole(u.role);
-          navigate(correctPortal === "marketing" ? "/marketing" : "/school");
-          return;
-        }
-        setAuthed(true);
-      })
-      .catch(() => navigate("/login"))
-      .finally(() => setLoading(false));
+    let isMounted = true;
+
+    const checkAuth = () => {
+      api.auth
+        .me()
+        .then((u) => {
+          if (!isMounted) return;
+          if (u.role !== "SUPER_ADMIN") {
+            const correctPortal = getPortalForRole(u.role);
+            navigate(correctPortal === "marketing" ? "/marketing" : "/school");
+            return;
+          }
+          setAuthed(true);
+          setLoading(false);
+        })
+        .catch(() => {
+          if (!isMounted) return;
+          window.location.replace("/login");
+        });
+    };
+
+    checkAuth();
+
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        checkAuth();
+      }
+    };
+    const handlePopState = () => {
+      checkAuth();
+    };
+
+    window.addEventListener("pageshow", handlePageShow);
+    window.addEventListener("popstate", handlePopState);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener("pageshow", handlePageShow);
+      window.removeEventListener("popstate", handlePopState);
+    };
   }, [navigate]);
+
   if (loading) return <SchoolLoader label="Opening the ID card designer…" />;
   return authed ? <TemplateDesigner /> : null;
 }
@@ -106,7 +172,11 @@ function Router() {
       <Route path="/marketing/notifications"><ProtectedPortal portal="marketing" initialNav="Overview" /></Route>
       <Route path="/marketing/settings"><ProtectedPortal portal="marketing" initialNav="Settings" /></Route>
       <Route path="/about"><ProtectedPortal portal="school" initialNav="About Us" /></Route>
-      <Route path="/"><PortalRedirect /></Route>
+      <Route path="/about-us"><AboutUsPage /></Route>
+      <Route path="/products"><ProductsPage /></Route>
+      <Route path="/notice"><NoticePage /></Route>
+      <Route path="/contact-us"><ContactUsPage /></Route>
+      <Route path="/"><Landing /></Route>
       <Route><PortalRedirect /></Route>
     </Switch>
   );
