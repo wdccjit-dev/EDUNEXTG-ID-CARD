@@ -787,23 +787,6 @@ export default function Landing() {
             <span className="lp-footer-copy">
               © {new Date().getFullYear()} Insight Education Solutions. All rights reserved.
             </span>
-            <div className="lp-footer-bottom-links">
-              <a href="#about" onClick={(e) => handleNavClick(e, "#about")}>
-                About
-              </a>
-              <span>•</span>
-              <a href="#products" onClick={(e) => handleNavClick(e, "#products")}>
-                Products
-              </a>
-              <span>•</span>
-              <a href="#notice" onClick={(e) => handleNavClick(e, "#notice")}>
-                Notice
-              </a>
-              <span>•</span>
-              <a href="#contact" onClick={(e) => handleNavClick(e, "#contact")}>
-                Contact
-              </a>
-            </div>
             <a
               href="#home"
               className="lp-back-to-top"
