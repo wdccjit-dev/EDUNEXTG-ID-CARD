@@ -60,6 +60,11 @@ const CLIENT_LOGOS = Array.from({ length: 11 }, (_, i) => {
    ─────────────────────────────────────────── */
 const PRODUCT_CARDS = [
   {
+    title: "ID CARDS",
+    subtitle: "School, College & Institutional ID Cards",
+    image: "/home/product-idcards.jpg",
+  },
+  {
     title: "LANYARDS / RIBBONS",
     subtitle: "Custom Printed & Plain Lanyards",
     image: "/home/product-lanyards.jpg",
@@ -324,43 +329,6 @@ export default function Landing() {
         <section id="products" className="lp-products">
           <div className="lp-container">
             <div className="lp-products-grid">
-              {/* Card 1 — ID Cards (green, hover overlay) */}
-              <div className="lp-product-card-primary" tabIndex={0}>
-                <div className="card-default">
-                  <div className="card-image-area">
-                    <img
-                      src="/home/product-idcards.jpg"
-                      alt="ID Cards"
-                      loading="lazy"
-                      width={280}
-                      height={200}
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = "none";
-                      }}
-                    />
-                  </div>
-                  <div className="card-info">
-                    <div className="card-info-text">
-                      <h3>ID CARDS</h3>
-                      <p>School, College &amp; Institutional ID Cards</p>
-                    </div>
-                    <a href="#contact" className="lp-arrow-btn lp-arrow-btn-green" aria-label="View ID Cards" onClick={(e) => handleNavClick(e, "#contact")}>
-                      <ChevronRight size={18} />
-                    </a>
-                  </div>
-                </div>
-                {/* Overlay shown on hover / focus */}
-                <div className="card-overlay">
-                  <p>
-                    Discover durable, high-quality ID cards designed to meet every institution's needs.
-                  </p>
-                  <p>
-                    <span className="click-more">Click More</span> Options to know more.
-                  </p>
-                </div>
-              </div>
-
-              {/* Cards 2–4 — light green */}
               {PRODUCT_CARDS.map((card) => (
                 <div key={card.title} className="lp-product-card">
                   <img
