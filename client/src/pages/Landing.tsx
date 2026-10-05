@@ -12,7 +12,6 @@ import {
   Menu,
   X,
   LockKeyhole,
-  Megaphone,
   ArrowRight,
   MapPin,
   Phone,
@@ -20,20 +19,6 @@ import {
   Clock,
   ArrowUp,
 } from "lucide-react";
-
-/* ───────────────────────────────────────────
-   Notices – easy to update in one place
-   ─────────────────────────────────────────── */
-const NOTICES = [
-  {
-    title: "New ID Card & Lanyard Designs Available",
-    date: "April 25, 2025",
-  },
-  {
-    title: "Contact for Bulk Requirements",
-    date: "April 10, 2026",
-  },
-] as const;
 
 /* ───────────────────────────────────────────
    Nav links
@@ -378,11 +363,10 @@ export default function Landing() {
           </div>
         </section>
 
-        {/* ════════════ CUSTOM BANNER + NOTICES ════════════ */}
-        <section id="notice" className="lp-banner-section">
+        {/* ════════════ CUSTOM REQUIREMENT BANNER ════════════ */}
+        <section className="lp-banner-section">
           <div className="lp-container">
             <div className="lp-banner-row">
-              {/* Left – custom requirement banner */}
               <div className="lp-custom-banner">
                 <div className="lp-custom-banner-text">
                   <h3 className="font-heading">
@@ -406,30 +390,6 @@ export default function Landing() {
                     width={500}
                     height={280}
                   />
-                </div>
-              </div>
-
-              {/* Right – notices */}
-              <div className="lp-notices-card">
-                <div className="lp-notices-header">
-                  <Megaphone size={18} />
-                  Latest Notice
-                </div>
-                <div className="lp-notices-body">
-                  {NOTICES.map((notice, i) => (
-                    <div key={i} className="lp-notice-item">
-                      <div className="lp-notice-title">
-                        <span className="lp-notice-dot" />
-                        {notice.title}
-                      </div>
-                      <div className="lp-notice-date">{notice.date}</div>
-                    </div>
-                  ))}
-                </div>
-                <div className="lp-notices-footer">
-                  <Link href="/contact-us">
-                    CONTACT FOR DETAILS <ChevronRight size={14} />
-                  </Link>
                 </div>
               </div>
             </div>
