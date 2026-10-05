@@ -665,27 +665,19 @@ button:active:not(:disabled) { transform: scale(0.97); }
 
 .landing-root .lp-product-card-primary .card-image-area {
   height: 200px;
-  background: #f1f8f3;
+  background: #ffffff;
   position: relative;
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 14px;
 }
 
 .landing-root .lp-product-card-primary .card-image-area img {
+  width: 100%;
   height: 100%;
-  width: auto;
-  max-width: 100%;
-  object-fit: contain;
-  border-radius: 8px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
-  transition: transform 0.25s ease;
-}
-
-.landing-root .lp-product-card-primary:hover .card-image-area img {
-  transform: scale(1.04);
+  object-fit: cover;
+  opacity: 1;
 }
 
 .landing-root .lp-product-card-primary .card-info {
