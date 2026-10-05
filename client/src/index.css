@@ -1968,7 +1968,8 @@ button:active:not(:disabled) { transform: scale(0.97); }
   letter-spacing: 0.5px;
   padding: 4px 12px;
   border-radius: 20px;
-  backdrop-blur: 4px;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
 }
 
 .landing-root .lp-product-showcase-content {
