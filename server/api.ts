@@ -222,8 +222,13 @@ router.post("/auth/login", async (req, res) => {
     fail(res, e);
   }
 });
-router.post("/auth/logout", (_req, res) => { clearApplicationSession(res); res.json({ success: true }); });
+router.post("/auth/logout", (_req, res) => {
+  clearApplicationSession(res);
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  res.json({ success: true });
+});
 router.get("/auth/me", async (req, res) => {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
   try {
     const user = await authenticateApplicationRequest(req);
     if (!user) return res.status(401).json({ error: "Authentication required" });

@@ -662,11 +662,14 @@ export default function Home({
   const logout = async () => {
     try {
       await api.auth.logout();
-      window.location.href = "/login";
     } catch (error) {
-      toast.error("Could not sign out", {
-        description: error instanceof Error ? error.message : "Request failed",
-      });
+      console.error("Logout error", error);
+    } finally {
+      try {
+        sessionStorage.clear();
+        localStorage.clear();
+      } catch {}
+      window.location.replace("/login");
     }
   };
 
