@@ -1766,3 +1766,411 @@ button:active:not(:disabled) { transform: scale(0.97); }
     text-align: center;
   }
 }
+
+/* ======================================================
+   DEDICATED SUBPAGES STYLING (About, Products, Notice, Contact)
+   ====================================================== */
+.landing-root .lp-page-banner {
+  background: linear-gradient(135deg, #1b4a7c 0%, #26307f 60%, #1d5a2e 100%);
+  color: #ffffff;
+  padding: 64px 0 54px 0;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.landing-root .lp-page-banner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 80% 20%, rgba(126, 217, 87, 0.18) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+.landing-root .lp-page-banner-content {
+  max-width: 800px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 1;
+}
+
+.landing-root .lp-page-badge {
+  display: inline-block;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #7ed957;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  padding: 5px 14px;
+  border-radius: 9999px;
+  margin-bottom: 14px;
+}
+
+.landing-root .lp-page-banner h1 {
+  font-size: 40px;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0 0 14px 0;
+  line-height: 1.2;
+}
+
+.landing-root .lp-page-banner p {
+  font-size: 16px;
+  line-height: 1.6;
+  opacity: 0.9;
+  margin: 0;
+  color: #e7f3e9;
+}
+
+/* --- About Story Section --- */
+.landing-root .lp-about-story-section {
+  padding: 64px 0;
+  background: #ffffff;
+}
+
+.landing-root .lp-about-story-grid {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 48px;
+  align-items: center;
+}
+
+.landing-root .lp-about-highlights-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.landing-root .lp-about-highlight-box {
+  background: var(--lp-green-lighter);
+  border: 1px solid rgba(0, 137, 77, 0.15);
+  border-radius: 12px;
+  padding: 16px 14px;
+}
+
+.landing-root .lp-about-img-frame {
+  position: relative;
+}
+
+.landing-root .lp-about-experience-pill {
+  position: absolute;
+  bottom: -16px;
+  left: 24px;
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 14px 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(0, 137, 77, 0.2);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.landing-root .lp-contact-cta-band {
+  background: linear-gradient(135deg, var(--lp-green) 0%, #15803d 100%);
+  color: #ffffff;
+  padding: 44px 0;
+  margin-top: 40px;
+}
+
+.landing-root .lp-contact-cta-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+/* --- Products Catalog Page --- */
+.landing-root .lp-products-catalog-section {
+  padding: 56px 0;
+  background: #fbfdfc;
+}
+
+.landing-root .lp-products-filter-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 40px;
+  flex-wrap: wrap;
+}
+
+.landing-root .lp-filter-pill {
+  background: #ffffff;
+  border: 1px solid rgba(0, 137, 77, 0.2);
+  color: var(--lp-text);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 9px 20px;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+
+.landing-root .lp-filter-pill:hover,
+.landing-root .lp-filter-pill.active {
+  background: var(--lp-green);
+  color: #ffffff;
+  border-color: var(--lp-green);
+  box-shadow: 0 4px 14px rgba(0, 137, 77, 0.3);
+}
+
+.landing-root .lp-products-showcase-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 32px;
+}
+
+.landing-root .lp-product-showcase-card {
+  background: #ffffff;
+  border-radius: 20px;
+  border: 1px solid rgba(0, 137, 77, 0.15);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.landing-root .lp-product-showcase-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px rgba(0, 137, 77, 0.12);
+}
+
+.landing-root .lp-product-showcase-image-wrapper {
+  position: relative;
+  height: 250px;
+  background: var(--lp-green-card);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.landing-root .lp-product-showcase-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.landing-root .lp-product-category-tag {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  background: rgba(26, 60, 120, 0.9);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  backdrop-blur: 4px;
+}
+
+.landing-root .lp-product-showcase-content {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.landing-root .lp-product-showcase-content h3 {
+  font-size: 20px;
+  color: var(--lp-dark-blue);
+  margin: 0 0 6px 0;
+}
+
+.landing-root .lp-product-subtitle {
+  font-size: 13px;
+  color: var(--lp-text-light);
+  margin: 0 0 18px 0;
+  line-height: 1.5;
+}
+
+.landing-root .lp-product-specs-list {
+  background: #f8faf9;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  border: 1px solid #edf2ef;
+}
+
+.landing-root .lp-spec-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #444;
+  margin-bottom: 4px;
+}
+
+.landing-root .lp-spec-item:last-child {
+  margin-bottom: 0;
+}
+
+.landing-root .lp-bullet-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--lp-green);
+  flex-shrink: 0;
+}
+
+.landing-root .lp-product-features-list {
+  margin-bottom: 22px;
+}
+
+.landing-root .lp-feature-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  color: #444;
+  margin-bottom: 6px;
+  line-height: 1.4;
+}
+
+.landing-root .lp-product-card-action {
+  margin-top: auto;
+  padding-top: 10px;
+}
+
+.landing-root .lp-product-inquire-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  background: linear-gradient(135deg, var(--lp-green) 0%, #15803d 100%);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 11px 20px;
+  border-radius: 8px;
+  text-decoration: none;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.landing-root .lp-product-inquire-btn:hover {
+  opacity: 0.95;
+  transform: translateY(-1px);
+}
+
+.landing-root .lp-custom-package-band {
+  padding: 30px 0 60px 0;
+}
+
+/* --- Notice Board Page --- */
+.landing-root .lp-notices-page-section {
+  padding: 56px 0;
+  background: #fdfdfd;
+}
+
+.landing-root .lp-notices-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.landing-root .lp-notice-feed-card {
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid rgba(0, 137, 77, 0.15);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+  padding: 26px 28px;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.landing-root .lp-notice-feed-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 137, 77, 0.1);
+}
+
+.landing-root .lp-notice-feed-header {
+  margin-bottom: 12px;
+}
+
+.landing-root .lp-notice-pill {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 20px;
+  border: 1px solid transparent;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.landing-root .lp-notice-date-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: #888;
+}
+
+.landing-root .lp-notice-feed-title {
+  font-size: 20px;
+  color: var(--lp-dark-blue);
+  margin: 0 0 10px 0;
+  line-height: 1.35;
+}
+
+.landing-root .lp-notice-feed-summary {
+  font-size: 14px;
+  color: #555;
+  line-height: 1.6;
+  margin: 0 0 16px 0;
+}
+
+.landing-root .lp-notice-feed-details {
+  background: #f7faf8;
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 18px;
+  border: 1px solid #e7efe9;
+}
+
+.landing-root .lp-notice-feed-footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.landing-root .lp-notice-action-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--lp-teal);
+  text-decoration: none;
+  transition: gap 0.2s;
+}
+
+.landing-root .lp-notice-action-link:hover {
+  color: var(--lp-green);
+  gap: 9px;
+}
+
+@media (max-width: 900px) {
+  .landing-root .lp-about-story-grid {
+    grid-template-columns: 1fr;
+    gap: 36px;
+  }
+  .landing-root .lp-about-highlights-grid {
+    grid-template-columns: 1fr;
+  }
+  .landing-root .lp-products-showcase-grid {
+    grid-template-columns: 1fr;
+  }
+  .landing-root .lp-page-banner h1 {
+    font-size: 30px;
+  }
+}
+

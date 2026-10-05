@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { Link } from "wouter";
 import {
   ShieldCheck,
   PenSquare,
@@ -40,11 +41,11 @@ const NOTICES = [
    Nav links
    ─────────────────────────────────────────── */
 const NAV_LINKS = [
-  { label: "Home", href: "#home" },
-  { label: "About Us", href: "#about" },
-  { label: "Products", href: "#products" },
-  { label: "Notice", href: "#notice" },
-  { label: "Contact Us", href: "#contact" },
+  { label: "Home", href: "/" },
+  { label: "About Us", href: "/about-us" },
+  { label: "Products", href: "/products" },
+  { label: "Notice", href: "/notice" },
+  { label: "Contact Us", href: "/contact-us" },
 ] as const;
 
 /* ───────────────────────────────────────────
@@ -201,13 +202,22 @@ export default function Landing() {
             <ul className="lp-nav">
               {NAV_LINKS.map((link) => (
                 <li key={link.href}>
-                  <a
-                    href={link.href}
-                    className={activeSection === link.href.replace("#", "") ? "active" : ""}
-                    onClick={(e) => handleNavClick(e, link.href)}
-                  >
-                    {link.label}
-                  </a>
+                  {link.href === "/" ? (
+                    <a
+                      href="#home"
+                      className={activeSection === "home" ? "active" : ""}
+                      onClick={(e) => handleNavClick(e, "#home")}
+                    >
+                      {link.label}
+                    </a>
+                  ) : (
+                    <Link
+                      href={link.href}
+                      className={activeSection === link.href.replace("/", "") ? "active" : ""}
+                    >
+                      {link.label}
+                    </Link>
+                  )}
                 </li>
               ))}
             </ul>
@@ -238,14 +248,25 @@ export default function Landing() {
           aria-label="Mobile navigation"
         >
           {NAV_LINKS.map((link) => (
-            <a
-              key={link.href}
-              href={link.href}
-              className={activeSection === link.href.replace("#", "") ? "active" : ""}
-              onClick={(e) => handleNavClick(e, link.href)}
-            >
-              {link.label}
-            </a>
+            link.href === "/" ? (
+              <a
+                key={link.href}
+                href="#home"
+                className={activeSection === "home" ? "active" : ""}
+                onClick={(e) => handleNavClick(e, "#home")}
+              >
+                {link.label}
+              </a>
+            ) : (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={activeSection === link.href.replace("/", "") ? "active" : ""}
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                {link.label}
+              </Link>
+            )
           ))}
           <a href="/login" className="lp-portal-btn" style={{ alignSelf: "flex-start", marginTop: 8 }}>
             <LockKeyhole size={16} />
@@ -666,24 +687,16 @@ export default function Landing() {
                   </a>
                 </li>
                 <li>
-                  <a href="#about" onClick={(e) => handleNavClick(e, "#about")}>
-                    About Us
-                  </a>
+                  <Link href="/about-us">About Us</Link>
                 </li>
                 <li>
-                  <a href="#products" onClick={(e) => handleNavClick(e, "#products")}>
-                    Products
-                  </a>
+                  <Link href="/products">Products</Link>
                 </li>
                 <li>
-                  <a href="#notice" onClick={(e) => handleNavClick(e, "#notice")}>
-                    Notice Board
-                  </a>
+                  <Link href="/notice">Notice Board</Link>
                 </li>
                 <li>
-                  <a href="#contact" onClick={(e) => handleNavClick(e, "#contact")}>
-                    Contact Us
-                  </a>
+                  <Link href="/contact-us">Contact Us</Link>
                 </li>
                 <li>
                   <a href="/login" className="lp-footer-login-link">
@@ -699,29 +712,19 @@ export default function Landing() {
               <h4 className="lp-footer-col-title">Our Products</h4>
               <ul className="lp-footer-nav-list">
                 <li>
-                  <a href="#products" onClick={(e) => handleNavClick(e, "#products")}>
-                    Institutional &amp; School ID Cards
-                  </a>
+                  <Link href="/products">Institutional &amp; School ID Cards</Link>
                 </li>
                 <li>
-                  <a href="#products" onClick={(e) => handleNavClick(e, "#products")}>
-                    Custom Printed &amp; Plain Lanyards
-                  </a>
+                  <Link href="/products">Custom Printed &amp; Plain Lanyards</Link>
                 </li>
                 <li>
-                  <a href="#products" onClick={(e) => handleNavClick(e, "#products")}>
-                    Durable ID Card Holders
-                  </a>
+                  <Link href="/products">Durable ID Card Holders</Link>
                 </li>
                 <li>
-                  <a href="#products" onClick={(e) => handleNavClick(e, "#products")}>
-                    Metal Hooks &amp; Retractable Yoyos
-                  </a>
+                  <Link href="/products">Metal Hooks &amp; Retractable Yoyos</Link>
                 </li>
                 <li>
-                  <a href="#contact" onClick={(e) => handleNavClick(e, "#contact")}>
-                    Customized Institutional Packages
-                  </a>
+                  <Link href="/contact-us">Customized Institutional Packages</Link>
                 </li>
               </ul>
             </div>

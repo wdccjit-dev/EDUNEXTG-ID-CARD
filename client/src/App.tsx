@@ -17,6 +17,10 @@ const ResetPassword = lazy(() =>
   import("./pages/PasswordReset").then((module) => ({ default: module.ResetPassword })),
 );
 const Landing = lazy(() => import("./pages/Landing"));
+const AboutUsPage = lazy(() => import("./pages/AboutUsPage"));
+const ProductsPage = lazy(() => import("./pages/ProductsPage"));
+const NoticePage = lazy(() => import("./pages/NoticePage"));
+const ContactUsPage = lazy(() => import("./pages/ContactUsPage"));
 
 function getPortalForRole(role: string): "admin" | "school" | "marketing" {
   if (role === "SUPER_ADMIN") return "admin";
@@ -107,6 +111,10 @@ function Router() {
       <Route path="/marketing/notifications"><ProtectedPortal portal="marketing" initialNav="Overview" /></Route>
       <Route path="/marketing/settings"><ProtectedPortal portal="marketing" initialNav="Settings" /></Route>
       <Route path="/about"><ProtectedPortal portal="school" initialNav="About Us" /></Route>
+      <Route path="/about-us"><AboutUsPage /></Route>
+      <Route path="/products"><ProductsPage /></Route>
+      <Route path="/notice"><NoticePage /></Route>
+      <Route path="/contact-us"><ContactUsPage /></Route>
       <Route path="/"><Landing /></Route>
       <Route><PortalRedirect /></Route>
     </Switch>
