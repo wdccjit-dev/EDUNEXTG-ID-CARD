@@ -13,6 +13,13 @@ import {
   LockKeyhole,
   Megaphone,
   ArrowRight,
+  Phone,
+  Mail,
+  MapPin,
+  Clock,
+  Send,
+  CheckCircle2,
+  ArrowUp,
 } from "lucide-react";
 
 /* ───────────────────────────────────────────
@@ -95,6 +102,16 @@ const STATS = [
 export default function Landing() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState("home");
+  const [formData, setFormData] = useState({
+    name: "",
+    institution: "",
+    email: "",
+    phone: "",
+    product: "ID Cards",
+    message: "",
+  });
+  const [formSubmitted, setFormSubmitted] = useState(false);
+  const [formLoading, setFormLoading] = useState(false);
 
   /* ── Set document title ── */
   useEffect(() => {
@@ -148,6 +165,16 @@ export default function Landing() {
     });
     return () => observer.disconnect();
   }, []);
+
+  /* ── Contact form submit handler ── */
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormLoading(true);
+    setTimeout(() => {
+      setFormLoading(false);
+      setFormSubmitted(true);
+    }, 600);
+  };
 
   return (
     <div className="landing-root">
@@ -277,7 +304,6 @@ export default function Landing() {
             {/* Mobile: marquee */}
             <div className="lp-clients-marquee">
               <div className="lp-marquee-track">
-                {/* Duplicate the logos for seamless looping */}
                 {[...CLIENT_LOGOS, ...CLIENT_LOGOS].map((logo, i) => (
                   <img
                     key={i}
@@ -302,7 +328,6 @@ export default function Landing() {
               <div className="lp-product-card-primary" tabIndex={0}>
                 <div className="card-default">
                   <div className="card-image-area">
-                    {/* product-idcards.jpg may be missing; use a solid bg as fallback */}
                     <img
                       src="/home/product-idcards.jpg"
                       alt="ID Cards"
@@ -319,8 +344,7 @@ export default function Landing() {
                       <h3>ID CARDS</h3>
                       <p>School, College &amp; Institutional ID Cards</p>
                     </div>
-                    {/* TODO: link to real product page */}
-                    <a href="#contact" className="lp-arrow-btn lp-arrow-btn-green" aria-label="View ID Cards">
+                    <a href="#contact" className="lp-arrow-btn lp-arrow-btn-green" aria-label="View ID Cards" onClick={(e) => handleNavClick(e, "#contact")}>
                       <ChevronRight size={18} />
                     </a>
                   </div>
@@ -351,8 +375,7 @@ export default function Landing() {
                     <h3>{card.title}</h3>
                     <p>{card.subtitle}</p>
                     <div className="card-body-footer">
-                      {/* TODO: link to real product page */}
-                      <a href="#contact" className="lp-arrow-btn" aria-label={`View ${card.title}`}>
+                      <a href="#contact" className="lp-arrow-btn" aria-label={`Inquire about ${card.title}`} onClick={(e) => handleNavClick(e, "#contact")}>
                         <ChevronRight size={18} />
                       </a>
                     </div>
@@ -363,7 +386,7 @@ export default function Landing() {
           </div>
         </section>
 
-        {/* ════════════ WHY CHOOSE ════════════ */}
+        {/* ════════════ ABOUT US / WHY CHOOSE ════════════ */}
         <section id="about" className="lp-why-choose">
           <div className="lp-container">
             <div className="lp-why-inner">
@@ -457,36 +480,342 @@ export default function Landing() {
                   ))}
                 </div>
                 <div className="lp-notices-footer">
-                  <a href="#notice" onClick={(e) => handleNavClick(e, "#notice")}>
-                    VIEW ALL NOTICE <ChevronRight size={14} />
+                  <a href="#contact" onClick={(e) => handleNavClick(e, "#contact")}>
+                    CONTACT FOR DETAILS <ChevronRight size={14} />
                   </a>
                 </div>
               </div>
             </div>
           </div>
         </section>
+
+        {/* ════════════ CONTACT US (Dedicated Section) ════════════ */}
+        <section id="contact" className="lp-contact-section">
+          <div className="lp-container">
+            <div className="lp-section-title">
+              <span className="line" />
+              <h2 className="font-heading">Contact Us</h2>
+              <span className="line" />
+            </div>
+            <p className="lp-contact-subtitle">
+              Get in touch with our team for bulk institutional orders, custom designs, or free product samples.
+            </p>
+
+            <div className="lp-contact-grid">
+              {/* Left Column: Direct Contact Info */}
+              <div className="lp-contact-info-cards">
+                <div className="lp-contact-card">
+                  <div className="lp-contact-icon-box">
+                    <Phone size={22} />
+                  </div>
+                  <div>
+                    <h4>Phone &amp; WhatsApp Support</h4>
+                    <p className="lp-contact-main-text">+91 98765 43210 &nbsp;|&nbsp; +91 98765 43211</p>
+                    <p className="lp-contact-sub-text">Mon – Sat: 9:30 AM – 6:30 PM IST</p>
+                  </div>
+                </div>
+
+                <div className="lp-contact-card">
+                  <div className="lp-contact-icon-box">
+                    <Mail size={22} />
+                  </div>
+                  <div>
+                    <h4>Email Inquiries</h4>
+                    <p className="lp-contact-main-text">sales@insighteducation.in</p>
+                    <p className="lp-contact-sub-text">Quick responses within 2–4 business hours</p>
+                  </div>
+                </div>
+
+                <div className="lp-contact-card">
+                  <div className="lp-contact-icon-box">
+                    <MapPin size={22} />
+                  </div>
+                  <div>
+                    <h4>Production &amp; Head Office</h4>
+                    <p className="lp-contact-main-text">Insight Education Identity Solutions</p>
+                    <p className="lp-contact-sub-text">Plot 42, Okhla Industrial Area Phase-II, New Delhi – 110020</p>
+                  </div>
+                </div>
+
+                <div className="lp-contact-card">
+                  <div className="lp-contact-icon-box">
+                    <Clock size={22} />
+                  </div>
+                  <div>
+                    <h4>Institutional Dispatch &amp; Delivery</h4>
+                    <p className="lp-contact-main-text">Pan-India Express Shipping</p>
+                    <p className="lp-contact-sub-text">Express 3–5 days turnaround for confirmed school batches</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Inquiry Form */}
+              <div className="lp-contact-form-card">
+                <h3 className="font-heading">Request a Quote or Sample Kit</h3>
+                <p className="lp-form-intro">Fill out the quick form below and our institutional specialist will get back to you promptly.</p>
+
+                {formSubmitted ? (
+                  <div className="lp-form-success">
+                    <CheckCircle2 size={36} className="text-green-600" />
+                    <div>
+                      <h4>Thank You for Your Inquiry!</h4>
+                      <p>We have received your requirement. A member of our education specialist team will contact you shortly.</p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormSubmitted(false);
+                          setFormData({ name: "", institution: "", email: "", phone: "", product: "ID Cards", message: "" });
+                        }}
+                        className="lp-form-reset-btn"
+                      >
+                        Send Another Inquiry
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <form onSubmit={handleFormSubmit} className="lp-contact-form">
+                    <div className="lp-form-row">
+                      <div className="lp-form-group">
+                        <label htmlFor="contact-name">Your Name *</label>
+                        <input
+                          id="contact-name"
+                          type="text"
+                          required
+                          placeholder="e.g. Ramesh Kumar"
+                          value={formData.name}
+                          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        />
+                      </div>
+                      <div className="lp-form-group">
+                        <label htmlFor="contact-institution">School / College / Organization *</label>
+                        <input
+                          id="contact-institution"
+                          type="text"
+                          required
+                          placeholder="e.g. Delhi Public School"
+                          value={formData.institution}
+                          onChange={(e) => setFormData({ ...formData, institution: e.target.value })}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="lp-form-row">
+                      <div className="lp-form-group">
+                        <label htmlFor="contact-email">Email Address *</label>
+                        <input
+                          id="contact-email"
+                          type="email"
+                          required
+                          placeholder="principal@school.edu.in"
+                          value={formData.email}
+                          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        />
+                      </div>
+                      <div className="lp-form-group">
+                        <label htmlFor="contact-phone">Phone / WhatsApp Number *</label>
+                        <input
+                          id="contact-phone"
+                          type="tel"
+                          required
+                          placeholder="+91 98765 00000"
+                          value={formData.phone}
+                          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="lp-form-group">
+                      <label htmlFor="contact-product">Interested Solution</label>
+                      <select
+                        id="contact-product"
+                        value={formData.product}
+                        onChange={(e) => setFormData({ ...formData, product: e.target.value })}
+                      >
+                        <option value="ID Cards">Student &amp; Staff ID Cards</option>
+                        <option value="Lanyards">Customized Sublimation Lanyards &amp; Ribbons</option>
+                        <option value="Holders">ID Card Holders (Soft &amp; Hard)</option>
+                        <option value="Clips & Hooks">Metal Clips, Hooks &amp; Yoyos</option>
+                        <option value="Complete Package">Complete ID Card Package (Cards + Lanyards + Holders)</option>
+                        <option value="Bulk Order">Bulk Order / Annual School Contract</option>
+                      </select>
+                    </div>
+
+                    <div className="lp-form-group">
+                      <label htmlFor="contact-message">Estimated Quantity or Details</label>
+                      <textarea
+                        id="contact-message"
+                        rows={3}
+                        placeholder="Tell us about your estimated student strength or custom design requirements..."
+                        value={formData.message}
+                        onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                      />
+                    </div>
+
+                    <button type="submit" className="lp-form-submit-btn" disabled={formLoading}>
+                      {formLoading ? "Sending..." : "Submit Inquiry"} <Send size={16} />
+                    </button>
+                  </form>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
       </main>
 
-      {/* ════════════ FOOTER ════════════ */}
-      <footer id="contact" className="lp-footer" role="contentinfo">
+      {/* ════════════ FOOTER (Expanded) ════════════ */}
+      <footer className="lp-footer" role="contentinfo">
         <div className="lp-container">
-          <div className="lp-footer-inner">
-            <img
-              src="/insight-education-logo.png"
-              alt="Insight Education logo"
-              width={120}
-              height={48}
-              loading="lazy"
-            />
-            <div className="lp-footer-contact">
-              {/* TODO: replace with real contact details */}
-              <a href="mailto:info@insighteducation.com">info@insighteducation.com</a>
-              <a href="tel:+910000000000">+91 00000 00000</a>
+          <div className="lp-footer-grid">
+            {/* Column 1: About Us / Brand */}
+            <div className="lp-footer-col">
+              <a href="#home" onClick={(e) => handleNavClick(e, "#home")}>
+                <img
+                  src="/insight-education-logo.png"
+                  alt="Insight Education logo"
+                  className="lp-footer-logo"
+                  width={140}
+                  height={56}
+                  loading="lazy"
+                />
+              </a>
+              <p className="lp-footer-brand-desc">
+                Insight Education is a trusted manufacturer and supplier of institutional identity solutions,
+                providing premium ID cards, custom lanyards, holders, and accessories across 500+ institutions.
+              </p>
+              <div className="lp-footer-badge">
+                <ShieldCheck size={16} />
+                <span>Quality Guaranteed &amp; Verified</span>
+              </div>
             </div>
-            <span className="lp-footer-copy">© {new Date().getFullYear()} Insight Education. All rights reserved.</span>
+
+            {/* Column 2: Quick Links (About Us, Products, Notice, Contact Us) */}
+            <div className="lp-footer-col">
+              <h4 className="lp-footer-col-title">Quick Navigation</h4>
+              <ul className="lp-footer-nav-list">
+                <li>
+                  <a href="#home" onClick={(e) => handleNavClick(e, "#home")}>
+                    Home
+                  </a>
+                </li>
+                <li>
+                  <a href="#about" onClick={(e) => handleNavClick(e, "#about")}>
+                    About Us
+                  </a>
+                </li>
+                <li>
+                  <a href="#products" onClick={(e) => handleNavClick(e, "#products")}>
+                    Products
+                  </a>
+                </li>
+                <li>
+                  <a href="#notice" onClick={(e) => handleNavClick(e, "#notice")}>
+                    Notice Board
+                  </a>
+                </li>
+                <li>
+                  <a href="#contact" onClick={(e) => handleNavClick(e, "#contact")}>
+                    Contact Us
+                  </a>
+                </li>
+                <li>
+                  <a href="/login" className="lp-footer-login-link">
+                    <LockKeyhole size={13} />
+                    School Portal Login
+                  </a>
+                </li>
+              </ul>
+            </div>
+
+            {/* Column 3: Products */}
+            <div className="lp-footer-col">
+              <h4 className="lp-footer-col-title">Our Products</h4>
+              <ul className="lp-footer-nav-list">
+                <li>
+                  <a href="#products" onClick={(e) => handleNavClick(e, "#products")}>
+                    Institutional &amp; School ID Cards
+                  </a>
+                </li>
+                <li>
+                  <a href="#products" onClick={(e) => handleNavClick(e, "#products")}>
+                    Custom Printed &amp; Plain Lanyards
+                  </a>
+                </li>
+                <li>
+                  <a href="#products" onClick={(e) => handleNavClick(e, "#products")}>
+                    Durable ID Card Holders
+                  </a>
+                </li>
+                <li>
+                  <a href="#products" onClick={(e) => handleNavClick(e, "#products")}>
+                    Metal Hooks &amp; Retractable Yoyos
+                  </a>
+                </li>
+                <li>
+                  <a href="#contact" onClick={(e) => handleNavClick(e, "#contact")}>
+                    Customized Institutional Packages
+                  </a>
+                </li>
+              </ul>
+            </div>
+
+            {/* Column 4: Contact Us */}
+            <div className="lp-footer-col">
+              <h4 className="lp-footer-col-title">Contact Us</h4>
+              <div className="lp-footer-contact-details">
+                <div className="lp-footer-contact-row">
+                  <MapPin size={18} className="lp-footer-icon" />
+                  <span>Plot 42, Okhla Industrial Area Phase-II, New Delhi – 110020</span>
+                </div>
+                <div className="lp-footer-contact-row">
+                  <Phone size={18} className="lp-footer-icon" />
+                  <a href="tel:+919876543210">+91 98765 43210 / 11</a>
+                </div>
+                <div className="lp-footer-contact-row">
+                  <Mail size={18} className="lp-footer-icon" />
+                  <a href="mailto:sales@insighteducation.in">sales@insighteducation.in</a>
+                </div>
+                <div className="lp-footer-contact-row">
+                  <Clock size={18} className="lp-footer-icon" />
+                  <span>Mon – Sat: 9:30 AM – 6:30 PM</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom Bar */}
+          <div className="lp-footer-bottom">
+            <span className="lp-footer-copy">
+              © {new Date().getFullYear()} Insight Education Solutions. All rights reserved.
+            </span>
+            <div className="lp-footer-bottom-links">
+              <a href="#about" onClick={(e) => handleNavClick(e, "#about")}>
+                About
+              </a>
+              <span>•</span>
+              <a href="#products" onClick={(e) => handleNavClick(e, "#products")}>
+                Products
+              </a>
+              <span>•</span>
+              <a href="#notice" onClick={(e) => handleNavClick(e, "#notice")}>
+                Notice
+              </a>
+              <span>•</span>
+              <a href="#contact" onClick={(e) => handleNavClick(e, "#contact")}>
+                Contact
+              </a>
+            </div>
+            <a
+              href="#home"
+              className="lp-back-to-top"
+              aria-label="Back to top"
+              onClick={(e) => handleNavClick(e, "#home")}
+            >
+              Back to Top <ArrowUp size={15} />
+            </a>
           </div>
         </div>
       </footer>
     </div>
   );
 }
+
