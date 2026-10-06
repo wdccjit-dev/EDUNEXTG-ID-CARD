@@ -9,7 +9,6 @@ import {
   Phone,
   Mail,
   Clock,
-  ArrowUp,
 } from "lucide-react";
 
 export const PUBLIC_NAV_LINKS = [
@@ -28,11 +27,6 @@ export default function PublicLayout({ children, activePath }: PublicLayoutProps
   const [location] = useLocation();
   const currentPath = activePath || location;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  const scrollToTop = (e: React.MouseEvent) => {
-    e.preventDefault();
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
 
   return (
     <div className="landing-root">
@@ -71,10 +65,10 @@ export default function PublicLayout({ children, activePath }: PublicLayoutProps
           </nav>
 
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            {/* Portal Login button */}
+            {/* Login button */}
             <a href="/login" className="lp-portal-btn">
               <LockKeyhole size={16} />
-              Portal Login
+              Login
             </a>
 
             {/* Hamburger (mobile) */}
@@ -115,7 +109,7 @@ export default function PublicLayout({ children, activePath }: PublicLayoutProps
             style={{ alignSelf: "flex-start", marginTop: 8 }}
           >
             <LockKeyhole size={16} />
-            Portal Login
+            Login
           </a>
         </nav>
       </header>
@@ -202,15 +196,15 @@ export default function PublicLayout({ children, activePath }: PublicLayoutProps
               <div className="lp-footer-contact-details">
                 <div className="lp-footer-contact-row">
                   <MapPin size={18} className="lp-footer-icon" />
-                  <span>Plot 42, Okhla Industrial Area Phase-II, New Delhi – 110020</span>
+                  <span>AF-333, Rabindrapally, Talbagan, P.O. Prafulla Kanan, Kolkata-700101</span>
                 </div>
                 <div className="lp-footer-contact-row">
                   <Phone size={18} className="lp-footer-icon" />
-                  <a href="tel:+919876543210">+91 98765 43210 / 11</a>
+                  <a href="tel:+918100879809">+91 81008 79809</a>
                 </div>
                 <div className="lp-footer-contact-row">
                   <Mail size={18} className="lp-footer-icon" />
-                  <a href="mailto:sales@insighteducation.in">sales@insighteducation.in</a>
+                  <a href="mailto:insiteducation@gmail.com">insiteducation@gmail.com</a>
                 </div>
                 <div className="lp-footer-contact-row">
                   <Clock size={18} className="lp-footer-icon" />
@@ -225,14 +219,6 @@ export default function PublicLayout({ children, activePath }: PublicLayoutProps
             <span className="lp-footer-copy">
               © {new Date().getFullYear()} Insight Education Solutions. All rights reserved.
             </span>
-            <a
-              href="#top"
-              className="lp-back-to-top"
-              aria-label="Back to top"
-              onClick={scrollToTop}
-            >
-              Back to Top <ArrowUp size={15} />
-            </a>
           </div>
         </div>
       </footer>
