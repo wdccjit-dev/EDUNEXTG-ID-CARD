@@ -476,15 +476,15 @@ export default function Landing() {
               <div className="lp-footer-contact-details">
                 <div className="lp-footer-contact-row">
                   <MapPin size={18} className="lp-footer-icon" />
-                  <span>Plot 42, Okhla Industrial Area Phase-II, New Delhi – 110020</span>
+                  <span>AF-333, Rabindrapally, Talbagan, P.O. Prafulla Kanan, Kolkata-700101</span>
                 </div>
                 <div className="lp-footer-contact-row">
                   <Phone size={18} className="lp-footer-icon" />
-                  <a href="tel:+919876543210">+91 98765 43210 / 11</a>
+                  <a href="tel:+918100879809">+91 81008 79809</a>
                 </div>
                 <div className="lp-footer-contact-row">
                   <Mail size={18} className="lp-footer-icon" />
-                  <a href="mailto:sales@insighteducation.in">sales@insighteducation.in</a>
+                  <a href="mailto:insiteducation@gmail.com">insiteducation@gmail.com</a>
                 </div>
                 <div className="lp-footer-contact-row">
                   <Clock size={18} className="lp-footer-icon" />
