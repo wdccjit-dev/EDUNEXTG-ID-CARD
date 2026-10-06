@@ -368,7 +368,7 @@ export default function OrderListView({
                 <th className="py-3 px-4">Type</th>
                 <th className="py-3 px-4">Class/Sec</th>
                 <th className="py-3 px-4 text-right">Qty</th>
-                <th className="py-3 px-4">Hook / Clip</th>
+                <th className="py-3 px-4">Hook / Clamps</th>
                 <th className="py-3 px-4">Status</th>
                 <th className="py-3 px-4 text-right">Actions</th>
               </tr>
@@ -433,7 +433,7 @@ export default function OrderListView({
                       </td>
                       <td className="py-3 px-4 text-muted-foreground text-[11px]">
                         <div>{ord.hookType}</div>
-                        <div className="text-[10px] text-muted-foreground">Clip: {ord.clip ? "Yes" : "No"}</div>
+                        <div className="text-[10px] text-muted-foreground">Clamps: {ord.clip ? "Yes" : "No"}</div>
                       </td>
                       <td className="py-3 px-4">
                         <Badge
@@ -596,14 +596,14 @@ export default function OrderListView({
                   </div>
                   <div className="rounded-xl border border-border p-2.5">
                     <span className="text-muted-foreground font-semibold block text-[10px] uppercase">Card Material</span>
-                    <span className="font-bold text-foreground">{selectedOrder.cardMaterial === "PVC_PREMIUM" ? "PVC Premium" : "PVC Standard"}</span>
+                    <span className="font-bold text-foreground">{selectedOrder.cardMaterial === "PVC_PREMIUM" ? "PVC Core" : "PVC Inkjet"}</span>
                   </div>
                   <div className="rounded-xl border border-border p-2.5">
                     <span className="text-muted-foreground font-semibold block text-[10px] uppercase">Hook Type</span>
                     <span className="font-bold text-foreground">{selectedOrder.hookType}</span>
                   </div>
                   <div className="rounded-xl border border-border p-2.5">
-                    <span className="text-muted-foreground font-semibold block text-[10px] uppercase">Clip Included</span>
+                    <span className="text-muted-foreground font-semibold block text-[10px] uppercase">Clamps Included</span>
                     <span className="font-bold text-foreground">{selectedOrder.clip ? "Yes" : "No"}</span>
                   </div>
                 </div>

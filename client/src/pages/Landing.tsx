@@ -58,8 +58,8 @@ const PRODUCT_CARDS = [
     image: "/home/product-holders.jpg",
   },
   {
-    title: "CLIPS & HOOKS",
-    subtitle: "Metal Hooks, Plastic Clips & Attachments",
+    title: "CLAMPS & HOOKS",
+    subtitle: "Metal Hooks, Plastic Clamps & Attachments",
     image: "/home/product-clips.jpg",
   },
 ] as const;
@@ -238,7 +238,7 @@ export default function Landing() {
           <div className="lp-hero-image">
             <img
               src="/home/hero-products.jpg"
-              alt="ID cards, lanyards, holders and clips displayed together"
+              alt="ID cards, lanyards, holders and clamps displayed together"
               width={988}
               height={380}
             />
@@ -374,7 +374,7 @@ export default function Landing() {
                     <span className="highlight-green">Your Requirement</span>
                   </h3>
                   <p>
-                    Choose your card design, holder, ribbon, colour, clip and finishing according to your
+                    Choose your card design, holder, ribbon, colour, clamp and finishing according to your
                     institution's requirements.
                   </p>
                   <Link href="/contact-us" className="lp-banner-cta">

@@ -29,8 +29,8 @@ export type LanyardSize = (typeof LANYARD_SIZES)[number];
 
 
 export const CARD_MATERIALS = [
-  { value: "PVC_STANDARD", label: "PVC Standard" },
-  { value: "PVC_PREMIUM", label: "PVC Premium" },
+  { value: "PVC_STANDARD", label: "PVC Inkjet" },
+  { value: "PVC_PREMIUM", label: "PVC Core" },
 ] as const;
 
 export type CardMaterial = (typeof CARD_MATERIALS)[number]["value"];
