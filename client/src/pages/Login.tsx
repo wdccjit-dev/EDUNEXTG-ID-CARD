@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import PublicLayout from "@/components/PublicLayout";
 
 export default function Login() {
   const [, navigate] = useLocation();
@@ -60,8 +61,9 @@ export default function Login() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background px-4 py-8 sm:px-5">
-      <div className="w-full max-w-md">
+    <PublicLayout activePath="/login">
+      <div className="flex min-h-[calc(100vh-140px)] items-center justify-center bg-background px-4 py-16 sm:px-6">
+        <div className="w-full max-w-md">
         {/* Login Form Card */}
         <form
           onSubmit={submit}
@@ -181,6 +183,7 @@ export default function Login() {
           </div>
         )}
       </div>
-    </main>
+    </div>
+  </PublicLayout>
   );
 }
