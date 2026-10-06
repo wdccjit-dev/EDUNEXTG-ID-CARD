@@ -28,6 +28,8 @@ const REQUIRED_TABLES = [
   "notifications",
   "audit_logs",
   "password_resets",
+  "orders",
+  "removed_cards_history",
 ] as const;
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
