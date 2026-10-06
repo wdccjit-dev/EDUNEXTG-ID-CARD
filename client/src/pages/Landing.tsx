@@ -17,7 +17,6 @@ import {
   Phone,
   Mail,
   Clock,
-  ArrowUp,
 } from "lucide-react";
 
 /* ───────────────────────────────────────────
@@ -166,10 +165,10 @@ export default function Landing() {
           </nav>
 
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            {/* Portal Login button */}
+            {/* Login button */}
             <a href="/login" className="lp-portal-btn">
               <LockKeyhole size={16} />
-              Portal Login
+              Login
             </a>
 
             {/* Hamburger (mobile) */}
@@ -212,7 +211,7 @@ export default function Landing() {
           ))}
           <a href="/login" className="lp-portal-btn" style={{ alignSelf: "flex-start", marginTop: 8 }}>
             <LockKeyhole size={16} />
-            Portal Login
+            Login
           </a>
         </nav>
       </header>
@@ -498,16 +497,8 @@ export default function Landing() {
           {/* Bottom Bar */}
           <div className="lp-footer-bottom">
             <span className="lp-footer-copy">
-              © {new Date().getFullYear()} Insight Education Solutions. All rights reserved.
+              © {new Date().getFullYear()}  Insight Education. All rights reserved.
             </span>
-            <a
-              href="#home"
-              className="lp-back-to-top"
-              aria-label="Back to top"
-              onClick={(e) => handleNavClick(e, "#home")}
-            >
-              Back to Top <ArrowUp size={15} />
-            </a>
           </div>
         </div>
       </footer>
