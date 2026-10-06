@@ -668,6 +668,7 @@ export default function Home({
       try {
         sessionStorage.clear();
         localStorage.clear();
+        sessionStorage.setItem("just_logged_out", "1");
       } catch {}
       window.location.replace("/login");
     }

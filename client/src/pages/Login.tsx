@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { Eye, EyeOff, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,22 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [showContactAdminModal, setShowContactAdminModal] = useState(false);
+
+  useEffect(() => {
+    // If user arrived from logout (sessionStorage flag or just generally on login page),
+    // ensure clicking browser back navigates to landing/home page '/' instead of looping or restoring previous page.
+    const isLoggedOut = sessionStorage.getItem("just_logged_out");
+    if (isLoggedOut) {
+      sessionStorage.removeItem("just_logged_out");
+      // Push state for login page so back button can be intercepted to go to '/'
+      window.history.pushState({ loginPage: true }, "", window.location.pathname);
+      const handlePopState = () => {
+        window.location.replace("/");
+      };
+      window.addEventListener("popstate", handlePopState);
+      return () => window.removeEventListener("popstate", handlePopState);
+    }
+  }, []);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
