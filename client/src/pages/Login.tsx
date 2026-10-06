@@ -1,10 +1,11 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { Eye, EyeOff, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import PublicLayout from "@/components/PublicLayout";
 
 export default function Login() {
   const [, navigate] = useLocation();
@@ -13,6 +14,22 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [showContactAdminModal, setShowContactAdminModal] = useState(false);
+
+  useEffect(() => {
+    // If user arrived from logout (sessionStorage flag or just generally on login page),
+    // ensure clicking browser back navigates to landing/home page '/' instead of looping or restoring previous page.
+    const isLoggedOut = sessionStorage.getItem("just_logged_out");
+    if (isLoggedOut) {
+      sessionStorage.removeItem("just_logged_out");
+      // Push state for login page so back button can be intercepted to go to '/'
+      window.history.pushState({ loginPage: true }, "", window.location.pathname);
+      const handlePopState = () => {
+        window.location.replace("/");
+      };
+      window.addEventListener("popstate", handlePopState);
+      return () => window.removeEventListener("popstate", handlePopState);
+    }
+  }, []);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -44,8 +61,9 @@ export default function Login() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background px-4 py-8 sm:px-5">
-      <div className="w-full max-w-md">
+    <PublicLayout activePath="/login">
+      <div className="flex min-h-[calc(100vh-140px)] items-center justify-center bg-background px-4 py-16 sm:px-6">
+        <div className="w-full max-w-md">
         {/* Login Form Card */}
         <form
           onSubmit={submit}
@@ -165,6 +183,7 @@ export default function Login() {
           </div>
         )}
       </div>
-    </main>
+    </div>
+  </PublicLayout>
   );
 }

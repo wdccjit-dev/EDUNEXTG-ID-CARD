@@ -16,7 +16,6 @@ export const PUBLIC_NAV_LINKS = [
   { label: "Home", href: "/" },
   { label: "About Us", href: "/about-us" },
   { label: "Products", href: "/products" },
-  { label: "Notice", href: "/notice" },
   { label: "Contact Us", href: "/contact-us" },
 ] as const;
 
@@ -162,9 +161,6 @@ export default function PublicLayout({ children, activePath }: PublicLayoutProps
                 </li>
                 <li>
                   <Link href="/products">Products</Link>
-                </li>
-                <li>
-                  <Link href="/notice">Notice Board</Link>
                 </li>
                 <li>
                   <Link href="/contact-us">Contact Us</Link>

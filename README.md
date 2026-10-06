@@ -25,7 +25,7 @@
   - **Bulk Photo ZIP Upload**: Upload a ZIP archive containing images named by student **Admission Number** or staff **Employee ID**; photos are automatically matched, resized, compressed (<100KB), and attached to the respective cards.
   - **Approval Pipeline**: Track full card lifecycle (`DRAFT` → `SUBMITTED` → `UNDER_REVIEW` → `APPROVED` / `CHANGES_REQUIRED` / `REJECTED` → `PRINTED`).
   - **Print & PDF Export**: Instant preview and download of single or batch print-ready cards formatted for standard CR80 PVC card dimensions.
-  - **Order Creation & Lanyard Specs**: Submit card production orders with custom specifications including card material (PVC Standard / Premium), print sides (Single / Double), lanyard color, and lanyard width.
+  - **Order Creation & Lanyard Specs**: Submit card production orders with custom specifications including card material (PVC Inkjet / Core), print sides (Single / Double), lanyard color, and lanyard width.
   - **Removed Cards History & Reports**: Dedicated reporting tabs to track cards removed or archived with full audit context (who removed, timestamp, class/section).
   - **School Settings**: Dedicated appearance settings (`/school/settings`) for personalization.
 

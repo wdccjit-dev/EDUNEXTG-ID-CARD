@@ -14,7 +14,7 @@ import {
 interface ProductItem {
   id: string;
   category: "idcards" | "lanyards" | "holders" | "clips";
-  title: "ID CARDS" | "LANYARDS / RIBBONS" | "ID CARD HOLDERS" | "CLIPS & HOOKS";
+  title: "ID CARDS" | "LANYARDS / RIBBONS" | "ID CARD HOLDERS" | "CLAMPS & HOOKS";
   displayTitle: string;
   subtitle: string;
   image: string;
@@ -50,7 +50,7 @@ const PRODUCTS_DATA: ProductItem[] = [
       "High-definition multi-color digital sublimation heat transfer",
       "Color-fast print that won't fade or peel after washing",
       "Safety breakaway buckle and quick-release detachment options",
-      "Sturdy metal fish hook, dog hook, or alligator clip attachment",
+      "Sturdy metal fish hook, dog hook, or alligator clamp attachment",
     ],
   },
   {
@@ -71,14 +71,14 @@ const PRODUCTS_DATA: ProductItem[] = [
   {
     id: "clips",
     category: "clips",
-    title: "CLIPS & HOOKS",
-    displayTitle: "Metal Hooks, Plastic Clips & Retractable Yoyos",
+    title: "CLAMPS & HOOKS",
+    displayTitle: "Metal Hooks, Plastic Clamps & Retractable Yoyos",
     subtitle: "Heavy duty connectors and badge reels for seamless wear",
     image: "/home/product-clips.jpg",
     specs: ["Corrosion-resistant nickel plating", "High-durability spring mechanisms", "Retractable cord reach: up to 60cm"],
     features: [
       "Heavy-duty dog hooks, trigger snaps, and lobster claws",
-      "Spring-loaded badge clips with reinforced clear vinyl straps",
+      "Spring-loaded badge clamps with reinforced clear vinyl straps",
       "Retractable badge reels (yoyos) with custom center logo sticker",
       "Detachable buckles and breakaway connectors for lab and child safety",
     ],
@@ -123,7 +123,7 @@ export default function ProductsPage() {
               { id: "idcards", label: "PVC ID Cards" },
               { id: "lanyards", label: "Custom Lanyards" },
               { id: "holders", label: "Card Holders" },
-              { id: "clips", label: "Clips & Attachments" },
+              { id: "clips", label: "Clamps & Attachments" },
             ].map((cat) => (
               <button
                 key={cat.id}
