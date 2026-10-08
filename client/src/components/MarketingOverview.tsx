@@ -22,7 +22,7 @@ import { format } from "date-fns";
 
 interface MarketingOverviewProps {
   user: ApiAuthUser;
-  onNavigate: (tab: "Create Order" | "Order List") => void;
+  onNavigate: (tab: "Create Order" | "Order List" | "Schools") => void;
   onViewOrder?: (order: ApiOrder) => void;
 }
 
@@ -64,7 +64,7 @@ export default function MarketingOverview({
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-2xl bg-gradient-to-r from-[#102728] via-[#15393a] to-[#1a4a49] p-6 text-white shadow-md">
         <div>
           <span className="inline-block rounded-full bg-emerald-500/20 px-3 py-0.5 text-xs font-bold text-emerald-300 border border-emerald-500/30 mb-2">
-            Marketing Portal
+            Partner Portal
           </span>
           <h1 className="text-2xl font-black tracking-tight">
             Welcome back, {user.name}
@@ -74,6 +74,13 @@ export default function MarketingOverview({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2.5">
+          <Button
+            onClick={() => onNavigate("Schools")}
+            variant="outline"
+            className="bg-white/10 hover:bg-white/20 text-white border-white/20 font-bold gap-2 rounded-xl"
+          >
+            <Building2 className="h-4 w-4" /> Partner Schools
+          </Button>
           <Button
             onClick={() => onNavigate("Create Order")}
             className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold gap-2 shadow-sm rounded-xl"

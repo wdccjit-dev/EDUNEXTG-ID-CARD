@@ -66,7 +66,7 @@ export default function OrderListView({
   initialSelectedOrder,
 }: OrderListViewProps) {
   const isSuperAdmin = user.role === "SUPER_ADMIN";
-  const isMarketingAdmin = user.role === "MARKETING_ADMIN";
+  const isMarketingAdmin = user.role === "PARTNER" || user.role === "PARTNER_ADMIN" || user.role === "MARKETING_ADMIN";
   const isSchoolAdmin = user.role === "SCHOOL_ADMIN";
 
   // Data states
@@ -198,8 +198,10 @@ export default function OrderListView({
         return <Badge className="bg-indigo-100 text-indigo-800 border-indigo-200 text-[10px] font-bold">Admin</Badge>;
       case "SCHOOL_ADMIN":
         return <Badge className="bg-teal-100 text-teal-800 border-teal-200 text-[10px] font-bold">School Admin</Badge>;
+      case "PARTNER":
+      case "PARTNER_ADMIN":
       case "MARKETING_ADMIN":
-        return <Badge className="bg-amber-100 text-amber-800 border-amber-200 text-[10px] font-bold">Marketing</Badge>;
+        return <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800 text-[10px] font-bold">Partner</Badge>;
       default:
         return <Badge variant="outline" className="text-[10px]">{role}</Badge>;
     }
@@ -213,10 +215,10 @@ export default function OrderListView({
           <h1 className="text-2xl font-black text-foreground">ID Card Orders</h1>
           <p className="text-xs text-muted-foreground mt-0.5">
             {isSuperAdmin
-              ? "All ID card batches across all partner schools and marketing reps"
+              ? "All ID card batches across all partner schools and partners"
               : isSchoolAdmin
               ? "Order batches for your school"
-              : "ID card orders placed by your marketing account"}
+              : "ID card orders placed by your partner account"}
           </p>
         </div>
         <Button
@@ -305,7 +307,7 @@ export default function OrderListView({
                   <SelectItem value="ALL">All Placed-By Roles</SelectItem>
                   <SelectItem value="SUPER_ADMIN">Super Admin</SelectItem>
                   <SelectItem value="SCHOOL_ADMIN">School Admin</SelectItem>
-                  <SelectItem value="MARKETING_ADMIN">Marketing Admin</SelectItem>
+                  <SelectItem value="PARTNER">Partner</SelectItem>
                 </SelectContent>
               </Select>
             </div>

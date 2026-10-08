@@ -22,13 +22,13 @@ const ProductsPage = lazy(() => import("./pages/ProductsPage"));
 const NoticePage = lazy(() => import("./pages/NoticePage"));
 const ContactUsPage = lazy(() => import("./pages/ContactUsPage"));
 
-function getPortalForRole(role: string): "admin" | "school" | "marketing" {
+function getPortalForRole(role: string): "admin" | "school" | "partner" {
   if (role === "SUPER_ADMIN") return "admin";
-  if (role === "MARKETING_ADMIN") return "marketing";
+  if (role === "PARTNER" || role === "PARTNER_ADMIN" || role === "MARKETING_ADMIN") return "partner";
   return "school";
 }
 
-function ProtectedPortal({ portal, initialNav }: { portal: "admin" | "school" | "marketing"; initialNav?: string }) {
+function ProtectedPortal({ portal, initialNav }: { portal: "admin" | "school" | "partner" | "marketing"; initialNav?: string }) {
   const [, navigate] = useLocation();
   const [user, setUser] = useState<ApiAuthUser | null>(null);
   const [loading, setLoading] = useState(true);
@@ -42,8 +42,11 @@ function ProtectedPortal({ portal, initialNav }: { portal: "admin" | "school" | 
         .then((nextUser) => {
           if (!isMounted) return;
           const correctPortal = getPortalForRole(nextUser.role);
-          if (portal !== correctPortal) {
-            navigate(correctPortal === "admin" ? "/admin" : correctPortal === "marketing" ? "/marketing" : "/school");
+          const isMatching =
+            portal === correctPortal ||
+            ((portal === "marketing" || portal === "partner") && correctPortal === "partner");
+          if (!isMatching) {
+            navigate(correctPortal === "admin" ? "/admin" : correctPortal === "partner" ? "/partner" : "/school");
             return;
           }
           setUser(nextUser);
@@ -51,7 +54,7 @@ function ProtectedPortal({ portal, initialNav }: { portal: "admin" | "school" | 
         })
         .catch(() => {
           if (!isMounted) return;
-          window.location.replace(portal === "marketing" ? "/marketing/login" : "/login");
+          window.location.replace(portal === "partner" || portal === "marketing" ? "/partner/login" : portal === "admin" ? "/admin/login" : "/login");
         });
     };
 
@@ -77,8 +80,8 @@ function ProtectedPortal({ portal, initialNav }: { portal: "admin" | "school" | 
     };
   }, [navigate, portal]);
 
-  if (loading) return <SchoolLoader label="Preparing your school workspace…" />;
-  return user ? <Home authenticatedUser={user} portal={portal} initialNav={initialNav} /> : null;
+  if (loading) return <SchoolLoader label="Preparing your workspace…" />;
+  return user ? <Home authenticatedUser={user} portal={portal === "marketing" ? "partner" : portal} initialNav={initialNav} /> : null;
 }
 
 function ProtectedDesigner() {
@@ -96,7 +99,7 @@ function ProtectedDesigner() {
           if (!isMounted) return;
           if (u.role !== "SUPER_ADMIN") {
             const correctPortal = getPortalForRole(u.role);
-            navigate(correctPortal === "marketing" ? "/marketing" : "/school");
+            navigate(correctPortal === "partner" ? "/partner" : "/school");
             return;
           }
           setAuthed(true);
@@ -139,6 +142,7 @@ function Router() {
       <Route path="/login"><Login /></Route>
       <Route path="/admin/login"><Login /></Route>
       <Route path="/school/login"><Login /></Route>
+      <Route path="/partner/login"><Login /></Route>
       <Route path="/marketing/login"><Login /></Route>
       <Route path="/forgot-password"><ForgotPassword /></Route>
       <Route path="/reset-password"><ResetPassword /></Route>
@@ -147,6 +151,7 @@ function Router() {
       <Route path="/admin/orders/create"><ProtectedPortal portal="admin" initialNav="Create Order" /></Route>
       <Route path="/admin/orders"><ProtectedPortal portal="admin" initialNav="Order List" /></Route>
       <Route path="/admin/schools"><ProtectedPortal portal="admin" initialNav="Schools" /></Route>
+      <Route path="/admin/partners"><ProtectedPortal portal="admin" initialNav="Partners" /></Route>
       <Route path="/admin/users"><ProtectedPortal portal="admin" initialNav="Users" /></Route>
       <Route path="/admin/templates"><ProtectedPortal portal="admin" initialNav="ID card templates" /></Route>
       <Route path="/admin/requests"><ProtectedPortal portal="admin" initialNav="ID card requests" /></Route>
@@ -166,11 +171,18 @@ function Router() {
       <Route path="/school/notifications"><ProtectedPortal portal="school" initialNav="Overview" /></Route>
       <Route path="/school/about"><ProtectedPortal portal="school" initialNav="About Us" /></Route>
       <Route path="/school/settings"><ProtectedPortal portal="school" initialNav="Settings" /></Route>
-      <Route path="/marketing"><ProtectedPortal portal="marketing" initialNav="Overview" /></Route>
-      <Route path="/marketing/orders/create"><ProtectedPortal portal="marketing" initialNav="Create Order" /></Route>
-      <Route path="/marketing/orders"><ProtectedPortal portal="marketing" initialNav="Order List" /></Route>
-      <Route path="/marketing/notifications"><ProtectedPortal portal="marketing" initialNav="Overview" /></Route>
-      <Route path="/marketing/settings"><ProtectedPortal portal="marketing" initialNav="Settings" /></Route>
+      <Route path="/partner"><ProtectedPortal portal="partner" initialNav="Overview" /></Route>
+      <Route path="/partner/schools"><ProtectedPortal portal="partner" initialNav="Schools" /></Route>
+      <Route path="/partner/orders/create"><ProtectedPortal portal="partner" initialNav="Create Order" /></Route>
+      <Route path="/partner/orders"><ProtectedPortal portal="partner" initialNav="Order List" /></Route>
+      <Route path="/partner/notifications"><ProtectedPortal portal="partner" initialNav="Overview" /></Route>
+      <Route path="/partner/settings"><ProtectedPortal portal="partner" initialNav="Settings" /></Route>
+      <Route path="/marketing"><ProtectedPortal portal="partner" initialNav="Overview" /></Route>
+      <Route path="/marketing/schools"><ProtectedPortal portal="partner" initialNav="Schools" /></Route>
+      <Route path="/marketing/orders/create"><ProtectedPortal portal="partner" initialNav="Create Order" /></Route>
+      <Route path="/marketing/orders"><ProtectedPortal portal="partner" initialNav="Order List" /></Route>
+      <Route path="/marketing/notifications"><ProtectedPortal portal="partner" initialNav="Overview" /></Route>
+      <Route path="/marketing/settings"><ProtectedPortal portal="partner" initialNav="Settings" /></Route>
       <Route path="/about"><ProtectedPortal portal="school" initialNav="About Us" /></Route>
       <Route path="/about-us"><AboutUsPage /></Route>
       <Route path="/products"><ProductsPage /></Route>
@@ -189,7 +201,7 @@ function PortalRedirect() {
       .me()
       .then((user) => {
         const correctPortal = getPortalForRole(user.role);
-        navigate(correctPortal === "admin" ? "/admin" : correctPortal === "marketing" ? "/marketing" : "/school");
+        navigate(correctPortal === "admin" ? "/admin" : correctPortal === "partner" ? "/partner" : "/school");
       })
       .catch(() => navigate("/login"));
   }, [navigate]);

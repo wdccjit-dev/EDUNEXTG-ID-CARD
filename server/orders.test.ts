@@ -400,7 +400,7 @@ describe("Order Module: Lifecycle, Scoping, Validation & RBAC", () => {
       expect(typeof item.placedByName).toBe("string");
       expect(item.placedByName.length).toBeGreaterThan(0);
       expect(typeof item.placedByRole).toBe("string");
-      expect(["SUPER_ADMIN", "SCHOOL_ADMIN", "MARKETING_ADMIN"]).toContain(item.placedByRole);
+      expect(["SUPER_ADMIN", "SCHOOL_ADMIN", "PARTNER", "PARTNER_ADMIN", "MARKETING_ADMIN"]).toContain(item.placedByRole);
     }
   });
 

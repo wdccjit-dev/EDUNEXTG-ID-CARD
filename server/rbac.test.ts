@@ -131,8 +131,24 @@ describe("RBAC: MARKETING_ADMIN Role Restrictions & Order Permissions", () => {
     expect(res.status).toBe(403);
   });
 
-  it("MARKETING_ADMIN gets 403 on schools", async () => {
+  it("PARTNER gets 200 on GET /schools and can POST /schools", async () => {
     const res = await fetch(`${baseUrl}/api/schools`, { headers: authHeader() });
+    expect(res.status).toBe(200);
+    const postRes = await fetch(`${baseUrl}/api/schools`, {
+      method: "POST",
+      headers: authHeader(),
+      body: JSON.stringify({ name: "Partner Test School", shortCode: `PTS${Date.now().toString().slice(-4)}` }),
+    });
+    expect([200, 201]).toContain(postRes.status);
+    const body = await postRes.json();
+    expect(body.name).toBe("Partner Test School");
+  });
+
+  it("PARTNER gets 403 on DELETE /schools", async () => {
+    const res = await fetch(`${baseUrl}/api/schools/999999`, {
+      method: "DELETE",
+      headers: authHeader(),
+    });
     expect(res.status).toBe(403);
   });
 
