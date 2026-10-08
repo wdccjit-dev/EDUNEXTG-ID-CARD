@@ -43,7 +43,7 @@ export default function AuditLogsSection({
 
   // Mode: "school" or "admin". School users can ONLY view "school" logs.
   const [activeMode, setActiveMode] = useState<"school" | "admin">("school");
-  const [marketingOnly, setMarketingOnly] = useState(false);
+  const [partnerOnly, setPartnerOnly] = useState(false);
 
   // Search and filter states
   const [searchQuery, setSearchQuery] = useState("");
@@ -192,12 +192,19 @@ export default function AuditLogsSection({
       });
     }
 
-    if (isAdmin && marketingOnly) {
+    if (isAdmin && partnerOnly) {
       result = result.filter(
         (i) =>
+          i.actorRole === "PARTNER" ||
+          i.actorRole === "PARTNER_ADMIN" ||
           i.actorRole === "MARKETING_ADMIN" ||
+          i.userRole === "PARTNER" ||
+          i.userRole === "PARTNER_ADMIN" ||
           i.userRole === "MARKETING_ADMIN" ||
+          Boolean((i.newValues as any)?.placedByRole === "PARTNER") ||
+          Boolean((i.newValues as any)?.placedByRole === "PARTNER_ADMIN") ||
           Boolean((i.newValues as any)?.placedByRole === "MARKETING_ADMIN") ||
+          Boolean((i as any).isPartner) ||
           Boolean((i as any).isMarketing)
       );
     }
@@ -211,7 +218,7 @@ export default function AuditLogsSection({
     schoolActionFilter,
     adminActionFilter,
     searchQuery,
-    marketingOnly,
+    partnerOnly,
   ]);
 
   // Paginated items
@@ -330,26 +337,26 @@ export default function AuditLogsSection({
               </button>
             </div>
 
-            {/* Top Action Buttons: Marketing toggle, Export CSV & Clear logs */}
+            {/* Top Action Buttons: Partner toggle, Export CSV & Clear logs */}
             <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
               {isAdmin && (
                 <div className="flex items-center gap-2 rounded-xl border border-border bg-muted/40 px-3 py-1.5 shadow-2xs">
-                  <span className="text-xs font-bold text-foreground">Marketing logs</span>
+                  <span className="text-xs font-bold text-foreground">Partner logs</span>
                   <button
                     type="button"
                     role="switch"
-                    aria-checked={marketingOnly}
+                    aria-checked={partnerOnly}
                     onClick={() => {
-                      setMarketingOnly(!marketingOnly);
+                      setPartnerOnly(!partnerOnly);
                       setPage(1);
                     }}
                     className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                      marketingOnly ? "bg-primary" : "bg-muted"
+                      partnerOnly ? "bg-primary" : "bg-muted"
                     }`}
                   >
                     <span
                       className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                        marketingOnly ? "translate-x-4" : "translate-x-0"
+                        partnerOnly ? "translate-x-4" : "translate-x-0"
                       }`}
                     />
                   </button>
@@ -543,9 +550,9 @@ export default function AuditLogsSection({
                   {/* Right: Clean Timestamp & Badges */}
                   <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-1.5 shrink-0 pt-2 sm:pt-0 border-t sm:border-0 border-border">
                     <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                      {(log.isMarketing || log.actorRole === "MARKETING_ADMIN" || log.userRole === "MARKETING_ADMIN" || Boolean((log.newValues as any)?.placedByRole === "MARKETING_ADMIN")) && (
+                      {(log.isMarketing || (log as any).isPartner || log.actorRole === "PARTNER" || log.actorRole === "PARTNER_ADMIN" || log.actorRole === "MARKETING_ADMIN" || log.userRole === "PARTNER" || log.userRole === "PARTNER_ADMIN" || log.userRole === "MARKETING_ADMIN" || Boolean((log.newValues as any)?.placedByRole === "PARTNER") || Boolean((log.newValues as any)?.placedByRole === "MARKETING_ADMIN")) && (
                         <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-primary/10 text-primary border border-primary/20">
-                          Marketing
+                          Partner
                         </span>
                       )}
                       <RenderActionBadge action={log.action} />

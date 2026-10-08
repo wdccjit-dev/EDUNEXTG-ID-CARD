@@ -121,6 +121,7 @@ export type ApiActivity = {
   userEmail?: string | null;
   userRole?: string | null;
   actorRole?: string | null;
+  isPartner?: boolean;
   isMarketing?: boolean;
   schoolId: number | null;
   schoolName?: string | null;
@@ -141,7 +142,7 @@ export type ApiAuthUser = {
   email: string | null;
   phone?: string | null;
   avatarUrl?: string | null;
-  role: "SUPER_ADMIN" | "SCHOOL_ADMIN" | "SCHOOL_OPERATOR" | "VIEWER" | "MARKETING_ADMIN";
+  role: "SUPER_ADMIN" | "SCHOOL_ADMIN" | "SCHOOL_OPERATOR" | "VIEWER" | "PARTNER" | "PARTNER_ADMIN" | "MARKETING_ADMIN";
   schoolId: number | null;
   schoolName?: string | null;
   isActive: boolean;
@@ -229,6 +230,7 @@ export const api = {
     list: () => request<ApiUser[]>("/api/users"),
     create: (body: Partial<ApiUser> & { openId?: string; password?: string }) => request<ApiUser>("/api/users", json(body)),
     update: (id: number, body: Partial<ApiUser>) => request<ApiUser>(`/api/users/${id}`, put(body)),
+    setStatus: (id: number, isActive: boolean) => request<{ success: true }>(`/api/users/${id}/status`, patch({ isActive })),
     delete: (id: number) => request<void>(`/api/users/${id}`, { method: "DELETE" }),
   },
   templates: {
@@ -357,10 +359,10 @@ export const api = {
     clear: () => request<{ success: true; message: string }>("/api/notifications", { method: "DELETE" }),
   },
   auditLogs: {
-    list: (params?: { schoolId?: number; marketing?: boolean | number }) => {
+    list: (params?: { schoolId?: number; marketing?: boolean | number; partner?: boolean | number }) => {
       const qs = new URLSearchParams();
       if (params?.schoolId) qs.set("schoolId", String(params.schoolId));
-      if (params?.marketing) qs.set("marketing", "1");
+      if (params?.marketing || params?.partner) qs.set("partner", "1");
       const q = qs.toString();
       return request<ApiActivity[]>(`/api/audit-logs${q ? `?${q}` : ""}`);
     },

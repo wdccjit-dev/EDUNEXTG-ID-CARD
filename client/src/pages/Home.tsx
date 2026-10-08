@@ -56,12 +56,14 @@ import {
   ShoppingCart,
   Bell,
   Package,
+  Handshake,
 } from "lucide-react";
 import SuperAdminProfileDialog from "@/components/SuperAdminProfileDialog";
 import AboutUsSection from "@/components/AboutUsSection";
 import SettingsSection from "@/components/SettingsSection";
 import AuditLogsSection from "@/components/AuditLogsSection";
 import MarketingOverview from "@/components/MarketingOverview";
+import PartnersSection from "@/components/PartnersSection";
 import CreateOrderView from "@/components/CreateOrderView";
 import OrderListView from "@/components/OrderListView";
 import RemovedCardsHistorySection from "@/components/RemovedCardsHistorySection";
@@ -131,6 +133,7 @@ const navItems = [
   { label: "Orders", icon: ShoppingCart },
   { label: "Reports", icon: Grid2X2 },
   { label: "Users", icon: Users },
+  { label: "Partners", icon: Handshake },
   { label: "Audit logs", icon: BookOpenCheck },
 ];
 
@@ -150,6 +153,7 @@ function initialsFor(name: string) {
 type NavLabel =
   | "Overview"
   | "Schools"
+  | "Partners"
   | "ID card templates"
   | "ID card requests"
   | "Approved cards"
@@ -322,7 +326,7 @@ export default function Home({
   initialNav = "Overview",
 }: {
   authenticatedUser: ApiAuthUser;
-  portal: "admin" | "school" | "marketing";
+  portal: "admin" | "school" | "partner" | "marketing";
   initialNav?: string;
 }) {
   const [authenticatedUser, setAuthenticatedUser] = useState<ApiAuthUser>(initialAuthenticatedUser);
@@ -355,24 +359,25 @@ export default function Home({
     }
   }, [initialNav]);
 
-  // Guard for marketing admin & school portal navigation
+  // Guard for partner & school portal navigation
   useEffect(() => {
-    if (portal === "marketing") {
-      const allowed = ["Overview", "Orders", "Create Order", "Order List", "Settings", "About Us"];
+    if (portal === "marketing" || portal === "partner") {
+      const allowed = ["Overview", "Schools", "Orders", "Create Order", "Order List", "Settings", "About Us"];
       if (!allowed.includes(activeNav)) {
         setActiveNav("Overview");
       }
     } else if (portal === "school") {
-      if (activeNav === "Reports") {
+      if (activeNav === "Reports" || activeNav === "Partners") {
         setActiveNav("Overview");
       }
     }
   }, [portal, activeNav]);
 
   const visibleNavItems =
-    portal === "marketing"
+    portal === "marketing" || portal === "partner"
       ? [
           { label: "Overview", icon: LayoutDashboard },
+          { label: "Schools", icon: Building2 },
           { label: "Orders", icon: ShoppingCart },
         ]
       : portal === "admin"
@@ -452,7 +457,7 @@ export default function Home({
   const [userNameInput, setUserNameInput] = useState("");
   const [userEmailInput, setUserEmailInput] = useState("");
   const [userPasswordInput, setUserPasswordInput] = useState("");
-  const [userRoleInput, setUserRoleInput] = useState<"SUPER_ADMIN" | "SCHOOL_ADMIN" | "MARKETING_ADMIN">("SCHOOL_ADMIN");
+  const [userRoleInput, setUserRoleInput] = useState<"SUPER_ADMIN" | "SCHOOL_ADMIN" | "PARTNER">("SCHOOL_ADMIN");
   const [userSchoolIdInput, setUserSchoolIdInput] = useState<string>("");
   const [userFormErrors, setUserFormErrors] = useState<Partial<Record<"name" | "email" | "password" | "schoolId", string>>>({});
 
@@ -675,8 +680,13 @@ export default function Home({
   };
 
   const openCreateSchool = () => {
-    if (authenticatedUser.role !== "SUPER_ADMIN") {
-      return toast.error("Only Super Admins can manage schools");
+    if (
+      authenticatedUser.role !== "SUPER_ADMIN" &&
+      authenticatedUser.role !== "PARTNER" &&
+      (authenticatedUser.role as string) !== "PARTNER_ADMIN" &&
+      (authenticatedUser.role as string) !== "MARKETING_ADMIN"
+    ) {
+      return toast.error("Only Administrators and Partners can add schools");
     }
     setEditingSchool(null);
     setSchoolNameInput("");
@@ -688,8 +698,13 @@ export default function Home({
   };
 
   const handleEditSchool = (school: ApiSchool) => {
-    if (authenticatedUser.role !== "SUPER_ADMIN") {
-      return toast.error("Only Super Admins can manage schools");
+    if (
+      authenticatedUser.role !== "SUPER_ADMIN" &&
+      authenticatedUser.role !== "PARTNER" &&
+      (authenticatedUser.role as string) !== "PARTNER_ADMIN" &&
+      (authenticatedUser.role as string) !== "MARKETING_ADMIN"
+    ) {
+      return toast.error("Only Administrators and Partners can edit schools");
     }
     setEditingSchool(school);
     setSchoolNameInput(school.name);
@@ -928,8 +943,10 @@ export default function Home({
     setUserEmailInput(user.email || "");
     setUserPasswordInput(""); // Blank = keep existing password
     setUserRoleInput(
-      user.role === "SUPER_ADMIN" || user.role === "SCHOOL_ADMIN" || user.role === "MARKETING_ADMIN"
-        ? user.role
+      user.role === "SUPER_ADMIN"
+        ? "SUPER_ADMIN"
+        : user.role === "PARTNER" || (user.role as string) === "PARTNER_ADMIN" || (user.role as string) === "MARKETING_ADMIN"
+        ? "PARTNER"
         : "SCHOOL_ADMIN"
     );
     setUserSchoolIdInput(user.schoolId ? String(user.schoolId) : schools[0] ? String(schools[0].id) : "");
@@ -1446,7 +1463,7 @@ export default function Home({
                 </span>
               </div>
               <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#7fa09c] mt-0.5">
-                {portal === "admin" ? "admin console" : portal === "marketing" ? "marketing portal" : "school portal"}
+                {portal === "admin" ? "admin console" : (portal === "partner" || portal === "marketing") ? "partner portal" : "school portal"}
               </div>
             </div>
           </div>
@@ -1660,6 +1677,7 @@ export default function Home({
 
             {/* School Users Indicator */}
             {portal !== "marketing" &&
+              portal !== "partner" &&
               authenticatedUser.role === "SCHOOL_ADMIN" &&
               (authenticatedUser.schoolName || authenticatedUser.schoolId) && (
                 <div className="hidden items-center gap-2 rounded-xl border border-primary/20 bg-primary/10 px-3 py-1.5 text-xs font-extrabold text-primary sm:flex">
@@ -1717,7 +1735,7 @@ export default function Home({
                     type="button"
                     onClick={() => {
                       setProfileMenuOpen(false);
-                      if (authenticatedUser.role === "SUPER_ADMIN" || authenticatedUser.role === "MARKETING_ADMIN") {
+                      if (authenticatedUser.role === "SUPER_ADMIN" || authenticatedUser.role === "PARTNER" || (authenticatedUser.role as string) === "PARTNER_ADMIN" || (authenticatedUser.role as string) === "MARKETING_ADMIN") {
                         setProfileModalOpen(true);
                       } else {
                         toast.info("Profile details are managed by your administrator.");
@@ -1748,7 +1766,7 @@ export default function Home({
 
         <div className="mx-auto max-w-[1440px] px-4 pb-12 pt-6 sm:px-6 lg:px-9">
           {activeNav === "Overview" ? (
-            portal === "marketing" ? (
+            portal === "marketing" || portal === "partner" ? (
               <MarketingOverview
                 user={authenticatedUser}
                 onNavigate={(tab) => goTo(tab)}
@@ -2441,13 +2459,18 @@ export default function Home({
             <AboutUsSection />
           ) : activeNav === "Settings" ? (
             <SettingsSection />
+          ) : activeNav === "Partners" ? (
+            <PartnersSection
+              currentUser={authenticatedUser}
+              onNavigateToOrders={() => goTo("Order List")}
+            />
           ) : activeNav === "Create Order" ? (
             <CreateOrderView
               user={authenticatedUser}
               schools={schools}
               activeSchool={currentActiveSchool}
               onSuccess={() => goTo("Order List")}
-              onCancel={() => goTo(portal === "marketing" ? "Overview" : "Order List")}
+              onCancel={() => goTo(portal === "marketing" || portal === "partner" ? "Overview" : "Order List")}
             />
           ) : activeNav === "Order List" ? (
             <OrderListView
@@ -2520,8 +2543,8 @@ export default function Home({
         </div>
       </main>
 
-      {/* Super Admin & Marketing Admin Profile Management Dialog */}
-      {(authenticatedUser.role === "SUPER_ADMIN" || authenticatedUser.role === "MARKETING_ADMIN") && (
+      {/* Super Admin & Partner Admin Profile Management Dialog */}
+      {(authenticatedUser.role === "SUPER_ADMIN" || authenticatedUser.role === "PARTNER" || (authenticatedUser.role as string) === "PARTNER_ADMIN" || (authenticatedUser.role as string) === "MARKETING_ADMIN") && (
         <SuperAdminProfileDialog
           open={profileModalOpen}
           onOpenChange={setProfileModalOpen}
@@ -2702,7 +2725,7 @@ export default function Home({
               <DialogDescription>
                 {editingUser
                   ? "Update user details, role assignment, or change password."
-                  : "Create an administrator, school administrator, or marketing admin account."}
+                  : "Create an administrator, school administrator, or partner account."}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
@@ -2800,7 +2823,7 @@ export default function Home({
                   <SelectContent>
                     <SelectItem value="SUPER_ADMIN">Admin (SUPER_ADMIN)</SelectItem>
                     <SelectItem value="SCHOOL_ADMIN">School Admin (SCHOOL_ADMIN)</SelectItem>
-                    <SelectItem value="MARKETING_ADMIN">Marketing Admin (MARKETING_ADMIN)</SelectItem>
+                    <SelectItem value="PARTNER">Partner (PARTNER)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -3924,7 +3947,13 @@ function ModuleView({
 
   const filteredUsers = useMemo(() => {
     return users
-      .filter((u) => userRoleFilter === "All" || u.role === userRoleFilter)
+      .filter((u) => {
+        if (userRoleFilter === "All") return true;
+        if (userRoleFilter === "PARTNER") {
+          return u.role === "PARTNER" || (u.role as string) === "PARTNER_ADMIN" || (u.role as string) === "MARKETING_ADMIN";
+        }
+        return u.role === userRoleFilter;
+      })
       .filter(
         (u) =>
           !searchTerm ||
@@ -4047,7 +4076,11 @@ function ModuleView({
           )}
 
           {((isRequests && authenticatedUser.role === "SUPER_ADMIN") ||
-            (isSchools && authenticatedUser.role === "SUPER_ADMIN") ||
+            (isSchools &&
+              (authenticatedUser.role === "SUPER_ADMIN" ||
+                authenticatedUser.role === "PARTNER" ||
+                (authenticatedUser.role as string) === "PARTNER_ADMIN" ||
+                (authenticatedUser.role as string) === "MARKETING_ADMIN")) ||
             (isTemplates && authenticatedUser.role === "SUPER_ADMIN") ||
             (isUsers && authenticatedUser.role === "SUPER_ADMIN")) && (
               <Button
@@ -4888,7 +4921,10 @@ function ModuleView({
                       </td>
                       <td className="px-5 py-4 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1.5">
-                          {authenticatedUser.role === "SUPER_ADMIN" && (
+                          {(authenticatedUser.role === "SUPER_ADMIN" ||
+                            authenticatedUser.role === "PARTNER" ||
+                            (authenticatedUser.role as string) === "PARTNER_ADMIN" ||
+                            (authenticatedUser.role as string) === "MARKETING_ADMIN") && (
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <button
@@ -4900,13 +4936,15 @@ function ModuleView({
                                 </button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="w-36 bg-card p-1 rounded-xl shadow-lg border border-border">
-                                <DropdownMenuItem
-                                  onClick={() => onGenerateCredentials?.(school)}
-                                  className="flex items-center gap-2 px-2.5 py-2 text-xs font-semibold text-primary hover:bg-primary/10 rounded-lg cursor-pointer"
-                                >
-                                  <KeyRound className="h-3.5 w-3.5" />
-                                  View
-                                </DropdownMenuItem>
+                                {authenticatedUser.role === "SUPER_ADMIN" && (
+                                  <DropdownMenuItem
+                                    onClick={() => onGenerateCredentials?.(school)}
+                                    className="flex items-center gap-2 px-2.5 py-2 text-xs font-semibold text-primary hover:bg-primary/10 rounded-lg cursor-pointer"
+                                  >
+                                    <KeyRound className="h-3.5 w-3.5" />
+                                    View
+                                  </DropdownMenuItem>
+                                )}
                                 <DropdownMenuItem
                                   onClick={() => onEditSchool?.(school)}
                                   className="flex items-center gap-2 px-2.5 py-2 text-xs font-semibold text-foreground hover:bg-muted rounded-lg cursor-pointer"
@@ -4914,13 +4952,15 @@ function ModuleView({
                                   <FileEdit className="h-3.5 w-3.5" />
                                   Edit
                                 </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => onDeleteSchool?.(school.id, school.name)}
-                                  className="flex items-center gap-2 px-2.5 py-2 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg cursor-pointer"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                  Delete
-                                </DropdownMenuItem>
+                                {authenticatedUser.role === "SUPER_ADMIN" && (
+                                  <DropdownMenuItem
+                                    onClick={() => onDeleteSchool?.(school.id, school.name)}
+                                    className="flex items-center gap-2 px-2.5 py-2 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg cursor-pointer"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           )}
@@ -5015,7 +5055,7 @@ function ModuleView({
             <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-muted/30 border-b border-border">
               <div className="flex items-center gap-1.5">
                 <span className="text-xs font-bold text-muted-foreground mr-1">Role:</span>
-                {["All", "SUPER_ADMIN", "SCHOOL_ADMIN", "MARKETING_ADMIN", "VIEWER"].map((role) => (
+                {["All", "SUPER_ADMIN", "SCHOOL_ADMIN", "PARTNER", "VIEWER"].map((role) => (
                   <button
                     key={role}
                     onClick={() => {
@@ -5027,7 +5067,7 @@ function ModuleView({
                       : "bg-muted text-muted-foreground hover:bg-muted/80"
                       }`}
                   >
-                    {role === "All" ? "All Roles" : role === "MARKETING_ADMIN" ? "Marketing Admin" : role.replace(/_/g, " ")}
+                    {role === "All" ? "All Roles" : role === "PARTNER" ? "Partner" : role === "MARKETING_ADMIN" ? "Partner" : role.replace(/_/g, " ")}
                   </button>
                 ))}
               </div>
@@ -5068,12 +5108,12 @@ function ModuleView({
                       tone={
                         user.role === "SUPER_ADMIN"
                           ? "indigo"
-                          : user.role === "MARKETING_ADMIN"
+                          : user.role === "PARTNER" || (user.role as string) === "PARTNER_ADMIN" || (user.role as string) === "MARKETING_ADMIN"
                           ? "yellow"
                           : "teal"
                       }
                     >
-                      {user.role === "MARKETING_ADMIN" ? "Marketing Admin" : user.role.replace(/_/g, " ")}
+                      {user.role === "PARTNER" || (user.role as string) === "PARTNER_ADMIN" || (user.role as string) === "MARKETING_ADMIN" ? "Partner" : user.role.replace(/_/g, " ")}
                     </StatusPill>
 
                     {authenticatedUser.role === "SUPER_ADMIN" && (

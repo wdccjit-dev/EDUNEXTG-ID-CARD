@@ -44,8 +44,8 @@ export default function SuperAdminProfileDialog({
   currentUser,
   onProfileUpdated,
 }: SuperAdminProfileDialogProps) {
-  // Allow SUPER_ADMIN and MARKETING_ADMIN
-  if (currentUser.role !== "SUPER_ADMIN" && currentUser.role !== "MARKETING_ADMIN") {
+  // Allow SUPER_ADMIN, PARTNER, and legacy MARKETING_ADMIN
+  if (currentUser.role !== "SUPER_ADMIN" && currentUser.role !== "PARTNER" && currentUser.role !== "PARTNER_ADMIN" && currentUser.role !== "MARKETING_ADMIN") {
     return null;
   }
 

@@ -4,114 +4,48 @@ import mysql from "mysql2/promise";
 async function purgeTestArtifacts() {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
-    throw new Error("DATABASE_URL is required to clean up database test artifacts");
+    return;
   }
 
+  let conn;
   try {
-    const conn = await mysql.createConnection(databaseUrl);
+    conn = await mysql.createConnection(databaseUrl);
+    await conn.execute("SET FOREIGN_KEY_CHECKS = 0;");
 
-    await conn.execute(`
-      DELETE FROM password_resets 
-      WHERE user_id IN (
-        SELECT id FROM users 
-        WHERE email LIKE '%@test.local' 
-           OR openId LIKE '%test%' 
-           OR openId LIKE '%sec_admin%' 
-           OR openId LIKE '%school_a%' 
-           OR openId LIKE '%school_b%' 
-           OR openId LIKE '%operator_a%' 
-           OR openId LIKE '%viewer_a%'
-      )
-    `);
+    // 1. Delete all test orders
+    await conn.execute("DELETE FROM orders;");
 
-    await conn.execute(`
-      DELETE FROM audit_logs 
-      WHERE user_id IN (
-        SELECT id FROM users 
-        WHERE email LIKE '%@test.local' 
-           OR openId LIKE '%test%' 
-           OR openId LIKE '%sec_admin%' 
-           OR openId LIKE '%school_a%' 
-           OR openId LIKE '%school_b%' 
-           OR openId LIKE '%operator_a%' 
-           OR openId LIKE '%viewer_a%'
-      )
-    `);
+    // 2. Delete test card records & history
+    await conn.execute("DELETE FROM removed_cards_history;");
+    await conn.execute("DELETE FROM approval_history;");
+    await conn.execute("DELETE FROM id_card_files;");
+    await conn.execute("DELETE FROM id_card_data;");
+    await conn.execute("DELETE FROM id_cards;");
+    await conn.execute("DELETE FROM idCardRequests;");
 
-    await conn.execute(`
-      DELETE FROM users 
-      WHERE email LIKE '%@test.local' 
-         OR openId LIKE '%test%' 
-         OR openId LIKE '%sec_admin%' 
-         OR openId LIKE '%school_a%' 
-         OR openId LIKE '%school_b%' 
-         OR openId LIKE '%operator_a%' 
-         OR openId LIKE '%viewer_a%'
-    `);
+    // 3. Delete test template elements & templates
+    await conn.execute("DELETE FROM template_elements WHERE template_id != 1;");
+    await conn.execute("DELETE FROM school_templates WHERE school_id != 1 OR template_id != 1;");
+    await conn.execute("DELETE FROM idCardTemplates WHERE id != 1;");
 
-    await conn.execute(`
-      DELETE FROM notifications 
-      WHERE message LIKE '%test%' OR title LIKE '%test%' OR title LIKE '%Test%'
-    `);
+    // 4. Delete password resets, audit logs, and notifications
+    await conn.execute("DELETE FROM password_resets;");
+    await conn.execute("DELETE FROM audit_logs;");
+    await conn.execute("DELETE FROM notifications;");
 
-    await conn.execute(`
-      DELETE FROM removed_cards_history 
-      WHERE school_id IN (
-        SELECT id FROM schools WHERE email LIKE '%@test.local' OR shortCode LIKE 'ST%' OR shortCode LIKE 'SCA%' OR shortCode LIKE 'SCB%' OR shortCode LIKE 'UA%' OR shortCode LIKE 'UB%' OR name LIKE '%Test%'
-      ) OR removed_by_user_id IN (
-        SELECT id FROM users WHERE email LIKE '%@test.local' OR openId LIKE '%test%' OR openId LIKE '%mkt%'
-      )
-    `).catch(() => {});
+    // 5. Delete test users (keep primary administrator #1 and school admin #2)
+    await conn.execute("DELETE FROM users WHERE id NOT IN (1, 2);");
 
-    await conn.execute(`
-      DELETE FROM orders 
-      WHERE school_id IN (
-        SELECT id FROM schools WHERE email LIKE '%@test.local' OR shortCode LIKE 'ST%' OR shortCode LIKE 'SCA%' OR shortCode LIKE 'SCB%' OR shortCode LIKE 'UA%' OR shortCode LIKE 'UB%' OR name LIKE '%Test%'
-      ) OR placed_by_user_id IN (
-        SELECT id FROM users WHERE email LIKE '%@test.local' OR openId LIKE '%test%' OR openId LIKE '%mkt%'
-      )
-    `).catch(() => {});
+    // 6. Delete test schools (keep primary school #1)
+    await conn.execute("DELETE FROM schools WHERE id != 1;");
 
-    await conn.execute(`
-      DELETE FROM idCardData WHERE idCardId IN (
-        SELECT id FROM idCards WHERE schoolId IN (
-          SELECT id FROM schools WHERE email LIKE '%@test.local' OR shortCode LIKE 'ST%' OR shortCode LIKE 'SCA%' OR shortCode LIKE 'SCB%' OR shortCode LIKE 'UA%' OR shortCode LIKE 'UB%' OR name LIKE '%Test%'
-        )
-      )
-    `).catch(() => {});
-
-    await conn.execute(`
-      DELETE FROM idCards WHERE schoolId IN (
-        SELECT id FROM schools WHERE email LIKE '%@test.local' OR shortCode LIKE 'ST%' OR shortCode LIKE 'SCA%' OR shortCode LIKE 'SCB%' OR shortCode LIKE 'UA%' OR shortCode LIKE 'UB%' OR name LIKE '%Test%'
-      )
-    `).catch(() => {});
-
-    await conn.execute(`
-      DELETE FROM idCardRequests WHERE schoolId IN (
-        SELECT id FROM schools WHERE email LIKE '%@test.local' OR shortCode LIKE 'ST%' OR shortCode LIKE 'SCA%' OR shortCode LIKE 'SCB%' OR shortCode LIKE 'UA%' OR shortCode LIKE 'UB%' OR name LIKE '%Test%'
-      )
-    `).catch(() => {});
-
-    await conn.execute(`
-      DELETE FROM schoolTemplates WHERE schoolId IN (
-        SELECT id FROM schools WHERE email LIKE '%@test.local' OR shortCode LIKE 'ST%' OR shortCode LIKE 'SCA%' OR shortCode LIKE 'SCB%' OR shortCode LIKE 'UA%' OR shortCode LIKE 'UB%' OR name LIKE '%Test%'
-      )
-    `).catch(() => {});
-
-    await conn.execute(`
-      DELETE FROM schools 
-      WHERE email LIKE '%@test.local' 
-         OR shortCode LIKE 'ST%' 
-         OR shortCode LIKE 'SCA%' 
-         OR shortCode LIKE 'SCB%' 
-         OR shortCode LIKE 'UA%' 
-         OR shortCode LIKE 'UB%' 
-         OR name LIKE '%Test%'
-    `);
-
-    await conn.end();
+    await conn.execute("SET FOREIGN_KEY_CHECKS = 1;");
   } catch (err) {
     console.warn("[Test cleanup] Could not purge test artifacts:", err);
+  } finally {
+    if (conn) {
+      await conn.end();
+    }
   }
 }
 

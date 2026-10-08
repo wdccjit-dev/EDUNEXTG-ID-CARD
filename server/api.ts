@@ -37,9 +37,11 @@ const router = Router();
 const adminRoles = new Set(["SUPER_ADMIN"]);
 const schoolManagerRoles = new Set(["SUPER_ADMIN", "SCHOOL_ADMIN"]);
 const schoolWriteRoles = new Set(["SUPER_ADMIN", "SCHOOL_ADMIN", "SCHOOL_OPERATOR"]);
-const marketingRoles = new Set(["MARKETING_ADMIN"]);
-const orderRoles = new Set(["SUPER_ADMIN", "SCHOOL_ADMIN", "MARKETING_ADMIN"]);
-const profileRoles = new Set(["SUPER_ADMIN", "MARKETING_ADMIN"]);
+const partnerRoles = new Set(["PARTNER", "PARTNER_ADMIN", "MARKETING_ADMIN"]);
+const schoolCreateRoles = new Set(["SUPER_ADMIN", "PARTNER", "PARTNER_ADMIN", "MARKETING_ADMIN"]);
+const marketingRoles = partnerRoles;
+const orderRoles = new Set(["SUPER_ADMIN", "SCHOOL_ADMIN", "PARTNER", "PARTNER_ADMIN", "MARKETING_ADMIN"]);
+const profileRoles = new Set(["SUPER_ADMIN", "PARTNER", "PARTNER_ADMIN", "MARKETING_ADMIN"]);
 
 function detectImageMimeType(buffer: Buffer): "image/png" | "image/jpeg" | "image/webp" | "image/gif" | null {
   if (buffer.length < 12) return null;
@@ -116,13 +118,13 @@ function canWriteSchool(user: User, schoolId?: number) {
 }
 
 function canReadSchool(user: User, schoolId?: number) {
-  return adminRoles.has(user.role) || (user.schoolId !== null && user.schoolId === schoolId);
+  return adminRoles.has(user.role) || partnerRoles.has(user.role) || (user.schoolId !== null && user.schoolId === schoolId);
 }
 
 function requestedSchoolId(user: User, value: unknown) {
   const id = Number(value);
   if (!Number.isInteger(id) || id <= 0) return null;
-  return adminRoles.has(user.role) ? id : user.schoolId === id ? id : null;
+  return adminRoles.has(user.role) || partnerRoles.has(user.role) ? id : user.schoolId === id ? id : null;
 }
 
 async function audit(user: User, action: string, entityType: string, entityId: number | null, schoolId: number | null, newValues?: unknown) {
@@ -245,10 +247,10 @@ router.post("/auth/reset-password", async (req, res) => { try { const token = St
 
 router.use(auth);
 
-// Restrict MARKETING_ADMIN to auth, profile, notifications, orders, and about
+// Restrict Partner to auth, profile, notifications, orders, schools, and about
 router.use((req, res, next) => {
   const user = currentUser(res);
-  if (user && marketingRoles.has(user.role)) {
+  if (user && partnerRoles.has(user.role)) {
     const p = req.path;
     const isAllowed =
       p === "/profile" ||
@@ -257,10 +259,12 @@ router.use((req, res, next) => {
       p.startsWith("/notifications/") ||
       p === "/orders" ||
       p.startsWith("/orders/") ||
+      p === "/schools" ||
+      p.startsWith("/schools/") ||
       p === "/about";
 
     if (!isAllowed) {
-      return res.status(403).json({ error: "Insufficient permissions for marketing admin" });
+      return res.status(403).json({ error: "Insufficient permissions for partner" });
     }
   }
   next();
@@ -489,7 +493,7 @@ router.get("/schools", async (_req, res) => {
     const db = await getDb();
     if (!db) return res.status(503).json({ error: "Database not available" });
     const user = currentUser(res);
-    const rows = adminRoles.has(user.role)
+    const rows = adminRoles.has(user.role) || partnerRoles.has(user.role)
       ? await db.select().from(schools).orderBy(desc(schools.createdAt))
       : user.schoolId
       ? await db.select().from(schools).where(eq(schools.id, user.schoolId))
@@ -501,7 +505,7 @@ router.get("/schools", async (_req, res) => {
   }
 });
 
-router.post("/schools", requireRole(adminRoles), async (req, res) => {
+router.post("/schools", requireRole(schoolCreateRoles), async (req, res) => {
   try {
     const db = await getDb();
     if (!db) return res.status(503).json({ error: "Database not available" });
@@ -713,8 +717,8 @@ const handleUpdateSchool = async (req: Request, res: Response) => {
   } catch (e) { fail(res, e); }
 };
 
-router.put("/schools/:id", requireRole(adminRoles), handleUpdateSchool);
-router.patch("/schools/:id", requireRole(adminRoles), handleUpdateSchool);
+router.put("/schools/:id", requireRole(schoolCreateRoles), handleUpdateSchool);
+router.patch("/schools/:id", requireRole(schoolCreateRoles), handleUpdateSchool);
 
 const handleSchoolStatusUpdate = async (req: any, res: any) => {
   try {
@@ -857,10 +861,10 @@ router.post("/users", requireRole(adminRoles), async (req, res) => {
   try {
     const actor = currentUser(res);
     const role = req.body.role;
-    const allowedRoles = ["SUPER_ADMIN", "SCHOOL_ADMIN", "MARKETING_ADMIN"];
+    const allowedRoles = ["SUPER_ADMIN", "SCHOOL_ADMIN", "PARTNER", "PARTNER_ADMIN", "MARKETING_ADMIN"];
     if (!role || !allowedRoles.includes(role)) {
       return res.status(400).json({
-        error: "Only Admin (SUPER_ADMIN), School Admin (SCHOOL_ADMIN), and Marketing Admin (MARKETING_ADMIN) can be created.",
+        error: "Only Admin (SUPER_ADMIN), School Admin (SCHOOL_ADMIN), and Partner (PARTNER) can be created.",
       });
     }
     if (String(req.body.password ?? "").length < 8) {
@@ -3101,19 +3105,28 @@ router.get("/audit-logs", async (req, res) => {
           if (!nv.studentName && detail.studentName) nv.studentName = detail.studentName;
         }
       }
-      const isMarketing =
+      const isPartner =
+        row.actorRole === "PARTNER" ||
+        row.actorRole === "PARTNER_ADMIN" ||
         row.actorRole === "MARKETING_ADMIN" ||
+        row.userRole === "PARTNER" ||
+        row.userRole === "PARTNER_ADMIN" ||
         row.userRole === "MARKETING_ADMIN" ||
-        (nv && typeof nv === "object" && nv.placedByRole === "MARKETING_ADMIN");
+        (nv && typeof nv === "object" && (nv.placedByRole === "PARTNER" || nv.placedByRole === "PARTNER_ADMIN" || nv.placedByRole === "MARKETING_ADMIN"));
       return {
         ...row,
-        isMarketing,
+        isPartner,
+        isMarketing: isPartner,
         newValues: nv,
       };
     });
 
-    const isMarketingFilter = req.query.marketing === "1" || req.query.marketing === "true";
-    const filteredRows = isMarketingFilter ? enrichedRows.filter((r) => r.isMarketing) : enrichedRows;
+    const isPartnerFilter =
+      req.query.partner === "1" ||
+      req.query.partner === "true" ||
+      req.query.marketing === "1" ||
+      req.query.marketing === "true";
+    const filteredRows = isPartnerFilter ? enrichedRows.filter((r) => r.isPartner) : enrichedRows;
 
     if (req.query.export === "csv" || req.query.format === "csv") {
       const headers = ["Timestamp", "User", "Role", "Actor Role", "Action", "School", "Entity", "Details"];
@@ -3968,7 +3981,7 @@ router.get("/orders", requireRole(orderRoles), async (req, res) => {
     } else if (user.role === "SCHOOL_ADMIN") {
       if (!user.schoolId) return res.json({ items: [], total: 0, page: 1, pageSize: 10 });
       conditions.push(eq(orders.schoolId, user.schoolId));
-    } else if (user.role === "MARKETING_ADMIN") {
+    } else if (user.role === "PARTNER" || user.role === "PARTNER_ADMIN" || user.role === "MARKETING_ADMIN") {
       conditions.push(eq(orders.placedByUserId, user.id));
     }
 
@@ -3981,7 +3994,11 @@ router.get("/orders", requireRole(orderRoles), async (req, res) => {
     }
 
     if (req.query.placedByRole) {
-      conditions.push(eq(orders.placedByRole, String(req.query.placedByRole)));
+      if (req.query.placedByRole === "PARTNER" || req.query.placedByRole === "MARKETING_ADMIN") {
+        conditions.push(or(eq(orders.placedByRole, "PARTNER"), eq(orders.placedByRole, "PARTNER_ADMIN"), eq(orders.placedByRole, "MARKETING_ADMIN")));
+      } else {
+        conditions.push(eq(orders.placedByRole, String(req.query.placedByRole)));
+      }
     }
 
     if (req.query.from) {
@@ -4115,7 +4132,7 @@ router.get("/orders/:id", requireRole(orderRoles), async (req, res) => {
     if (user.role === "SCHOOL_ADMIN" && order.schoolId === user.schoolId) {
       return res.json(order);
     }
-    if (user.role === "MARKETING_ADMIN" && order.placedByUserId === user.id) {
+    if ((user.role === "PARTNER" || user.role === "PARTNER_ADMIN" || user.role === "MARKETING_ADMIN") && order.placedByUserId === user.id) {
       return res.json(order);
     }
 

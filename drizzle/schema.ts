@@ -13,7 +13,7 @@ import {
 } from "drizzle-orm/mysql-core";
 import { relations } from "drizzle-orm";
 
-export const userRoleValues = ["SUPER_ADMIN", "SCHOOL_ADMIN", "SCHOOL_OPERATOR", "VIEWER", "MARKETING_ADMIN"] as const;
+export const userRoleValues = ["SUPER_ADMIN", "SCHOOL_ADMIN", "SCHOOL_OPERATOR", "VIEWER", "PARTNER", "PARTNER_ADMIN", "MARKETING_ADMIN"] as const;
 export const orderTypeValues = ["STUDENT", "STAFF"] as const;
 export const printSideValues = ["SINGLE", "DOUBLE"] as const;
 export const cardMaterialValues = ["PVC_STANDARD", "PVC_PREMIUM"] as const;
